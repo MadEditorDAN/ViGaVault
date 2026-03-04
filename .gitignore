@@ -3,9 +3,10 @@
 __pycache__/
 *.py[cod]
 
-# Tes logs et bases de données
+# Tes logs et bases de données et images
 *.log
 VGVDB.csv
+images/
 
 # Dossier VS Code
 .vscode/
