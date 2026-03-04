@@ -1,12 +1,14 @@
 import sys
 import pandas as pd
 import os
+import re
+import requests
 from ViGaVault_Scan import LibraryManager
 from PySide6.QtWidgets import (QApplication, QMainWindow, QListWidget, QListWidgetItem, 
                              QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, 
                              QLineEdit, QComboBox, QDialog, QTextEdit, QFormLayout, QMessageBox)
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import Qt, QSize, QTimer
+from PySide6.QtGui import QPixmap, QIcon
 
 DB_FILE = "VGVDB.csv"
 
@@ -92,13 +94,19 @@ class Sidebar(QWidget):
         self.scan_input.setPlaceholderText("Nom du jeu à chercher...")
         self.scan_btn = QPushButton("Rechercher")
         self.scan_results = QListWidget()
+        self.scan_results.setIconSize(QSize(50, 70)) # Définit une taille visible pour les covers
+        
+        self.btns_layout = QHBoxLayout()
         self.btn_confirm = QPushButton("Valider le choix")
+        self.btn_cancel = QPushButton("Annuler")
+        self.btns_layout.addWidget(self.btn_confirm)
+        self.btns_layout.addWidget(self.btn_cancel)
         
         self.scan_layout.addWidget(QLabel("Scan Manuel"))
         self.scan_layout.addWidget(self.scan_input)
         self.scan_layout.addWidget(self.scan_btn)
         self.scan_layout.addWidget(self.scan_results)
-        self.scan_layout.addWidget(self.btn_confirm)
+        self.scan_layout.addLayout(self.btns_layout)
         
         self.layout.addWidget(self.scan_panel)
         self.scan_panel.hide() 
@@ -113,6 +121,7 @@ class Sidebar(QWidget):
         self.scan_btn.clicked.connect(self.parent.run_inline_search)
         self.scan_input.returnPressed.connect(self.parent.run_inline_search)
         self.btn_confirm.clicked.connect(self.parent.apply_inline_selection)
+        self.btn_cancel.clicked.connect(self.parent.cancel_inline_scan)
         self.scan_results.itemDoubleClicked.connect(self.parent.apply_inline_selection)
 
 class SelectionDialog(QDialog):
@@ -129,7 +138,7 @@ class SelectionDialog(QDialog):
             # On crée un item pour la liste
             item = QListWidgetItem(g.get('name', 'Unknown'))
             # On stocke l'objet jeu complet (g) dans les données de l'item (rôle 1)
-            item.setData(1, g) 
+            item.setData(Qt.UserRole, g) 
             self.list_widget.addItem(item)
             
         layout.addWidget(self.list_widget)
@@ -141,7 +150,7 @@ class SelectionDialog(QDialog):
     def get_selected_candidate(self):
         item = self.list_widget.currentItem()
         if item:
-            return item.data(1) # Récupère l'objet stocké
+            return item.data(Qt.UserRole) # Récupère l'objet stocké
         return None
 
 class GameCard(QWidget):
@@ -223,7 +232,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("ViGaVault Library")
         self.resize(1200, 800)
-        self.sort_desc = False
+        self.sort_desc = True
         
         # 1. Mise en place du layout principal (Horizontal)
         central_widget = QWidget()
@@ -247,6 +256,9 @@ class MainWindow(QMainWindow):
             platforms = ["Toutes"] + sorted(list(set(self.master_df['Platforms'].dropna().unique())))
             self.sidebar.combo_platform.addItems([p for p in platforms if p])
             
+            # Tri par défaut sur "Date de sortie"
+            self.sidebar.combo_sort.setCurrentIndex(1)
+            
             # Affichage initial
             self.apply_filters()
 
@@ -254,7 +266,12 @@ class MainWindow(QMainWindow):
         self.current_scan_game = game_data
         # On ne touche plus à filter_panel.hide() !
         self.sidebar.scan_panel.show() 
-        self.sidebar.scan_input.setText(game_data.get('Folder_Name'))
+        
+        # Nettoyage : retire l'année au début (ex: "1992 - Dune" -> "Dune")
+        raw_name = game_data.get('Folder_Name', '')
+        clean_name = re.sub(r'^\d{4}\s*-\s*', '', raw_name)
+        self.sidebar.scan_input.setText(clean_name)
+        
         self.sidebar.scan_results.clear()
         self.sidebar.scan_input.setFocus() # Donne le focus direct au champ
 
@@ -272,17 +289,37 @@ class MainWindow(QMainWindow):
         self.sidebar.scan_results.clear()
         for g in candidates:
             item = QListWidgetItem(g.get('name'))
-            item.setData(1, g)
+            item.setData(Qt.UserRole, g)
+            
+            # Récupération et affichage de la cover
+            if 'cover' in g and 'url' in g['cover']:
+                try:
+                    # URL IGDB commence par //, on ajoute https: et on prend une taille adaptée
+                    img_url = "https:" + g['cover']['url'].replace("t_thumb", "t_cover_small")
+                    data = requests.get(img_url, timeout=1).content
+                    pix = QPixmap()
+                    pix.loadFromData(data)
+                    item.setIcon(QIcon(pix))
+                except Exception:
+                    pass # On ignore silencieusement les erreurs d'image pour ne pas bloquer
+            
             self.sidebar.scan_results.addItem(item)
             
         if not candidates:
-            QMessageBox.information(self, "Info", "Aucun résultat trouvé.")
+            item = QListWidgetItem("Aucun résultat trouvé.")
+            item.setFlags(item.flags() & ~Qt.ItemIsEnabled) # Grise l'élément pour le rendre non-sélectionnable
+            self.sidebar.scan_results.addItem(item)
+
+    def cancel_inline_scan(self):
+        self.sidebar.scan_panel.hide()
+        self.sidebar.scan_results.clear()
+        self.sidebar.scan_input.clear()
 
     def apply_inline_selection(self):
         item = self.sidebar.scan_results.currentItem()
         if not item: return
         
-        chosen_game = item.data(1)
+        chosen_game = item.data(Qt.UserRole)
         manager = LibraryManager(r"\\madhdd02\Software\GAMES", "VGVDB.csv")
         manager.load_db()
         game_obj = manager.games.get(self.current_scan_game.get('Folder_Name'))
@@ -290,8 +327,25 @@ class MainWindow(QMainWindow):
         if game_obj.apply_candidate_data(chosen_game):
             manager.save_db()
             self.refresh_data()
-            self.sidebar.scan_panel.hide() # On cache juste le scan après validation
-            QMessageBox.information(self, "Succès", "Mise à jour terminée !")
+            
+            # Positionner la liste sur le jeu modifié
+            target_folder = self.current_scan_game.get('Folder_Name')
+            for i in range(self.list_widget.count()):
+                list_item = self.list_widget.item(i)
+                if list_item.data(Qt.UserRole) == target_folder:
+                    self.list_widget.scrollToItem(list_item)
+                    self.list_widget.setCurrentItem(list_item)
+                    break
+            
+            # Feedback visuel dans la liste au lieu du popup
+            self.sidebar.scan_results.clear()
+            item = QListWidgetItem("Mise à jour terminée !")
+            item.setTextAlignment(Qt.AlignCenter)
+            item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
+            self.sidebar.scan_results.addItem(item)
+            
+            # Fermeture automatique du panneau après 2 secondes
+            QTimer.singleShot(2000, self.cancel_inline_scan)
 
     def refresh_data(self):
         """Recharge le CSV et met à jour l'affichage"""
@@ -338,6 +392,7 @@ class MainWindow(QMainWindow):
             # C'est ici qu'il faut ajouter le ', self'
             card = GameCard(row.to_dict(), self) 
             item.setSizeHint(card.sizeHint())
+            item.setData(Qt.UserRole, row['Folder_Name']) # Stocke l'ID pour le scroll
             self.list_widget.addItem(item)
             self.list_widget.setItemWidget(item, card)
 
