@@ -1,0 +1,3 @@
+pandas
+pyside6
+requests

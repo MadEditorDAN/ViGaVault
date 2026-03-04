@@ -215,6 +215,9 @@ class GameCard(QWidget):
         # Utilise parent_window pour appeler la méthode de la MainWindow
         if hasattr(self.parent_window, 'start_inline_scan'):
             self.parent_window.start_inline_scan(self.data)
+            # Lancement automatique de la recherche pour gagner du temps
+            if hasattr(self.parent_window, 'run_inline_search'):
+                self.parent_window.run_inline_search()
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -251,7 +254,7 @@ class MainWindow(QMainWindow):
         self.current_scan_game = game_data
         # On ne touche plus à filter_panel.hide() !
         self.sidebar.scan_panel.show() 
-        self.sidebar.scan_input.setText(game_data.get('Clean_Title'))
+        self.sidebar.scan_input.setText(game_data.get('Folder_Name'))
         self.sidebar.scan_results.clear()
         self.sidebar.scan_input.setFocus() # Donne le focus direct au champ
 
