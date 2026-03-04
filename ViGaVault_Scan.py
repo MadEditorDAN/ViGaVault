@@ -111,7 +111,7 @@ class Game:
         # Note: 'release_dates.date' is essential here to get the Unix timestamp
         query = (f'search "{search_term}"; fields name, summary, genres.name, '
                  'involved_companies.company.name, involved_companies.developer, '
-                 'involved_companies.publisher, videos.video_id, release_dates.date, cover.url; limit 1;')
+                 'involved_companies.publisher, videos.video_id, release_dates.date, cover.url; where platforms = (6); limit 1;')
         
         try:
             response = requests.post(api_url, headers=headers, data=query, timeout=10)
@@ -135,8 +135,8 @@ class Game:
                     valid_dates = [d['date'] for d in dates if 'date' in d]
                     if valid_dates:
                         orig_ts = min(valid_dates)
-                        # Explicitly use utcfromtimestamp to format as YYYY-MM-DD
-                        self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%Y-%m-%d')
+                        # Explicitly use utcfromtimestamp to format as DD/MM/YYYY
+                        self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%d/%m/%Y')
                 
                 self.data['Image_Link'] = self._ensure_cover(g)
                 self.data['Status_Flag'] = 'OK'
@@ -164,7 +164,7 @@ class Game:
         # 2. Requête avec limite à 5 pour le scoring
         query = (f'search "{search_term}"; fields name, summary, genres.name, '
                  'involved_companies.company.name, involved_companies.developer, '
-                 'involved_companies.publisher, videos.video_id, release_dates.date, cover.url; limit 5;')
+                 'involved_companies.publisher, videos.video_id, release_dates.date, cover.url; where platforms = (6); limit 5;')
         
         try:
             response = requests.post(api_url, headers=headers, data=query, timeout=10)
@@ -217,7 +217,7 @@ class Game:
                     dates = g.get('release_dates', [])
                     if dates:
                         orig_ts = min([d['date'] for d in dates if 'date' in d])
-                        self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%Y-%m-%d')
+                        self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%d/%m/%Y')
                     
                     self.data['Image_Link'] = self._ensure_cover(g)
                     self.data['Status_Flag'] = 'OK'
@@ -236,7 +236,7 @@ class Game:
         headers = {"Client-ID": IGDB_CLIENT_ID, "Authorization": f"Bearer {token}"}
         query = (f'search "{search_term}"; fields name, summary, genres.name, '
                  'involved_companies.company.name, involved_companies.developer, '
-                 'involved_companies.publisher, videos.video_id, release_dates.date, cover.url; limit 20;')
+                 'involved_companies.publisher, videos.video_id, release_dates.date, cover.url; where platforms = (6); limit 20;')
         
         response = requests.post(api_url, headers=headers, data=query, timeout=10)
         
@@ -268,7 +268,7 @@ class Game:
         dates = g.get('release_dates', [])
         if dates:
             orig_ts = min([d['date'] for d in dates if 'date' in d])
-            self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%Y-%m-%d')
+            self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%d/%m/%Y')
         
         # Téléchargement forcé de l'image
         self.data['Image_Link'] = self._ensure_cover(g, force_download=True)
