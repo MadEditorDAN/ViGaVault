@@ -1,0 +1,10 @@
+# Fichiers Python
+__pycache__/
+*.py[cod]
+
+# Tes logs et bases de données
+*.log
+VGVDB.csv
+
+# Dossier VS Code
+.vscode/
