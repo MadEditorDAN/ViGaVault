@@ -236,7 +236,7 @@ class Game:
         headers = {"Client-ID": IGDB_CLIENT_ID, "Authorization": f"Bearer {token}"}
         query = (f'search "{search_term}"; fields name, summary, genres.name, '
                  'involved_companies.company.name, involved_companies.developer, '
-                 'involved_companies.publisher, videos.video_id, release_dates.date, cover.url; limit 10;')
+                 'involved_companies.publisher, videos.video_id, release_dates.date, cover.url; limit 20;')
         
         response = requests.post(api_url, headers=headers, data=query, timeout=10)
         

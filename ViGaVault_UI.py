@@ -6,7 +6,7 @@ import requests
 from ViGaVault_Scan import LibraryManager
 from PySide6.QtWidgets import (QApplication, QMainWindow, QListWidget, QListWidgetItem, 
                              QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, 
-                             QLineEdit, QComboBox, QDialog, QTextEdit, QFormLayout, QMessageBox)
+                             QLineEdit, QComboBox, QDialog, QTextEdit, QFormLayout, QMessageBox, QFrame)
 from PySide6.QtCore import Qt, QSize, QTimer
 from PySide6.QtGui import QPixmap, QIcon
 
@@ -83,12 +83,16 @@ class Sidebar(QWidget):
         
         self.btn_toggle_sort = QPushButton("⇅ Inverser l'ordre")
         self.filter_layout.addWidget(self.btn_toggle_sort)
-        self.filter_layout.addStretch()
-        self.layout.addWidget(self.filter_panel)
 
         # --- PANNEAU SCAN ---
         self.scan_panel = QWidget()
         self.scan_layout = QVBoxLayout(self.scan_panel)
+        
+        # Ligne de séparation
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
+        self.scan_layout.addWidget(line)
         
         self.scan_input = QLineEdit()
         self.scan_input.setPlaceholderText("Nom du jeu à chercher...")
@@ -108,7 +112,9 @@ class Sidebar(QWidget):
         self.scan_layout.addWidget(self.scan_results)
         self.scan_layout.addLayout(self.btns_layout)
         
-        self.layout.addWidget(self.scan_panel)
+        self.filter_layout.addWidget(self.scan_panel)
+        self.filter_layout.addStretch()
+        self.layout.addWidget(self.filter_panel)
         self.scan_panel.hide() 
         
         # --- CONNEXIONS ---
@@ -267,9 +273,12 @@ class MainWindow(QMainWindow):
         # On ne touche plus à filter_panel.hide() !
         self.sidebar.scan_panel.show() 
         
-        # Nettoyage : retire l'année au début (ex: "1992 - Dune" -> "Dune")
+        # Nettoyage du nom de dossier pour la recherche
         raw_name = game_data.get('Folder_Name', '')
+        # 1. Retire l'année au début (ex: "1992 - Dune" -> "Dune")
         clean_name = re.sub(r'^\d{4}\s*-\s*', '', raw_name)
+        # 2. Retire la dernière paire de parenthèses (ex: "Portal (Steam)" -> "Portal")
+        clean_name = re.sub(r'\s*\([^)]*\)$', '', clean_name).strip()
         self.sidebar.scan_input.setText(clean_name)
         
         self.sidebar.scan_results.clear()
