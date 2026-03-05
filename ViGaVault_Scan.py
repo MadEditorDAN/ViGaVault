@@ -392,6 +392,8 @@ class LibraryManager:
                     (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'developers' LIMIT 1) as developers_json,
                     (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'publishers' LIMIT 1) as publishers_json,
                     (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'originalImages' LIMIT 1) as original_images_json,
+                    (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'videos' LIMIT 1) as videos_json,
+                    (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'media' LIMIT 1) as media_json,
                     (SELECT name FROM Products p JOIN ReleaseProperties rp ON p.id = rp.gameId WHERE rp.releaseKey = urp.releaseKey LIMIT 1) as product_name,
                     (SELECT title FROM LimitedDetails WHERE productId = (SELECT gameId FROM ReleaseProperties WHERE releaseKey = urp.releaseKey LIMIT 1) LIMIT 1) as ld_title,
                     (SELECT description FROM Details d JOIN LimitedDetails ld ON d.limitedDetailsId = ld.id WHERE ld.productId = (SELECT gameId FROM ReleaseProperties WHERE releaseKey = urp.releaseKey LIMIT 1) LIMIT 1) as ld_summary,
@@ -430,7 +432,7 @@ class LibraryManager:
         # Création d'une map pour une recherche ultra-rapide par releaseKey
         key_to_game_map = {game.data.get('game_ID'): game for game in self.games.values() if game.data.get('game_ID')}
 
-        for releaseKey, meta_json, title_json, orig_title_json, summary_json, developers_json, publishers_json, original_images_json, product_name, ld_title, ld_summary, ld_release_date, ld_images, ld_videos in gog_games:
+        for releaseKey, meta_json, title_json, orig_title_json, summary_json, developers_json, publishers_json, original_images_json, videos_json, media_json, product_name, ld_title, ld_summary, ld_release_date, ld_images, ld_videos in gog_games:
             title = "Unknown"
             metadata = {}
             
@@ -640,22 +642,37 @@ class LibraryManager:
                         release_date = ld_release_date # On garde tel quel si échec (ex: juste l'année)
                 if release_date: game_obj.data['Original_Release_Date'] = release_date
 
-                # Trailer Link (Youtube)
+                folder_name_for_files = game_obj.data['Folder_Name']
+
+                # --- GESTION DES VIDÉOS (Trailer & Download) ---
+                # On rassemble toutes les sources potentielles de vidéos
+                video_sources = []
+                
+                # 1. meta (GOG)
+                if meta_data.get('videos'): video_sources.extend(meta_data['videos'])
+                
+                # 2. GamePiece 'videos'
+                if videos_json:
+                    v_data = safe_json_load(videos_json)
+                    if isinstance(v_data, list): video_sources.extend(v_data)
+                    elif isinstance(v_data, dict) and 'videos' in v_data: video_sources.extend(v_data['videos'])
+
+                # 3. LimitedDetails 'videos'
+                if ld_videos:
+                    v_data = safe_json_load(ld_videos)
+                    if isinstance(v_data, list): video_sources.extend(v_data)
+
+                # 4. GamePiece 'media'
+                if media_json:
+                    m_data = safe_json_load(media_json)
+                    if isinstance(m_data, dict) and 'videos' in m_data: video_sources.extend(m_data['videos'])
+
+                # --- A. Trailer Link (YouTube) ---
                 if not game_obj.data.get('Trailer_Link'):
-                    # 1. Depuis meta_data (GOG natif)
-                    videos = meta_data.get('videos', [])
-                    yt_video = next((v for v in videos if v.get('provider') == 'youtube'), None)
-                    
-                    # 2. Depuis ld_videos (Jeux externes)
-                    if not yt_video and ld_videos:
-                        v_data = safe_json_load(ld_videos)
-                        if isinstance(v_data, list):
-                            yt_video = next((v for v in v_data if v.get('provider') == 'youtube'), None)
-                    
-                    if yt_video and yt_video.get('video_id'):
+                    yt_video = next((v for v in video_sources if v.get('provider') == 'youtube' and v.get('video_id')), None)
+                    if yt_video:
                         game_obj.data['Trailer_Link'] = f"https://www.youtube.com/watch?v={yt_video.get('video_id')}"
 
-                folder_name_for_files = game_obj.data['Folder_Name']
                 # Téléchargement de la jaquette (toujours)
                 cover_url = meta_data.get('image')
                 
@@ -688,24 +705,21 @@ class LibraryManager:
                     else:
                         game_obj.data['Image_Link'] = save_path
 
-                # Téléchargement de la vidéo (toujours)
-                # On cherche une URL de fichier vidéo direct (.mp4)
+                # --- B. Téléchargement Vidéo (.mp4) ---
                 video_url = None
                 
-                # 1. Via meta_data (GOG)
-                videos = meta_data.get('videos', [])
-                if videos:
-                    video_url = next((v.get('video_url') for v in videos if 'gog' in v.get('provider', '') and v.get('video_url', '').endswith('.mp4')), None)
+                # Recherche dans les sources structurées
+                mp4_video = next((v for v in video_sources if v.get('video_url', '').endswith('.mp4') or v.get('url', '').endswith('.mp4')), None)
+                if mp4_video:
+                    video_url = mp4_video.get('video_url') or mp4_video.get('url')
                 
-                # 2. Via ld_videos (Externe)
-                if not video_url and ld_videos:
-                    v_data = safe_json_load(ld_videos)
-                    if isinstance(v_data, list):
-                        for v in v_data:
-                            url = v.get('video_url') or v.get('url')
-                            if url and url.endswith('.mp4'):
-                                video_url = url
-                                break
+                # Fallback : Recherche dans le résumé (HTML)
+                if not video_url and game_obj.data.get('Summary'):
+                    # Regex pour trouver src="...mp4"
+                    match = re.search(r'src="([^"]+\.mp4)"', game_obj.data['Summary'])
+                    if match:
+                        video_url = match.group(1)
+                        if video_url.startswith('//'): video_url = "https:" + video_url
 
                 if video_url:
                     video_save_path = os.path.join("videos", f"{folder_name_for_files}.mp4")
