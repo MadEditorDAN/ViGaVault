@@ -9,6 +9,7 @@ import sqlite3
 import json
 import argparse
 from datetime import datetime
+from urllib.parse import urlparse
 import difflib
 
 
@@ -42,6 +43,19 @@ def setup_logging():
         ]
     )
 setup_logging()
+
+def get_safe_filename(name):
+    """Nettoie un nom pour le rendre sûr pour un nom de fichier."""
+    # Remplacement des deux-points par un espace
+    safe_name = name.replace(':', ' ')
+    # On enlève tout ce qui n'est pas alphanumérique, espace, tiret, point, parenthèses, etc.
+    safe_name = re.sub(r'[^\w\s\-\.\(\)\[\]]', '', safe_name).strip()
+    # Remplace les espaces multiples par un seul
+    safe_name = re.sub(r'\s{2,}', ' ', safe_name).strip()
+    # Suppression du point final éventuel (problématique sous Windows)
+    safe_name = safe_name.rstrip('. ')
+    return safe_name
+
 
 def is_hidden(filepath):
     try:
@@ -134,12 +148,12 @@ class Game:
             return
 
         # Sinon, on regarde si une image existe déjà dans le dossier images
-        name = self.data.get('Folder_Name', '')
-        for ext in ['.jpg', '.png', '.jpeg']:
-            potential_path = os.path.join("images", f"{name}{ext}")
+        safe_name = get_safe_filename(self.data.get('Folder_Name', ''))
+        for ext in ['.jpg', '.png', '.jpeg', '.webp']:
+            potential_path = os.path.join("images", f"{safe_name}{ext}")
             if os.path.exists(potential_path):
                 self.data['Image_Link'] = potential_path
-                logging.info(f"    [IMAGE] Trouvée localement : {name}{ext}")
+                logging.info(f"    [IMAGE] Trouvée localement : {safe_name}{ext}")
                 return
 
     def _ensure_cover(self, game_info, force_download=False):
@@ -154,19 +168,59 @@ class Game:
             os.makedirs("images", exist_ok=True)
             # IGDB fournit une URL relative commençant par //, on rajoute https:
             cover_url = "https:" + game_info['cover']['url'].replace('t_thumb', 't_cover_big')
-            save_path = os.path.join("images", f"{self.data['Folder_Name']}.jpg")
+            
+            # Nettoyage strict pour le nom de fichier sur le disque
+            safe_filename = get_safe_filename(self.data.get('Folder_Name', ''))
+
+            # Détermination de l'extension
+            try:
+                path = urlparse(cover_url).path
+                ext = os.path.splitext(path)[1]
+                if not ext: ext = '.jpg' # IGDB est presque toujours en .jpg
+            except:
+                ext = '.jpg'
+
+            save_path = os.path.join("images", f"{safe_filename}{ext}")
             
             try:
                 response = requests.get(cover_url, stream=True)
                 if response.status_code == 200:
-                    with open(save_path, 'wb') as f:
-                        for chunk in response.iter_content(1024):
-                            f.write(chunk)
+                    with open(save_path, 'wb') as f: shutil.copyfileobj(response.raw, f)
                     logging.info(f"    [IMAGE OK] Téléchargée (forcée={force_download}) : {save_path}")
                     return save_path
             except Exception as e:
                 logging.error(f"    [IMAGE ERREUR] {e}")
         return ""
+
+    def refetch_cover(self, token):
+        """Fetches only the cover URL from IGDB and downloads the image if missing."""
+        game_id = self.data.get('game_ID', '')
+        if not game_id or not game_id.startswith('igdb_'):
+            logging.warning(f"    [COVER FETCH] Impossible de récupérer l'image pour '{self.data['Clean_Title']}', ID IGDB manquant.")
+            return False
+
+        igdb_id = game_id.replace('igdb_', '')
+        logging.info(f"    [COVER FETCH] Récupération de l'URL de l'image pour '{self.data['Clean_Title']}' (ID: {igdb_id})")
+
+        api_url = "https://api.igdb.com/v4/games"
+        headers = {"Client-ID": IGDB_CLIENT_ID, "Authorization": f"Bearer {token}"}
+        query = f'fields cover.url; where id = {igdb_id};'
+
+        try:
+            response = requests.post(api_url, headers=headers, data=query, timeout=10)
+            if response.status_code == 200 and response.json():
+                game_info = response.json()[0]
+                # On force le téléchargement car on est ici parce que l'image manque
+                new_path = self._ensure_cover(game_info, force_download=True)
+                if new_path:
+                    self.data['Image_Link'] = new_path
+                    return True
+            else:
+                logging.error(f"    [COVER FETCH ERROR] Impossible de trouver les infos pour l'ID {igdb_id}.")
+                return False
+        except Exception as e:
+            logging.error(f"    [COVER FETCH CRITICAL] Erreur réseau : {e}")
+            return False
 
     def fetch_metadata(self, token):
         # Utilisation prioritaire du Search_Title pour la requête API
@@ -300,40 +354,8 @@ class Game:
             logging.error(f"    [SMART SCAN CRITICAL] {e}")
             return False
 
-    def fetch_candidates(self, token, search_term):
-        search_term = str(search_term).strip()
-        # Log du début de la recherche
-        logging.info(f"    [MANUAL SCAN] Recherche API pour : {search_term}")
-        
-        api_url = "https://api.igdb.com/v4/games"
-        headers = {"Client-ID": IGDB_CLIENT_ID, "Authorization": f"Bearer {token}"}
-        
-        # Si le terme est un ID numérique, on cherche par ID
-        if search_term.isdigit():
-            query = (f'fields id, name, summary, genres.name, '
-                     'involved_companies.company.name, involved_companies.developer, '
-                     f'involved_companies.publisher, videos.video_id, release_dates.date, cover.url; where id = {search_term};')
-        else:
-            query = (f'search "{search_term}"; fields id, name, summary, genres.name, '
-                     'involved_companies.company.name, involved_companies.developer, '
-                     'involved_companies.publisher, videos.video_id, release_dates.date, cover.url; where platforms = (6, 13, 14, 3); limit 50;')
-        
-        response = requests.post(api_url, headers=headers, data=query, timeout=10)
-        
-        if response.status_code == 200:
-            results = response.json()
-            if results:
-                logging.info(f"    [MANUAL SCAN] {len(results)} candidats trouvés :")
-                for g in results:
-                    logging.info(f"        -> {g.get('name')}")
-            else:
-                logging.warning(f"    [MANUAL SCAN] Aucun résultat pour : {search_term}")
-            return results
-        else:
-            logging.error(f"    [MANUAL SCAN CRITICAL] Erreur API : {response.status_code}")
-            return []
-
     def apply_candidate_data(self, g):
+        logging.info(f"    [MANUAL APPLY] Application des données pour '{self.data.get('Clean_Title')}' -> '{g.get('name')}'")
         self.data['Clean_Title'] = g.get('name', self.data.get('Clean_Title'))
         self.data['Summary'] = g.get('summary', '')
         self.data['Genre'] = ", ".join([ge['name'] for ge in g.get('genres', [])])
@@ -392,14 +414,11 @@ class LibraryManager:
                     (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'developers' LIMIT 1) as developers_json,
                     (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'publishers' LIMIT 1) as publishers_json,
                     (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'originalImages' LIMIT 1) as original_images_json,
-                    (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'videos' LIMIT 1) as videos_json,
-                    (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'media' LIMIT 1) as media_json,
                     (SELECT name FROM Products p JOIN ReleaseProperties rp ON p.id = rp.gameId WHERE rp.releaseKey = urp.releaseKey LIMIT 1) as product_name,
                     (SELECT title FROM LimitedDetails WHERE productId = (SELECT gameId FROM ReleaseProperties WHERE releaseKey = urp.releaseKey LIMIT 1) LIMIT 1) as ld_title,
                     (SELECT description FROM Details d JOIN LimitedDetails ld ON d.limitedDetailsId = ld.id WHERE ld.productId = (SELECT gameId FROM ReleaseProperties WHERE releaseKey = urp.releaseKey LIMIT 1) LIMIT 1) as ld_summary,
                     (SELECT releaseDate FROM Details d JOIN LimitedDetails ld ON d.limitedDetailsId = ld.id WHERE ld.productId = (SELECT gameId FROM ReleaseProperties WHERE releaseKey = urp.releaseKey LIMIT 1) LIMIT 1) as ld_release_date,
-                    (SELECT images FROM LimitedDetails WHERE productId = (SELECT gameId FROM ReleaseProperties WHERE releaseKey = urp.releaseKey LIMIT 1) LIMIT 1) as ld_images,
-                    (SELECT videos FROM Details d JOIN LimitedDetails ld ON d.limitedDetailsId = ld.id WHERE ld.productId = (SELECT gameId FROM ReleaseProperties WHERE releaseKey = urp.releaseKey LIMIT 1) LIMIT 1) as ld_videos
+                    (SELECT images FROM LimitedDetails WHERE productId = (SELECT gameId FROM ReleaseProperties WHERE releaseKey = urp.releaseKey LIMIT 1) LIMIT 1) as ld_images
                 FROM
                     UserReleaseProperties urp
                 LEFT JOIN
@@ -432,7 +451,7 @@ class LibraryManager:
         # Création d'une map pour une recherche ultra-rapide par releaseKey
         key_to_game_map = {game.data.get('game_ID'): game for game in self.games.values() if game.data.get('game_ID')}
 
-        for releaseKey, meta_json, title_json, orig_title_json, summary_json, developers_json, publishers_json, original_images_json, videos_json, media_json, product_name, ld_title, ld_summary, ld_release_date, ld_images, ld_videos in gog_games:
+        for releaseKey, meta_json, title_json, orig_title_json, summary_json, developers_json, publishers_json, original_images_json, product_name, ld_title, ld_summary, ld_release_date, ld_images in gog_games:
             title = "Unknown"
             metadata = {}
             
@@ -472,6 +491,13 @@ class LibraryManager:
                     stats['errors'] += 1
                     continue
 
+                # Nettoyage des suffixes Amazon (Prime/Luna) pour éviter les doublons
+                # Ex: "A Plague Tale - Amazon Prime" -> "A Plague Tale"
+                title = re.sub(r'\s*-\s*Amazon.*$', '', title, flags=re.IGNORECASE)
+
+                # Nettoyage des caractères spéciaux (tout ce qui n'est pas lettre, chiffre ou ponctuation de base)
+                title = re.sub(r'[^\w\s\-\.\:\,\;\!\?\(\)\[\]\&\'\"]', '', title)
+
                 platform = 'Unknown'
                 if releaseKey.startswith('gog_'): platform = 'GOG'
                 elif releaseKey.startswith('steam_'): platform = 'Steam'
@@ -506,7 +532,7 @@ class LibraryManager:
                 # 1. Match par identifiant unique (le plus fiable)
                 if releaseKey in key_to_game_map:
                     game_obj = key_to_game_map[releaseKey]
-                    logging.info(f"    [GOG MATCH KEY] Mise à jour par clé : '{title}'")
+                    logging.info(f"    [GOG MATCH KEY] Jeu reconnu par clé : '{title}'")
                     stats['matched_key'] += 1
                 # 2. Match intelligent (Score based)
                 else:
@@ -564,15 +590,23 @@ class LibraryManager:
                     # Seuil d'acceptation : 70 points
                     if best_game and best_score >= 70:
                         game_obj = best_game
-                        logging.info(f"    [GOG MATCH SMART] Associé (Score: {best_score}) : '{title}' -> '{best_game.data.get('Clean_Title')}'")
+                        logging.info(f"    [GOG MATCH SMART] Jeu reconnu par titre (Score: {best_score}) : '{title}' -> '{best_game.data.get('Clean_Title')}'")
                         stats['matched_smart'] += 1
                 
                 # 3. Si aucun match, c'est un nouveau jeu
                 if not game_obj:
                     logging.info(f"    [GOG NEW] Ajout du jeu : '{title}' ({platform})")
                     folder_name = title
-                    # Nettoyage des caractères interdits dans les noms de fichiers
-                    folder_name = re.sub(r'[<>:"/\\|?*]', '', folder_name)
+                    # Remplacement des deux-points par un espace
+                    folder_name = folder_name.replace(':', ' ')
+                    # Nettoyage des caractères interdits et des espaces multiples
+                    folder_name = re.sub(r'[<>"/\\|?*]', '', folder_name)
+                    folder_name = re.sub(r'\s{2,}', ' ', folder_name).strip()
+                    # Windows n'aime pas les dossiers finissant par un point ou un espace
+                    folder_name = folder_name.rstrip('. ')
+                    
+                    if not folder_name: folder_name = f"Unknown Game [{releaseKey}]"
+
                     if folder_name in self.games:
                         folder_name = f"{title} [{releaseKey}]" # Evite les doublons de nom
                     game_obj = Game(Folder_Name=folder_name, Status_Flag='OK', Path_Root='')
@@ -581,7 +615,12 @@ class LibraryManager:
                 # --- MISE A JOUR DES DONNEES ---
                 game_obj.data['game_ID'] = releaseKey
                 game_obj.data['Clean_Title'] = title
-                game_obj.data['Platforms'] = platform
+                
+                # On ne met à jour la plateforme que si elle n'est pas déjà définie localement (ou si c'est Warez/Unknown)
+                # Cela évite qu'une version "Amazon" écrase une version locale identifiée comme "Epic" ou "Steam"
+                current_platforms = game_obj.data.get('Platforms', '')
+                if platform != 'Amazon' or current_platforms in ['', 'Unknown', 'Warez']:
+                     game_obj.data['Platforms'] = platform
 
                 # Summary
                 summary = meta_data.get('summary')
@@ -643,35 +682,59 @@ class LibraryManager:
                 if release_date: game_obj.data['Original_Release_Date'] = release_date
 
                 folder_name_for_files = game_obj.data['Folder_Name']
+                
+                # Nettoyage strict pour le nom de fichier sur le disque (Images/Vidéos)
+                safe_filename = get_safe_filename(folder_name_for_files)
 
                 # --- GESTION DES VIDÉOS (Trailer & Download) ---
-                # On rassemble toutes les sources potentielles de vidéos
-                video_sources = []
-                
-                # 1. meta (GOG)
-                if meta_data.get('videos'): video_sources.extend(meta_data['videos'])
-                
-                # 2. GamePiece 'videos'
-                if videos_json:
-                    v_data = safe_json_load(videos_json)
-                    if isinstance(v_data, list): video_sources.extend(v_data)
-                    elif isinstance(v_data, dict) and 'videos' in v_data: video_sources.extend(v_data['videos'])
-
-                # 3. LimitedDetails 'videos'
-                if ld_videos:
-                    v_data = safe_json_load(ld_videos)
-                    if isinstance(v_data, list): video_sources.extend(v_data)
-
-                # 4. GamePiece 'media'
-                if media_json:
-                    m_data = safe_json_load(media_json)
-                    if isinstance(m_data, dict) and 'videos' in m_data: video_sources.extend(m_data['videos'])
-
-                # --- A. Trailer Link (YouTube) ---
+                # On ne cherche plus les vidéos dans la DB GOG (fichiers inutiles)
+                # On garde juste le Trailer Link si présent dans les métadonnées de base
                 if not game_obj.data.get('Trailer_Link'):
-                    yt_video = next((v for v in video_sources if v.get('provider') == 'youtube' and v.get('video_id')), None)
+                    # Recherche simple dans meta_data (GOG natif) pour YouTube uniquement
+                    videos = meta_data.get('videos', [])
+                    yt_video = next((v for v in videos if isinstance(v, dict) and v.get('provider') == 'youtube' and v.get('video_id')), None)
+                    
                     if yt_video:
                         game_obj.data['Trailer_Link'] = f"https://www.youtube.com/watch?v={yt_video.get('video_id')}"
+
+                # --- B. Préparation Vidéo (.mp4) ---
+                video_url = None
+                
+                # 1. (Supprimé) Recherche dans les sources locales (DB GOG) - Fichiers inutiles
+                
+                # 2. Recherche Web (API Steam) si c'est un jeu Steam et qu'on n'a rien trouvé
+                if not video_url and platform == 'Steam':
+                    try:
+                        # ID format: steam_12345 -> 12345
+                        app_id = releaseKey.replace('steam_', '')
+                        if app_id.isdigit():
+                            logging.info(f"    [STEAM API] Recherche vidéo pour {title} (AppID: {app_id})")
+                            # API Steam publique pour les détails du jeu
+                            steam_url = f"https://store.steampowered.com/api/appdetails?appids={app_id}"
+                            resp = requests.get(steam_url, timeout=2)
+                            if resp.status_code == 200:
+                                data = resp.json()
+                                if data.get(app_id, {}).get('success'):
+                                    movies = data[app_id]['data'].get('movies', [])
+                                    if movies:
+                                        # On prend la résolution max du premier trailer
+                                        video_url = movies[0].get('mp4', {}).get('max')
+                                        logging.info(f"    [STEAM API] Vidéo trouvée !")
+                                    else:
+                                        logging.info(f"    [STEAM API] Pas de vidéo disponible.")
+                    except Exception as e:
+                        logging.warning(f"    [WEB FETCH ERROR] Steam API failed for {title}: {e}")
+
+                # 3. Fallback : Recherche dans le résumé (HTML)
+                if not video_url and game_obj.data.get('Summary'):
+                    match = re.search(r'src="([^"]+\.mp4)"', game_obj.data['Summary'])
+                    if match:
+                        video_url = match.group(1)
+                        if video_url.startswith('//'): video_url = "https:" + video_url
+
+                # Si on a trouvé une vidéo MP4 et qu'on n'a pas de Trailer Link (YouTube), on sauvegarde l'URL MP4
+                if video_url and not game_obj.data.get('Trailer_Link'):
+                    game_obj.data['Trailer_Link'] = video_url
 
                 # Téléchargement de la jaquette (toujours)
                 cover_url = meta_data.get('image')
@@ -694,44 +757,47 @@ class LibraryManager:
                 
                 if cover_url:
                     if cover_url.startswith('//'): cover_url = "https:" + cover_url
-                    save_path = os.path.join("images", f"{folder_name_for_files}.jpg")
-                    if not os.path.exists(save_path):
+                    
+                    # On vérifie si une image valide existe déjà pour ce jeu
+                    existing_image_path = game_obj.data.get('Image_Link')
+                    image_exists_on_disk = existing_image_path and os.path.exists(existing_image_path)
+
+                    if not image_exists_on_disk:
+                        # Déterminer l'extension de l'image depuis l'URL
                         try:
+                            path = urlparse(cover_url).path
+                            ext = os.path.splitext(path)[1]
+                            # Si l'extension est vide (ex: URL sans .jpg) mais que c'est une image GOG, c'est probablement du webp
+                            if not ext and 'gog.com' in cover_url:
+                                ext = '.webp'
+                            elif not ext:
+                                ext = '.jpg' # Fallback pour les autres cas
+                        except:
+                            ext = '.jpg' # Fallback ultime en cas d'erreur de parsing
+                        save_path = os.path.join("images", f"{safe_filename}{ext}")
+                        try:
+                            logging.info(f"    [IMAGE] Fichier manquant ou invalide, tentative de téléchargement...")
                             response = requests.get(cover_url, timeout=5)
                             if response.status_code == 200:
                                 with open(save_path, 'wb') as f: f.write(response.content)
                                 game_obj.data['Image_Link'] = save_path
-                        except: pass
-                    else:
-                        game_obj.data['Image_Link'] = save_path
+                                logging.info(f"    [IMAGE] Téléchargée : {safe_filename}{ext}")
+                        except Exception as e: logging.error(f"    [IMAGE ERROR] {e}")
 
-                # --- B. Téléchargement Vidéo (.mp4) ---
-                video_url = None
-                
-                # Recherche dans les sources structurées
-                mp4_video = next((v for v in video_sources if v.get('video_url', '').endswith('.mp4') or v.get('url', '').endswith('.mp4')), None)
-                if mp4_video:
-                    video_url = mp4_video.get('video_url') or mp4_video.get('url')
-                
-                # Fallback : Recherche dans le résumé (HTML)
-                if not video_url and game_obj.data.get('Summary'):
-                    # Regex pour trouver src="...mp4"
-                    match = re.search(r'src="([^"]+\.mp4)"', game_obj.data['Summary'])
-                    if match:
-                        video_url = match.group(1)
-                        if video_url.startswith('//'): video_url = "https:" + video_url
+                # --- C. Téléchargement Vidéo (.mp4) ---
+                existing_video_path = game_obj.data.get('Path_Video')
+                video_exists_on_disk = existing_video_path and os.path.exists(existing_video_path)
 
-                if video_url:
-                    video_save_path = os.path.join("videos", f"{folder_name_for_files}.mp4")
-                    if not os.path.exists(video_save_path):
-                        try:
-                            response = requests.get(video_url, stream=True, timeout=10)
-                            if response.status_code == 200:
-                                with open(video_save_path, 'wb') as f: shutil.copyfileobj(response.raw, f)
-                                game_obj.data['Path_Video'] = video_save_path
-                        except: pass
-                    else:
-                        game_obj.data['Path_Video'] = video_save_path
+                if video_url and not video_exists_on_disk:
+                    video_save_path = os.path.join("videos", f"{safe_filename}.mp4")
+                    try:
+                        logging.info(f"    [VIDEO] Fichier manquant ou invalide, téléchargement en cours : {safe_filename}.mp4 ...")
+                        response = requests.get(video_url, stream=True, timeout=10)
+                        if response.status_code == 200:
+                            with open(video_save_path, 'wb') as f: shutil.copyfileobj(response.raw, f)
+                            game_obj.data['Path_Video'] = video_save_path
+                            logging.info(f"    [VIDEO] Téléchargement terminé.")
+                    except Exception as e: logging.error(f"    [VIDEO ERROR] {e}")
                 
                 self.games[game_obj.data['Folder_Name']] = game_obj
                 stats['processed'] += 1
@@ -758,7 +824,12 @@ class LibraryManager:
         url = "https://id.twitch.tv/oauth2/token"
         params = {"client_id": IGDB_CLIENT_ID, "client_secret": IGDB_CLIENT_SECRET, "grant_type": "client_credentials"}
         response = requests.post(url, params=params)
-        return response.json().get("access_token") if response.status_code == 200 else None
+        if response.status_code == 200:
+            logging.info("    [API AUTH] Token IGDB généré avec succès.")
+            return response.json().get("access_token")
+        else:
+            logging.error(f"    [API AUTH ERROR] Échec token : {response.text}")
+            return None
 
     def load_db(self):
         if os.path.exists(self.db_file):
@@ -768,35 +839,44 @@ class LibraryManager:
                 self.games[game_data['Folder_Name']] = Game(**game_data)
             logging.info(f"{len(self.games)} jeux chargés.")
 
-    def fetch_candidates(self, token, search_term):
+    def fetch_candidates(self, token, search_term, limit=10):
         search_term = str(search_term).strip()
         # Log du début de la recherche
         logging.info(f"    [MANUAL SCAN] Recherche API pour : {search_term}")
         
         api_url = "https://api.igdb.com/v4/games"
         headers = {"Client-ID": IGDB_CLIENT_ID, "Authorization": f"Bearer {token}"}
-        
+
         # Si le terme est un ID numérique, on cherche par ID
         if search_term.isdigit():
-            query = (f'fields name, summary, genres.name, '
+            query = (f'fields id, name, summary, genres.name, '
                      'involved_companies.company.name, involved_companies.developer, '
                      f'involved_companies.publisher, videos.video_id, release_dates.date, cover.url; where id = {search_term};')
         else:
-            query = (f'search "{search_term}"; fields name, summary, genres.name, '
+            query = (f'search "{search_term}"; fields id, name, summary, genres.name, '
                      'involved_companies.company.name, involved_companies.developer, '
-                     'involved_companies.publisher, videos.video_id, release_dates.date, cover.url; where platforms = (6, 13, 14, 3); limit 50;')
+                     f'involved_companies.publisher, videos.video_id, release_dates.date, cover.url; where platforms = (6, 13, 14, 3); limit {limit};')
         
         response = requests.post(api_url, headers=headers, data=query, timeout=10)
         
         if response.status_code == 200:
-            return response.json()
+            results = response.json()
+            if results:
+                logging.info(f"    [MANUAL SCAN] {len(results)} candidats trouvés :")
+                for g in results:
+                    logging.info(f"        -> {g.get('name')}")
+            else:
+                logging.warning(f"    [MANUAL SCAN] Aucun résultat pour : {search_term}")
+            return results
         else:
             logging.error(f"    [MANUAL SCAN CRITICAL] Erreur API : {response.status_code}")
             return []
 
-    def scan(self):
+    def scan(self, retry_failures=False):
         token = self.get_access_token()
         logging.info("--- DÉBUT DU SCAN ---")
+        if retry_failures:
+            logging.info("Mode 'Réessayer les échecs' activé.")
         
         stats = {
             'scanned': 0,
@@ -829,6 +909,7 @@ class LibraryManager:
                         self.games[folder] = Game(Folder_Name=folder, Path_Root=full_path)
                         stats['new'] += 1
                     else:
+                        logging.info(f"    [CHECK] Vérification du jeu existant : {folder}")
                         # Pour les jeux existants, on met à jour le chemin et on revérifie la vidéo
                         game = self.games[folder]
                         if game.data.get('Path_Root') != full_path:
@@ -842,7 +923,29 @@ class LibraryManager:
         existing_folders = list(self.games.keys())
         for folder in existing_folders:
             if folder not in found_folders:
-                logging.info(f"    [DELETE] Jeu introuvable sur le disque, suppression : {folder}")
+                game_to_delete = self.games.get(folder)
+                
+                # Suppression des fichiers média associés avant de supprimer l'entrée
+                if game_to_delete:
+                    # Suppression de l'image
+                    image_path = game_to_delete.data.get('Image_Link')
+                    if image_path and os.path.exists(image_path):
+                        try:
+                            os.remove(image_path)
+                            logging.info(f"    [DELETE] Fichier image orphelin supprimé : {image_path}")
+                        except Exception as e:
+                            logging.error(f"    [DELETE ERROR] Impossible de supprimer l'image {image_path}: {e}")
+                    
+                    # Suppression de la vidéo
+                    video_path = game_to_delete.data.get('Path_Video')
+                    if video_path and os.path.exists(video_path):
+                        try:
+                            os.remove(video_path)
+                            logging.info(f"    [DELETE] Fichier vidéo orphelin supprimé : {video_path}")
+                        except Exception as e:
+                            logging.error(f"    [DELETE ERROR] Impossible de supprimer la vidéo {video_path}: {e}")
+
+                logging.info(f"    [DELETE] Entrée de jeu introuvable sur le disque, suppression : {folder}")
                 del self.games[folder]
                 stats['deleted'] += 1
         
@@ -852,16 +955,38 @@ class LibraryManager:
             if not os.path.exists(game.data.get('Path_Root', '')):
                 logging.warning(f"    [GHOST] Le dossier '{name}' n'existe plus physiquement. Ignoré.")
                 continue
+            
+            image_is_missing = not game.data.get('Image_Link') or not os.path.exists(game.data.get('Image_Link'))
+
+            # Cas 1: Le jeu n'est pas "OK", on lance une récupération complète des métadonnées
+            if game.data.get('Status_Flag') != 'OK':
+                reason_for_fetch = ""
+                is_local_unidentified = not game.data.get('game_ID') and game.data.get('Platforms') == 'Warez'
+
+                if game.data.get('Status_Flag') == 'NEW':
+                    reason_for_fetch = "Nouveau jeu"
+                elif game.data.get('Status_Flag') == 'NEEDS_ATTENTION':
+                    reason_for_fetch = "Précédent échec"
+                elif is_local_unidentified:
+                    reason_for_fetch = "Jeu local sans métadonnées"
                 
-            # On fetch les métadonnées si le jeu est nouveau, en erreur, OU s'il n'a pas d'ID et pas de plateforme (jeu local existant)
-            is_local_without_id = not game.data.get('game_ID') and game.data.get('Platforms') == 'Warez'
-            if game.data.get('Status_Flag') in ['NEW', 'NEEDS_ATTENTION'] or is_local_without_id:
-                logging.info(f"    [FETCHING] Tentative pour : {name}")
+                if reason_for_fetch:
+                    logging.info(f"    [FETCHING] Tentative pour : {name} (Raison: {reason_for_fetch})")
+                    if token and game.fetch_metadata(token):
+                        stats['fetched_success'] += 1
+                    else:
+                        logging.warning(f"    [FAILURE] Échec pour : {name}")
+                        stats['fetched_fail'] += 1
+            
+            # Cas 2: Le jeu est "OK", mais l'image manque. On la retélécharge sans toucher au reste.
+            elif image_is_missing:
+                logging.info(f"    [FETCHING] Tentative pour : {name} (Raison: Image manquante pour jeu OK)")
                 if token and game.fetch_metadata(token):
                     stats['fetched_success'] += 1
                 else:
                     logging.warning(f"    [FAILURE] Échec pour : {name}")
                     stats['fetched_fail'] += 1
+
         
         # Rapport final
         report = (
@@ -880,6 +1005,7 @@ class LibraryManager:
         self.save_db()
 
     def scan_single_game(self, game_name, manual_search_term=None):
+        logging.info(f"--- SCAN UNITAIRE : {game_name} (Terme: {manual_search_term}) ---")
         token = self.get_access_token()
         if not token: return False
         
@@ -915,6 +1041,7 @@ class LibraryManager:
                 df[col] = df[col].astype(str).str.replace(r'\.0$', '', regex=True).replace('nan', '')
         
         df.fillna('').to_csv(self.db_file, sep=';', index=False, encoding='utf-8')
+        logging.info(f"    [DB SAVE] Base de données sauvegardée dans {self.db_file} ({len(df)} jeux).")
 
 if __name__ == "__main__":
     manager = LibraryManager(ROOT_PATH, DB_FILE)
@@ -922,9 +1049,10 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="ViGaVault Library Manager.")
     parser.add_argument('--sync-gog', action='store_true', help='Synchronise les jeux depuis la base de données GOG Galaxy.')
+    parser.add_argument('--retry', action='store_true', help="Réessaie de récupérer les métadonnées pour les jeux en échec (NEEDS_ATTENTION).")
     args = parser.parse_args()
 
     if args.sync_gog:
         manager.sync_gog()
     else:
-        manager.scan()
+        manager.scan(retry_failures=args.retry)

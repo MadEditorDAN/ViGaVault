@@ -45,3 +45,4 @@ def analyze_gog_db():
 
 if __name__ == "__main__":
     analyze_gog_db()
+    

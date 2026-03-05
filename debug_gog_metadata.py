@@ -137,3 +137,4 @@ def debug_gog_metadata():
 
 if __name__ == "__main__":
     debug_gog_metadata()
+

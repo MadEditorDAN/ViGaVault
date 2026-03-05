@@ -46,13 +46,17 @@ class GogSyncWorker(QThread):
             logging.error(f"Erreur critique dans le thread de synchronisation GOG : {e}")
 
 class LocalScanWorker(QThread):
-    def run(self):
+    def __init__(self, retry_failures=False):
+        super().__init__()
+        self.retry_failures = retry_failures
+
+    def run(self, ):
         """Runs the local folder scan process."""
         try:
             # We create the manager inside the thread
             manager = LibraryManager(r"\\madhdd02\Software\GAMES", "VGVDB.csv")
             manager.load_db()
-            manager.scan()
+            manager.scan(retry_failures=self.retry_failures)
         except Exception as e:
             # Log any exceptions that happen inside the thread
             logging.error(f"Erreur critique dans le thread de scan local : {e}")
@@ -247,7 +251,7 @@ class Sidebar(QWidget):
         
         self.search_bar = QLineEdit() # Défini avec self.
         self.search_bar.setPlaceholderText("Nom du jeu...")
-        self.search_bar.setClearButtonEnabled(True)
+        self.search_bar.setClearButtonEnabled(True) # Réactivation du bouton d'effacement
         self.filter_layout.addWidget(self.search_bar)
         
         # 2. Plateforme
@@ -284,8 +288,15 @@ class Sidebar(QWidget):
         self.filter_layout.addWidget(self.btn_sync_gog)
 
         # --- BOUTON SCAN LOCAL ---
+        scan_local_layout = QHBoxLayout()
         self.btn_scan_local = QPushButton("Scanner les dossiers locaux")
-        self.filter_layout.addWidget(self.btn_scan_local)
+        scan_local_layout.addWidget(self.btn_scan_local, 3) # 80%
+
+        self.chk_retry_failures = QCheckBox("Retry")
+        self.chk_retry_failures.setToolTip("Si coché, le scan tentera de récupérer les métadonnées pour les jeux marqués 'NEEDS_ATTENTION'.")
+        scan_local_layout.addWidget(self.chk_retry_failures, 1) # 20%
+        
+        self.filter_layout.addLayout(scan_local_layout)
 
         # --- PANNEAU SCAN ---
         self.scan_panel = QWidget()
@@ -299,7 +310,17 @@ class Sidebar(QWidget):
         
         self.scan_input = QLineEdit()
         self.scan_input.setPlaceholderText("Nom du jeu à chercher...")
+
+        scan_action_layout = QHBoxLayout()
         self.scan_btn = QPushButton("Rechercher")
+        scan_action_layout.addWidget(self.scan_btn, 3) # 80%
+
+        self.scan_limit_combo = QComboBox()
+        self.scan_limit_combo.addItems(['10', '20', '30', '40', '50'])
+        self.scan_limit_combo.setCurrentText('10')
+        self.scan_limit_combo.setToolTip("Nombre de résultats à afficher.")
+        scan_action_layout.addWidget(self.scan_limit_combo, 1) # 20%
+
         self.scan_results = QListWidget()
         self.scan_results.setIconSize(QSize(50, 70)) # Définit une taille visible pour les covers
         
@@ -311,7 +332,7 @@ class Sidebar(QWidget):
         
         self.scan_layout.addWidget(QLabel("Scan Manuel"))
         self.scan_layout.addWidget(self.scan_input)
-        self.scan_layout.addWidget(self.scan_btn)
+        self.scan_layout.addLayout(scan_action_layout)
         self.scan_layout.addWidget(self.scan_results)
         self.scan_layout.addLayout(self.btns_layout)
         
@@ -647,7 +668,8 @@ class MainWindow(QMainWindow):
         logging.getLogger().addHandler(self.qt_log_handler)
 
         # Setup and start worker thread
-        self.local_scan_worker = LocalScanWorker()
+        retry = self.sidebar.chk_retry_failures.isChecked()
+        self.local_scan_worker = LocalScanWorker(retry_failures=retry)
         self.local_scan_worker.finished.connect(self.finish_local_scan)
         self.local_scan_worker.start()
 
@@ -745,8 +767,9 @@ class MainWindow(QMainWindow):
         manager = LibraryManager(r"\\madhdd02\Software\GAMES", "VGVDB.csv")
         manager.load_db()
         token = manager.get_access_token()
-        
-        candidates = manager.fetch_candidates(token, term)
+
+        limit = int(self.sidebar.scan_limit_combo.currentText())
+        candidates = manager.fetch_candidates(token, term, limit=limit)
         
         self.sidebar.scan_results.clear()
         for g in candidates:
