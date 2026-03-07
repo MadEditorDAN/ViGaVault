@@ -12,10 +12,8 @@ from ViGaVault_Scan import LibraryManager, get_safe_filename
 from PySide6.QtWidgets import (QApplication, QMainWindow, QListWidget, QListWidgetItem, 
                              QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QStackedLayout, QFileDialog,
                              QLineEdit, QComboBox, QDialog, QTextEdit, QFormLayout, QMessageBox, QFrame, QAbstractItemView, QCheckBox, QSlider, QStyle, QGroupBox)
-from PySide6.QtCore import Qt, QSize, QTimer, QByteArray, QEvent, QUrl, QThread, Signal, QObject
+from PySide6.QtCore import Qt, QSize, QTimer, QByteArray, QEvent, QUrl, QThread, Signal, QObject, Slot
 from PySide6.QtGui import QPixmap, QIcon
-from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
-from PySide6.QtMultimediaWidgets import QVideoWidget
 
 DB_FILE = "VGVDB.csv"
 
@@ -25,6 +23,13 @@ try:
 except ImportError:
     YouTube = None
     InnerTube = None
+
+try:
+    from PySide6.QtWebEngineWidgets import QWebEngineView
+    from PySide6.QtWebEngineCore import QWebEngineSettings
+except ImportError:
+    QWebEngineView = None
+    QWebEngineSettings = None
 
 
 # --- Custom Logging Handler for UI ---
@@ -214,11 +219,11 @@ class ActionDialog(QDialog):
                         thumbnail_data = response.content
                 except Exception as e:
                     logging.warning(f"Could not fetch YouTube thumbnail: {e}")
-            self.btn_play_trailer.clicked.connect(self.play_trailer_internal)
+            self.btn_play_trailer.clicked.connect(self.play_trailer)
             self.btn_download_trailer.clicked.connect(self.download_youtube_trailer)
         elif self.trailer_link.endswith('.mp4'):
             self.trailer_thumbnail_label.setText("MP4 Trailer")
-            self.btn_play_trailer.clicked.connect(self.play_trailer_internal)
+            self.btn_play_trailer.clicked.connect(self.play_trailer)
             self.btn_download_trailer.clicked.connect(self.download_mp4_trailer)
         else:
             self.trailer_group.hide()
@@ -231,46 +236,28 @@ class ActionDialog(QDialog):
             self.trailer_thumbnail_label.setText("Trailer Available")
             self.trailer_thumbnail_label.setStyleSheet("border: 1px solid #555;")
 
-    def play_trailer_internal(self):
+    def play_trailer(self):
         if not self.trailer_link:
             return
 
-        source_url = None
         is_youtube = 'youtube.com' in self.trailer_link or 'youtu.be' in self.trailer_link
-        is_mp4 = self.trailer_link.endswith('.mp4')
 
         if is_youtube:
-            if not YouTube or not InnerTube:
-                QMessageBox.warning(self, "Dépendance manquante", "La lecture des vidéos YouTube nécessite la librairie 'pytube'.\n\nVeuillez l'installer avec : pip install pytube")
+            match = re.search(r"(?:v=|\/|embed\/)([0-9A-Za-z_-]{11}).*", self.trailer_link)
+            if match:
+                video_id = match.group(1)
+                embed_url = f"https://www.youtube.com/embed/{video_id}?autoplay=1&enablejsapi=1&origin=https://www.youtube.com"
+                
+                if QWebEngineView is not None:
+                    browser_dialog = SimpleBrowserDialog(embed_url, self.original_data.get('Clean_Title', 'Trailer'), self.parent())
+                    browser_dialog.exec()
+                else:
+                    QMessageBox.warning(self, "Dépendance manquante", "La lecture intégrée nécessite 'PySide6-WebEngine' (pip install PySide6-WebEngine).\n\nLa vidéo va s'ouvrir dans votre navigateur par défaut.")
+                    webbrowser.open(self.trailer_link)
             else:
-                try:
-                    self.btn_play_trailer.setText("...")
-                    self.btn_play_trailer.setEnabled(False)
-                    QApplication.processEvents()
-                    logging.info(f"Récupération du flux pour la vidéo YouTube : {self.trailer_link}")
-                    # On utilise un client alternatif pour contourner les erreurs 400 de YouTube
-                    client = InnerTube(client="ANDROID")
-                    yt = YouTube(self.trailer_link, innertube_client=client)
-                    stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
-                    if stream:
-                        source_url = QUrl(stream.url)
-                        logging.info(f"Flux trouvé : {stream.url}")
-                    else:
-                        QMessageBox.critical(self, "Erreur", "Aucun flux vidéo compatible n'a été trouvé pour cette vidéo YouTube.")
-                except Exception as e:
-                    logging.error(f"Erreur Pytube : {e}")
-                    QMessageBox.critical(self, "Erreur Pytube", f"Impossible de récupérer le flux de la vidéo.\n\n{e}")
-                finally:
-                    self.btn_play_trailer.setText("▶ Play")
-                    self.btn_play_trailer.setEnabled(True)
-        elif is_mp4:
-            source_url = QUrl(self.trailer_link)
-
-        if source_url:
-            player_dialog = VideoPlayerDialog(source_url, self.original_data.get('Clean_Title', 'Trailer'), self)
-            player_dialog.exec()
+                webbrowser.open(self.trailer_link)
         else:
-            logging.info("Impossible de lire en interne, ouverture dans le navigateur.")
+            # Pour tout autre lien (ex: .mp4 direct), on ouvre dans le navigateur par défaut
             webbrowser.open(self.trailer_link)
 
     def download_youtube_trailer(self):
@@ -339,151 +326,33 @@ class ActionDialog(QDialog):
         new_data.update(self.updated_data)
         return new_data
 
-class VideoPlayerDialog(QDialog):
-    def __init__(self, source, title, parent=None):
+class SimpleBrowserDialog(QDialog):
+    def __init__(self, url, title, parent=None):
         super().__init__(parent)
-        self.source = source
         self.setWindowTitle(title)
-        self.resize(1600, 900)
-        # Fenêtre sans bordure
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
-        self.setStyleSheet("background-color: black; color: white;")
+        self.setLayout(QVBoxLayout())
+        self.layout().setContentsMargins(0, 0, 0, 0)
+
+        self.browser = QWebEngineView()
+        # Activer les plugins/javascript est souvent nécessaire pour les lecteurs vidéo
+        if QWebEngineSettings:
+            settings = self.browser.settings()
+            settings.setAttribute(QWebEngineSettings.WebAttribute.PluginsEnabled, True)
+            settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
+            settings.setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, True)
+            settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, True)
         
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        
-        self.video_widget = QVideoWidget()
-        layout.addWidget(self.video_widget, 1) # Add stretch factor to make video area expand
-        
-        # --- CONTROLES ---
-        controls_widget = QWidget()
-        controls_widget.setStyleSheet("background-color: #222; border-top: 1px solid #444;")
-        controls_layout = QHBoxLayout(controls_widget)
-        controls_layout.setContentsMargins(10, 2, 10, 2)
-        
-        # Play/Pause
-        self.btn_play = QPushButton()
-        self.btn_play.setFixedSize(24, 24)
-        self.btn_play.setIcon(self.style().standardIcon(QStyle.SP_MediaPause))
-        self.btn_play.clicked.connect(self.toggle_play)
-        controls_layout.addWidget(self.btn_play)
-        
-        # Stop
-        self.btn_stop = QPushButton()
-        self.btn_stop.setFixedSize(24, 24)
-        self.btn_stop.setIcon(self.style().standardIcon(QStyle.SP_MediaStop))
-        self.btn_stop.clicked.connect(self.stop_video)
-        controls_layout.addWidget(self.btn_stop)
+        self.browser.setUrl(QUrl(url))
+        self.layout().addWidget(self.browser)
 
-        # Bouton Lecteur Externe
-        self.btn_external = QPushButton("⧉")
-        self.btn_external.setFixedSize(24, 24)
-        self.btn_external.setToolTip("Ouvrir avec le lecteur par défaut (VLC, MPC...)")
-        self.btn_external.clicked.connect(self.open_externally)
-        controls_layout.addWidget(self.btn_external)
-        
-        # Slider (Barre de temps)
-        self.slider = QSlider(Qt.Horizontal)
-        self.slider.setRange(0, 0)
-        self.slider.sliderMoved.connect(self.set_position)
-        self.slider.sliderPressed.connect(self.pause_for_seek)
-        self.slider.sliderReleased.connect(self.resume_after_seek)
-        controls_layout.addWidget(self.slider)
-        
-        # Fermer
-        self.btn_close = QPushButton("✖")
-        self.btn_close.setFixedSize(24, 24)
-        self.btn_close.setStyleSheet("font-weight: bold; color: #aaa; border: none;")
-        self.btn_close.clicked.connect(self.accept)
-        controls_layout.addWidget(self.btn_close)
-        
-        layout.addWidget(controls_widget)
-        
-        self.player = QMediaPlayer()
-        self.audio = QAudioOutput()
-        self.player.setAudioOutput(self.audio)
-        self.player.setVideoOutput(self.video_widget)
-        
-        if isinstance(source, QUrl):
-            self.player.setSource(source)
-            self.btn_external.hide()
-        else: # C'est un chemin de fichier local (str)
-            self.player.setSource(QUrl.fromLocalFile(source))
-            if not os.path.exists(source):
-                self.btn_external.setEnabled(False)
+        self.resize(1280, 720)
 
-        self.audio.setVolume(1.0)
-        
-        # Connexions signaux lecteur
-        self.player.positionChanged.connect(self.position_changed)
-        self.player.durationChanged.connect(self.duration_changed)
-        self.player.mediaStatusChanged.connect(self.media_status_changed)
-        
-        self.is_seeking = False
-        self.player.play()
-
-    def open_externally(self):
-        if not isinstance(self.source, QUrl) and os.path.exists(self.source):
-            try:
-                logging.info(f"Ouverture du lecteur externe pour : {self.source}")
-                os.startfile(self.source)
-                self.accept() # Ferme le lecteur interne
-            except Exception as e:
-                logging.error(f"Impossible d'ouvrir le fichier externe : {e}")
-                QMessageBox.warning(self, "Erreur", "Impossible d'ouvrir le fichier avec le lecteur externe.")
-
-    def toggle_play(self):
-        if self.player.playbackState() == QMediaPlayer.PlayingState:
-            self.player.pause()
-            self.btn_play.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
-        else:
-            self.player.play()
-            self.btn_play.setIcon(self.style().standardIcon(QStyle.SP_MediaPause))
-
-    def stop_video(self):
-        self.player.stop()
-        self.btn_play.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
-        self.slider.setValue(0)
-
-    def position_changed(self, position):
-        if not self.is_seeking:
-            self.slider.setValue(position)
-
-    def duration_changed(self, duration):
-        self.slider.setRange(0, duration)
-
-    def set_position(self, position):
-        self.player.setPosition(position)
-
-    def pause_for_seek(self):
-        self.is_seeking = True
-        self.was_playing = self.player.playbackState() == QMediaPlayer.PlayingState
-        self.player.pause()
-
-    def resume_after_seek(self):
-        self.set_position(self.slider.value())
-        self.is_seeking = False
-        if self.was_playing:
-            self.player.play()
-            
-    def media_status_changed(self, status):
-        if status == QMediaPlayer.EndOfMedia:
-             self.btn_play.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
-            event.accept()
-
-    def mouseMoveEvent(self, event):
-        if event.buttons() == Qt.LeftButton and hasattr(self, 'drag_pos'):
-            self.move(event.globalPosition().toPoint() - self.drag_pos)
-            event.accept()
-
-    def closeEvent(self, event):
-        self.player.stop()
-        super().closeEvent(event)
+        # Centrer sur l'écran de la fenêtre parente
+        if parent and parent.window():
+            parent_screen = parent.window().screen()
+            if parent_screen:
+                screen_geometry = parent_screen.geometry()
+                self.move(screen_geometry.center() - self.rect().center())
 
 class Sidebar(QWidget):
     def __init__(self, parent):
@@ -751,19 +620,22 @@ class GameCard(QWidget):
         return super().eventFilter(obj, event)
 
     def start_video(self):
-        if not self.video_path: return
-        print(f"Lancement vidéo : {self.video_path}")
-        
-        # Ouvre le lecteur dans une fenêtre dédiée
-        dlg = VideoPlayerDialog(self.video_path, self.data.get('Clean_Title', 'Vidéo'), self.window())
-        dlg.exec()
+        if self.video_path and os.path.exists(self.video_path):
+            try:
+                logging.info(f"Ouverture de la vidéo locale avec le lecteur par défaut : {self.video_path}")
+                os.startfile(self.video_path)
+            except Exception as e:
+                logging.error(f"Impossible d'ouvrir la vidéo locale : {e}")
+                QMessageBox.critical(self.parent_window, "Erreur", f"Impossible d'ouvrir le fichier vidéo :\n{e}")
+        else:
+            logging.warning(f"Tentative de lecture d'une vidéo locale inexistante : {self.video_path}")
 
     def open_folder(self):
         if os.path.exists(self.data.get('Path_Root', '')):
             os.startfile(self.data.get('Path_Root', ''))
 
     def edit_game(self):
-        dlg = ActionDialog("Éditer le jeu", self.data)
+        dlg = ActionDialog("Éditer le jeu", self.data, self.parent_window)
         if dlg.exec():
             new_data = dlg.get_data()
             if new_data:
