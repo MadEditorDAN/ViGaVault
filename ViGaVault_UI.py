@@ -7,10 +7,11 @@ import json
 import logging
 import subprocess
 import shutil
+from datetime import datetime
 import webbrowser
 from ViGaVault_Scan import LibraryManager, get_safe_filename
 from PySide6.QtWidgets import (QApplication, QMainWindow, QListWidget, QListWidgetItem, 
-                             QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QStackedLayout, QFileDialog,
+                             QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QPushButton, QStackedLayout, QFileDialog, QScrollArea,
                              QLineEdit, QComboBox, QDialog, QTextEdit, QFormLayout, QMessageBox, QFrame, QAbstractItemView, QCheckBox, QSlider, QStyle, QGroupBox)
 from PySide6.QtCore import Qt, QSize, QTimer, QByteArray, QEvent, QUrl, QThread, Signal, QObject, Slot
 from PySide6.QtGui import QPixmap, QIcon
@@ -41,10 +42,10 @@ class GogSyncWorker(QThread):
             # We create the manager inside the thread
             manager = LibraryManager(r"\\madhdd02\Software\GAMES", "VGVDB.csv")
             manager.load_db()
-            manager.sync_gog()
+            manager.sync_gog(worker_thread=self)
         except Exception as e:
             # Log any exceptions that happen inside the thread
-            logging.error(f"Erreur critique dans le thread de synchronisation GOG : {e}")
+            logging.error(f"Critical error in GOG sync thread: {e}")
 
 class LocalScanWorker(QThread):
     def __init__(self, retry_failures=False):
@@ -61,10 +62,56 @@ class LocalScanWorker(QThread):
             manager.scan(retry_failures=self.retry_failures, worker_thread=self)
         except Exception as e:
             # Log any exceptions that happen inside the thread
-            logging.error(f"Erreur critique dans le thread de scan local : {e}")
+            logging.error(f"Critical error in local scan thread: {e}")
 
+class FilterWorker(QThread):
+    finished = Signal(object)
 
-# --- Fenêtres de dialogue pour Editer et Scanner ---
+    def __init__(self, master_df, params, parent=None):
+        super().__init__(parent)
+        self.master_df = master_df
+        self.params = params
+
+    def run(self):
+        df = self.master_df.copy()
+
+        # Text Filter
+        search = self.params['search_text'].lower()
+        if search:
+            df = df[df['Clean_Title'].str.lower().str.contains(search)]
+            
+        # Platform Filter
+        selected_platforms = self.params['selected_platforms']
+        if selected_platforms:
+            regex_pattern = '|'.join([re.escape(p) for p in selected_platforms])
+            df = df[df['Platforms'].str.contains(regex_pattern, case=False, na=False)]
+        else:
+            df = df.iloc[0:0]
+
+        # Quick Filters
+        if self.params['chk_new']:
+            df = df[df['Status_Flag'] != 'OK']
+        else:
+            df = df[df['Status_Flag'] == 'OK']
+        
+        if self.params['chk_a_tester']:
+            df = df[df['Path_Root'].str.contains('_temp', case=False, na=False)]
+
+        if self.params['chk_vr']:
+            df = df[df['Path_Root'].str.contains('VR', case=False, na=False)]
+            
+        # Sorting
+        sort_col = self.params['sort_col']
+        sort_desc = self.params['sort_desc']
+        
+        if sort_col == "temp_sort_date" or sort_col == "temp_sort_title":
+            df = df.sort_values(by=sort_col, ascending=not sort_desc, na_position='last' if sort_col == "temp_sort_date" else 'first')
+        else:
+            df = df.sort_values(by=sort_col, ascending=not sort_desc, na_position='last')
+        
+        self.finished.emit(df)
+
+# --- Dialog Windows for Editing and Scanning ---
 class ActionDialog(QDialog):
     def __init__(self, title, data, parent=None):
         super().__init__(parent)
@@ -137,7 +184,7 @@ class ActionDialog(QDialog):
         self.url_line_edit.setReadOnly(True)
         url_layout.addWidget(self.url_line_edit)
         copy_btn = QPushButton("📋")
-        copy_btn.setToolTip("Copier l'URL dans le presse-papiers")
+        copy_btn.setToolTip("Copy URL to clipboard")
         copy_btn.clicked.connect(self.copy_trailer_url)
         url_layout.addWidget(copy_btn)
         self.trailer_layout.addLayout(url_layout)
@@ -157,8 +204,8 @@ class ActionDialog(QDialog):
 
         # --- Bottom Buttons ---
         button_box = QHBoxLayout()
-        btn_save = QPushButton("Sauvegarder")
-        btn_cancel = QPushButton("Annuler")
+        btn_save = QPushButton("Save")
+        btn_cancel = QPushButton("Cancel")
         btn_save.clicked.connect(self.accept)
         btn_cancel.clicked.connect(self.reject)
         button_box.addWidget(btn_save)
@@ -197,7 +244,7 @@ class ActionDialog(QDialog):
         if self.trailer_link:
             clipboard = QApplication.clipboard()
             clipboard.setText(self.trailer_link)
-            logging.info(f"URL copiée dans le presse-papiers : {self.trailer_link}")
+            logging.info(f"URL copied to clipboard: {self.trailer_link}")
 
     def setup_trailer_section(self):
         self.trailer_link = self.original_data.get('Trailer_Link', '')
@@ -236,9 +283,9 @@ class ActionDialog(QDialog):
     def play_trailer(self):
         if not self.trailer_link:
             return
-        logging.info(f"Ouverture du trailer dans le navigateur par défaut : {self.trailer_link}")
-        # new=1 tente d'ouvrir une nouvelle fenêtre de navigateur au lieu d'un nouvel onglet.
-        # Le positionnement sur l'écran est géré par le système d'exploitation.
+        logging.info(f"Opening trailer in default browser: {self.trailer_link}")
+        # new=1 attempts to open a new browser window instead of a new tab.
+        # The positioning on the screen is managed by the operating system.
         webbrowser.open(self.trailer_link, new=1)
 
     def get_data(self):
@@ -259,7 +306,7 @@ class Sidebar(QWidget):
         self.setFixedWidth(350)
         self.layout = QVBoxLayout(self)
         
-        # --- PANNEAU FILTRES ---
+        # --- FILTER PANEL ---
         self.filter_panel = QWidget()
         self.filter_layout = QVBoxLayout(self.filter_panel)
         
@@ -267,7 +314,7 @@ class Sidebar(QWidget):
         
         # 1. Header (Recherche + Compteur)
         header_layout = QHBoxLayout()
-        lbl_search = QLabel("Recherche")
+        lbl_search = QLabel("Search")
         lbl_search.setStyleSheet(label_style)
         header_layout.addWidget(lbl_search)
         header_layout.addStretch()
@@ -276,52 +323,51 @@ class Sidebar(QWidget):
         header_layout.addWidget(self.lbl_counter)
         self.filter_layout.addLayout(header_layout)
         
-        self.search_bar = QLineEdit() # Défini avec self.
-        self.search_bar.setPlaceholderText("Nom du jeu...")
-        self.search_bar.setClearButtonEnabled(True) # Réactivation du bouton d'effacement
+        self.search_bar = QLineEdit()
+        self.search_bar.setPlaceholderText("Game name...")
+        self.search_bar.setClearButtonEnabled(True)
         self.filter_layout.addWidget(self.search_bar)
         
-        # 2. Plateforme
-        lbl_plat = QLabel("Plateforme")
-        lbl_plat.setStyleSheet(label_style)
-        self.filter_layout.addWidget(lbl_plat)
-        self.combo_platform = QComboBox() # Défini avec self.
-        self.filter_layout.addWidget(self.combo_platform)
-        
         # 3. Tri
-        lbl_sort = QLabel("Trier par")
+        lbl_sort = QLabel("Sort by")
         lbl_sort.setStyleSheet(label_style)
         self.filter_layout.addWidget(lbl_sort)
-        self.combo_sort = QComboBox() # Défini avec self.
-        self.combo_sort.addItems(["Nom", "Date de sortie", "Développeur"])
-        self.filter_layout.addWidget(self.combo_sort)
-        
-        self.btn_toggle_sort = QPushButton("⇅ Inverser l'ordre")
-        self.filter_layout.addWidget(self.btn_toggle_sort)
 
-        # --- FILTRES RAPIDES ---
-        quick_filters_layout = QHBoxLayout()
-        self.chk_new = QCheckBox("NEW")
-        self.chk_a_tester = QCheckBox("A TESTER")
-        self.chk_vr = QCheckBox("VR")
+        sort_layout = QHBoxLayout()
+        self.combo_sort = QComboBox()
+        self.combo_sort.addItems(["Name", "Release Date", "Developer"])
+        sort_layout.addWidget(self.combo_sort, 4)
         
-        quick_filters_layout.addWidget(self.chk_new)
-        quick_filters_layout.addWidget(self.chk_a_tester)
-        quick_filters_layout.addWidget(self.chk_vr)
-        self.filter_layout.addLayout(quick_filters_layout)
+        self.btn_toggle_sort = QPushButton("⇅ Order")
+        self.btn_toggle_sort.setStyleSheet("font-size: 16px;")
+        sort_layout.addWidget(self.btn_toggle_sort, 1)
+        self.filter_layout.addLayout(sort_layout)
 
-        # --- BOUTON SYNC GOG ---
-        self.btn_sync_gog = QPushButton("Synchroniser GOG")
+        # --- FILTERS ---
+        filters_group = QGroupBox("Filters")
+        self.filters_layout = QGridLayout(filters_group)
+        self.filter_layout.addWidget(filters_group)
+
+        # --- PLATFORMS ---
+        self.platforms_group = QGroupBox("Platforms")
+        self.platforms_layout = QGridLayout(self.platforms_group)
+        self.filter_layout.addWidget(self.platforms_group)
+
+        self.platform_checkboxes = []
+
+
+        # --- GOG SYNC BUTTON ---
+        self.btn_sync_gog = QPushButton("Sync GOG")
         self.filter_layout.addWidget(self.btn_sync_gog)
 
-        # --- BOUTON SCAN LOCAL ---
+        # --- LOCAL SCAN BUTTON ---
         scan_local_layout = QHBoxLayout()
-        self.btn_scan_local = QPushButton("Scanner les dossiers locaux")
-        scan_local_layout.addWidget(self.btn_scan_local, 3) # 80%
+        self.btn_scan_local = QPushButton("Scan Local Folders")
+        scan_local_layout.addWidget(self.btn_scan_local, 3)
 
         self.chk_retry_failures = QCheckBox("Retry")
-        self.chk_retry_failures.setToolTip("Si coché, le scan tentera de récupérer les métadonnées pour les jeux marqués 'NEEDS_ATTENTION'.")
-        scan_local_layout.addWidget(self.chk_retry_failures, 1) # 20%
+        self.chk_retry_failures.setToolTip("If checked, the scan will attempt to retrieve metadata for games marked 'NEEDS_ATTENTION'.")
+        scan_local_layout.addWidget(self.chk_retry_failures, 1)
         
         self.filter_layout.addLayout(scan_local_layout)
 
@@ -336,28 +382,28 @@ class Sidebar(QWidget):
         self.scan_layout.addWidget(line)
         
         self.scan_input = QLineEdit()
-        self.scan_input.setPlaceholderText("Nom du jeu à chercher...")
+        self.scan_input.setPlaceholderText("Game name to search...")
 
         scan_action_layout = QHBoxLayout()
-        self.scan_btn = QPushButton("Rechercher")
-        scan_action_layout.addWidget(self.scan_btn, 3) # 80%
+        self.scan_btn = QPushButton("Search")
+        scan_action_layout.addWidget(self.scan_btn, 3)
 
         self.scan_limit_combo = QComboBox()
         self.scan_limit_combo.addItems(['10', '20', '30', '40', '50'])
         self.scan_limit_combo.setCurrentText('10')
-        self.scan_limit_combo.setToolTip("Nombre de résultats à afficher.")
-        scan_action_layout.addWidget(self.scan_limit_combo, 1) # 20%
+        self.scan_limit_combo.setToolTip("Number of results to display.")
+        scan_action_layout.addWidget(self.scan_limit_combo, 1)
 
         self.scan_results = QListWidget()
-        self.scan_results.setIconSize(QSize(50, 70)) # Définit une taille visible pour les covers
-        
+        self.scan_results.setIconSize(QSize(50, 70))
+
         self.btns_layout = QHBoxLayout()
-        self.btn_confirm = QPushButton("Valider le choix")
-        self.btn_cancel = QPushButton("Annuler")
+        self.btn_confirm = QPushButton("Confirm Choice")
+        self.btn_cancel = QPushButton("Cancel")
         self.btns_layout.addWidget(self.btn_confirm)
         self.btns_layout.addWidget(self.btn_cancel)
         
-        self.scan_title_label = QLabel("Scan Manuel")
+        self.scan_title_label = QLabel("Manual Scan")
         self.scan_layout.addWidget(self.scan_title_label)
         self.scan_layout.addWidget(self.scan_input)
         self.scan_layout.addLayout(scan_action_layout)
@@ -369,20 +415,14 @@ class Sidebar(QWidget):
         self.layout.addWidget(self.filter_panel)
         self.scan_panel.hide() 
         
-        # --- CONNEXIONS ---
-        self.search_bar.textChanged.connect(self.parent.on_search_changed)
-        self.combo_platform.currentIndexChanged.connect(self.parent.apply_filters)
-        self.combo_sort.currentIndexChanged.connect(self.parent.apply_filters)
+        # --- CONNECTIONS ---
+        self.search_bar.textChanged.connect(self.parent.request_filter_update)
+        self.combo_sort.currentIndexChanged.connect(self.parent.request_filter_update)
         self.btn_toggle_sort.clicked.connect(self.parent.toggle_sort_order)
         self.btn_sync_gog.clicked.connect(self.parent.start_gog_sync)
         self.btn_scan_local.clicked.connect(self.parent.start_local_scan)
 
-        # Connexions Filtres Rapides
-        self.chk_new.stateChanged.connect(self.parent.apply_filters)
-        self.chk_a_tester.stateChanged.connect(self.parent.apply_filters)
-        self.chk_vr.stateChanged.connect(self.parent.apply_filters)
-        
-        # Connexions Scan
+        # Scan Connections
         self.scan_btn.clicked.connect(self.parent.on_manual_search_trigger)
         self.scan_input.returnPressed.connect(self.parent.on_manual_search_trigger)
         self.btn_confirm.clicked.connect(self.parent.apply_inline_selection)
@@ -392,37 +432,37 @@ class Sidebar(QWidget):
 class SelectionDialog(QDialog):
     def __init__(self, candidates, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Choisir le bon jeu")
+        self.setWindowTitle("Choose the correct game")
         self.setMinimumWidth(500)
         
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Plusieurs résultats trouvés. Sélectionnez le bon :"))
+        layout.addWidget(QLabel("Multiple results found. Please select the correct one:"))
         
         self.list_widget = QListWidget()
         for g in candidates:
-            # On crée un item pour la liste
+            # Create an item for the list
             item = QListWidgetItem(g.get('name', 'Unknown'))
-            # On stocke l'objet jeu complet (g) dans les données de l'item (rôle 1)
+            # Store the full game object (g) in the item's data (UserRole)
             item.setData(Qt.UserRole, g) 
             self.list_widget.addItem(item)
             
         layout.addWidget(self.list_widget)
         
-        btn_valider = QPushButton("Valider")
-        btn_valider.clicked.connect(self.accept)
-        layout.addWidget(btn_valider)
+        btn_confirm = QPushButton("Confirm")
+        btn_confirm.clicked.connect(self.accept)
+        layout.addWidget(btn_confirm)
         
     def get_selected_candidate(self):
         item = self.list_widget.currentItem()
         if item:
-            return item.data(Qt.UserRole) # Récupère l'objet stocké
+            return item.data(Qt.UserRole) # Retrieve the stored object
         return None
 
 class GameCard(QWidget):
-    def __init__(self, game_data, parent_window, item): # <--- On ajoute parent_window ici
+    def __init__(self, game_data, parent_window, item):
         super().__init__()
         self.data = game_data
-        self.parent_window = parent_window # <--- On le stocke
+        self.parent_window = parent_window
         self.item = item
         
         main_layout = QHBoxLayout(self)
@@ -433,11 +473,10 @@ class GameCard(QWidget):
         self.img_label.setAlignment(Qt.AlignCenter)
         img_path = game_data.get('Image_Link', '')
         if img_path and os.path.exists(img_path):
-            # Optimisation : FastTransformation est beaucoup plus rapide que SmoothTransformation
             pixmap = QPixmap(img_path).scaled(200, 266, Qt.KeepAspectRatio, Qt.FastTransformation)
             self.img_label.setPixmap(pixmap)
         else:
-            self.img_label.setText("Pas d'image")
+            self.img_label.setText("No Image")
             self.img_label.setStyleSheet("border: 1px solid #555;")
         self.img_label.installEventFilter(self)
         main_layout.addWidget(self.img_label)
@@ -450,7 +489,7 @@ class GameCard(QWidget):
         header_layout = QHBoxLayout()
         
         title_layout = QVBoxLayout()
-        title_layout.setSpacing(0) # Rapproche le titre et le chemin
+        title_layout.setSpacing(0)
         
         title = QLabel(game_data.get('Clean_Title', 'Unknown'))
         title.setStyleSheet("font-weight: bold; font-size: 22px;")
@@ -467,45 +506,87 @@ class GameCard(QWidget):
         header_layout.addLayout(title_layout)
         header_layout.addStretch()
         
-        # Boutons
+        # Buttons
         self.video_path = game_data.get('Path_Video', '')
-        
-        btn_folder = QPushButton("📁")
-        btn_edit = QPushButton("✏️")
-        btn_scan = QPushButton("🔍")
-        
-        buttons = [btn_folder, btn_edit, btn_scan]
-        if self.video_path and os.path.exists(self.video_path):
-            btn_play = QPushButton("▶")
-            btn_play.clicked.connect(self.start_video)
-            buttons.insert(0, btn_play)
+        self.trailer_link = game_data.get('Trailer_Link', '')
+
+        has_local_video = bool(self.video_path and os.path.exists(self.video_path))
+        # Check for a valid trailer link, ignoring our special flags.
+        has_trailer = bool(self.trailer_link and self.trailer_link not in ['no_section', 'no_mp4'])
+
+        button_definitions = {
+            'local_video': {'enabled': has_local_video, 'fallback': "🎞️", 'font_size': "32px"},
+            'youtube':     {'enabled': has_trailer,     'fallback': "▶", 'font_size': "30px"},
+            'folder':      {'enabled': True,            'fallback': "📁", 'font_size': "32px"},
+            'edit':        {'enabled': True,            'fallback': "✏️", 'font_size': "28px"},
+            'scan':        {'enabled': True,            'fallback': "🔍", 'font_size': "28px"}
+        }
+
+        self.buttons = {}
+        for name, props in button_definitions.items():
+            btn = QPushButton()
+            self.buttons[name] = btn
+
+            icon_to_load = name
+            if not props['enabled'] and name in ['local_video', 'youtube']:
+                icon_to_load = f"{name}_disabled"
+
+            icon_path = f"icons/{icon_to_load}.png"
+
+            if os.path.exists(icon_path):
+                btn.setIcon(QIcon(icon_path))
+                btn.setIconSize(QSize(35, 35))
+                btn.setStyleSheet("border: none;")
+            else:
+                # Fallback to emoji if icon file is missing
+                fallback_emoji = props['fallback']
+                font_size = props['font_size']
+                style = f"font-size: {font_size}; border: none;"
+                if fallback_emoji == "▶":
+                    style += " color: #FF0000;"
+                btn.setStyleSheet(style)
+            
+            btn.setEnabled(props['enabled'])
+
+        buttons = [self.buttons['local_video'], self.buttons['youtube'], self.buttons['folder'], self.buttons['edit'], self.buttons['scan']]
             
         for btn in buttons:
             btn.setFixedSize(45, 45)
-            btn.setStyleSheet("font-size: 28px; padding: 0px;")
             btn.installEventFilter(self)
             header_layout.addWidget(btn)
-        
-        btn_folder.clicked.connect(self.open_folder)
-        btn_edit.clicked.connect(self.edit_game)
-        btn_scan.clicked.connect(self.scan_game)
+
+        self.buttons['local_video'].clicked.connect(self.start_video)
+        self.buttons['youtube'].clicked.connect(self.start_trailer)
+        self.buttons['folder'].clicked.connect(self.open_folder)
+        self.buttons['edit'].clicked.connect(self.edit_game)
+        self.buttons['scan'].clicked.connect(self.scan_game)
         
         details_layout.addLayout(header_layout)
         
         # Info
         for field in ['Original_Release_Date', 'Platforms', 'Developer']:
-            label = QLabel(f"{field.replace('_', ' ')}: {game_data.get(field, '')}")
+            display_name = 'Developer' # Default
+            if field == 'Original_Release_Date':
+                display_name = 'Release Date'
+            elif field == 'Platforms':
+                display_name = 'Platform(s)'
+
+            label = QLabel(f"{display_name}: {game_data.get(field, '')}")
             label.setStyleSheet("font-weight: bold; font-size: 16px;")
             label.setTextInteractionFlags(Qt.TextSelectableByMouse)
             label.installEventFilter(self)
             details_layout.addWidget(label)
         
-        summary = QLabel(f"Summary: {game_data.get('Summary', '')}")
-        summary.setWordWrap(True)
-        summary.setStyleSheet("font-size: 14px;") # You can change 14px to your desired size
-        summary.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        summary.installEventFilter(self)
-        details_layout.addWidget(summary)
+        summary_title = QLabel("Summary")
+        summary_title.setStyleSheet("font-weight: bold; font-size: 16px;")
+        details_layout.addWidget(summary_title)
+
+        summary_content = QLabel(game_data.get('Summary', ''))
+        summary_content.setWordWrap(True)
+        summary_content.setStyleSheet("font-size: 14px;")
+        summary_content.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        summary_content.installEventFilter(self)
+        details_layout.addWidget(summary_content)
         main_layout.addLayout(details_layout)
 
     def mousePressEvent(self, event):
@@ -517,134 +598,200 @@ class GameCard(QWidget):
             self.item.listWidget().setCurrentItem(self.item)
         return super().eventFilter(obj, event)
 
+    def start_trailer(self):
+        if self.trailer_link:
+            logging.info(f"Opening trailer in browser: {self.trailer_link}")
+            webbrowser.open(self.trailer_link, new=1)
+
     def start_video(self):
         if self.video_path and os.path.exists(self.video_path):
             try:
-                logging.info(f"Ouverture de la vidéo locale avec le lecteur par défaut : {self.video_path}")
+                logging.info(f"Opening local video with default player: {self.video_path}")
                 os.startfile(self.video_path)
             except Exception as e:
-                logging.error(f"Impossible d'ouvrir la vidéo locale : {e}")
-                QMessageBox.critical(self.parent_window, "Erreur", f"Impossible d'ouvrir le fichier vidéo :\n{e}")
+                logging.error(f"Could not open local video: {e}")
+                QMessageBox.critical(self.parent_window, "Error", f"Could not open video file:\n{e}")
         else:
-            logging.warning(f"Tentative de lecture d'une vidéo locale inexistante : {self.video_path}")
+            logging.warning(f"Attempted to play a non-existent local video: {self.video_path}")
 
     def open_folder(self):
         if os.path.exists(self.data.get('Path_Root', '')):
             os.startfile(self.data.get('Path_Root', ''))
 
     def edit_game(self):
-        dlg = ActionDialog("Éditer le jeu", self.data, self.parent_window)
+        dlg = ActionDialog("Edit Game", self.data, self.parent_window)
         if dlg.exec():
             new_data = dlg.get_data()
             if new_data:
                 self.parent_window.update_game_data(self.data['Folder_Name'], new_data)
 
     def scan_game(self):
-        # Utilise parent_window pour appeler la méthode de la MainWindow
         if hasattr(self.parent_window, 'start_inline_scan'):
-            # Appelle la méthode principale qui va gérer l'affichage ET le lancement
             self.parent_window.start_inline_scan(self.data)
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("ViGaVault Library")
         self.resize(1200, 800)
+        self.is_startup = True
         self.sort_desc = True
         
-        # Variables pour le chargement progressif (Lazy Loading)
+        
+        # Variables for Lazy Loading
         self.batch_size = 30
         self.current_df = pd.DataFrame()
         self.loaded_count = 0
         
-        # Timer pour le chargement en arrière-plan
+        # Timer for background loading
         self.background_loader = QTimer()
-        self.background_loader.setInterval(100) # Charge un batch toutes les 100ms
+        self.background_loader.setInterval(100) # Load a batch every 100ms
         self.background_loader.timeout.connect(self.load_more_items)
         
-        # Timer pour éviter de recharger la liste à chaque lettre tapée (Debounce)
-        self.search_timer = QTimer()
-        self.search_timer.setSingleShot(True)
-        self.search_timer.setInterval(300) # Attend 300ms après la dernière frappe
-        self.search_timer.timeout.connect(self.apply_filters)
+        # Timer to avoid reloading the list on every keystroke (Debounce)
+        self.filter_timer = QTimer()
+        self.filter_timer.setSingleShot(True)
+        self.filter_timer.setInterval(300) # Wait 300ms after the last change
+        self.filter_timer.timeout.connect(self.start_filter_worker)
 
         self.current_scan_game = None
         self.gog_sync_in_progress = False # Flag to prevent multiple syncs
         self.local_scan_in_progress = False
         
-        # 1. Mise en place du layout principal (Horizontal)
+        # 1. Setup main layout (Horizontal)
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
         
-        # 2. Liste des jeux (à gauche, occupe 3/4 de l'espace)
+        # 2. Game list (left, takes 3/4 of the space)
         self.list_widget = QListWidget()
-        # Assure un défilement fluide pixel par pixel au lieu de sauter d'item en item
         self.list_widget.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
         self.list_widget.verticalScrollBar().setSingleStep(25)
-        # Connexion pour le chargement infini
         self.list_widget.verticalScrollBar().valueChanged.connect(self.check_scroll_load)
         main_layout.addWidget(self.list_widget, stretch=3)
         
-        # 3. Sidebar (à droite, occupe 1/4 de l'espace)
-        # Tout le design (filtres + scan) est géré dans la classe Sidebar
+        # 3. Sidebar (right, takes 1/4 of the space)
+        # The entire design (filters + scan) is handled in the Sidebar class
         self.sidebar = Sidebar(self)
         main_layout.addWidget(self.sidebar, stretch=1)
         
-        # 4. Chargement des données
+        # 4. Data loading
         if os.path.exists(DB_FILE):
             self.master_df = pd.read_csv(DB_FILE, sep=';', encoding='utf-8').fillna('')
             
-            # Remplir les plateformes dans la sidebar
-            platforms = ["Toutes"] + sorted(list(set(self.master_df['Platforms'].dropna().unique())))
-            self.sidebar.combo_platform.addItems([p for p in platforms if p])
+            # Pre-calculate columns for faster sorting
+            self.master_df['temp_sort_date'] = pd.to_datetime(self.master_df['Original_Release_Date'], errors='coerce', dayfirst=True)
+            self.master_df['temp_sort_title'] = self.master_df['Clean_Title'].str.lower()
+
             
-            # --- RESTAURATION ---
-            saved_scroll = 0
+            # Populate platforms in the sidebar
+            all_platforms = set()
+            for platform_list in self.master_df['Platforms'].dropna().unique():
+                for platform in platform_list.split(','):
+                    p = platform.strip()
+                    if p:
+                        all_platforms.add(p)
+            
+            # Separate "Warez" to place it manually next to the "All/None" buttons
+            has_warez = "Warez" in all_platforms
+            if has_warez:
+                all_platforms.remove("Warez")
+            
+            # Populate Filters section
+            self.sidebar.chk_new = QCheckBox("NEW")
+            self.sidebar.chk_a_tester = QCheckBox("TO TEST")
+            self.sidebar.chk_vr = QCheckBox("VR")
+
+            # Add main filters
+            self.sidebar.filters_layout.addWidget(self.sidebar.chk_new, 0, 0)
+            self.sidebar.filters_layout.addWidget(self.sidebar.chk_a_tester, 0, 1)
+            self.sidebar.filters_layout.addWidget(self.sidebar.chk_vr, 0, 2)
+
+            self.sidebar.chk_new.stateChanged.connect(self.request_filter_update)
+            self.sidebar.chk_a_tester.stateChanged.connect(self.request_filter_update)
+            self.sidebar.chk_vr.stateChanged.connect(self.request_filter_update)
+
+            platforms_layout = self.sidebar.platforms_layout
+
+            # Start grid layout for all platform controls
+            row, col = 0, 0
+
+            # Add "All" / "None" buttons for platforms
+            btn_all_platforms = QPushButton("All")
+            btn_none_platforms = QPushButton("None")
+            platforms_layout.addWidget(btn_all_platforms, row, col)
+            col += 1
+            platforms_layout.addWidget(btn_none_platforms, row, col)
+            col += 1
+
+            if has_warez:
+                self.sidebar.chk_warez = QCheckBox("Warez")
+                self.sidebar.chk_warez.stateChanged.connect(self.request_filter_update)
+                platforms_layout.addWidget(self.sidebar.chk_warez, row, col)
+                col += 1
+                # Also add it to the main list for select all/none and settings to work
+                self.sidebar.platform_checkboxes.append(self.sidebar.chk_warez)
+
+            btn_all_platforms.clicked.connect(self.select_all_platforms)
+            btn_none_platforms.clicked.connect(self.select_none_platforms)
+
+            # Add platform filters
+            for platform in sorted(list(all_platforms)):
+                if col > 2:
+                    col = 0
+                    row += 1
+                chk = QCheckBox(platform)
+                chk.stateChanged.connect(self.request_filter_update)
+                platforms_layout.addWidget(chk, row, col)
+                self.sidebar.platform_checkboxes.append(chk)
+                col += 1
+            
+            # --- RESTORATION ---
             if os.path.exists("settings.json"):
                 saved_scroll = self.load_settings()
+                if saved_scroll:
+                    self.pending_scroll = saved_scroll
             else:
-                # Tri par défaut sur "Date de sortie"
+                # Default sort on "Release Date"
                 self.sidebar.combo_sort.setCurrentIndex(1)
             
-            # Affichage initial
-            self.apply_filters()
-            
-            # Restauration du scroll
-            if saved_scroll:
-                self.pending_scroll = saved_scroll
-                QTimer.singleShot(100, self.restore_scroll_position)
+            # Initial display
+            self.request_filter_update()
 
     def start_gog_sync(self):
         if self.gog_sync_in_progress or self.local_scan_in_progress:
-            QMessageBox.information(self, "Info", "Une autre tâche est déjà en cours.")
+            QMessageBox.information(self, "Info", "Another task is already in progress.")
             return
 
         # Check if GOG Galaxy is running
         try:
-            # Vérification silencieuse des processus
             output = subprocess.check_output('tasklist', shell=True).decode(errors='ignore')
             if "GalaxyClient.exe" in output:
-                reply = QMessageBox.question(self, "GOG Galaxy détecté", 
-                                            "GOG Galaxy est en cours d'exécution. Il doit être fermé pour accéder à la base de données.\n\nVeuillez le fermer et cliquer sur Oui.",
+                reply = QMessageBox.question(self, "GOG Galaxy Detected",
+                                            "GOG Galaxy is running. It must be closed to access the database.\n\nPlease close it and click Yes.",
                                             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
                 if reply == QMessageBox.No: return
         except: pass
 
         self.gog_sync_in_progress = True
         self.sidebar.btn_sync_gog.setEnabled(False)
-        self.sidebar.btn_sync_gog.setText("Synchronisation...")
+        self.sidebar.btn_sync_gog.setText("Syncing...")
         self.sidebar.btn_scan_local.setEnabled(False)
 
         # Show the scan panel as a log viewer
         self.sidebar.scan_panel.show()
-        self.sidebar.scan_title_label.setText("Synchronisation GOG")
+        self.sidebar.scan_title_label.setText("GOG Sync")
         self.sidebar.scan_input.hide()
         self.sidebar.scan_btn.hide()
         self.sidebar.scan_limit_combo.hide()
-        self.sidebar.btn_confirm.hide() #
-        self.sidebar.btn_cancel.setText("Fermer")
+        self.sidebar.btn_confirm.hide()
+        self.sidebar.btn_cancel.setText("Stop")
         self.sidebar.scan_results.clear()
-        self.sidebar.scan_results.addItem("Démarrage de la synchronisation GOG...")
+        self.sidebar.scan_results.addItem("Starting GOG sync...")
+
+        # Disconnect previous signals and connect the stop function
+        try: self.sidebar.btn_cancel.clicked.disconnect()
+        except: pass
+        self.sidebar.btn_cancel.clicked.connect(self.stop_gog_sync)
 
         # Setup logging to UI
         self.log_signal = QtLogSignal()
@@ -657,44 +804,57 @@ class MainWindow(QMainWindow):
         self.gog_worker.finished.connect(self.finish_gog_sync)
         self.gog_worker.start()
 
+    def stop_gog_sync(self):
+        """Requests interruption of the GOG sync thread and closes the panel."""
+        if self.gog_sync_in_progress and hasattr(self, 'gog_worker'):
+            logging.info("--- GOG Sync interrupted by user. ---")
+            self.gog_worker.requestInterruption()
+            self.sidebar.scan_panel.hide()
+            self.restore_scan_panel()
+
     def update_sync_log(self, message):
         self.sidebar.scan_results.addItem(message)
         self.sidebar.scan_results.scrollToBottom()
 
     def finish_gog_sync(self):
         logging.getLogger().removeHandler(self.qt_log_handler)
-        self.sidebar.scan_results.addItem("--- Synchronisation terminée ! ---")
-        self.sidebar.scan_results.scrollToBottom()
-        
+
+        # If the panel is still visible, it means the sync completed without interruption.
+        if self.sidebar.scan_panel.isVisible():
+            self.sidebar.scan_results.addItem("--- Sync complete! ---")
+            self.sidebar.scan_results.scrollToBottom()
+            # Change button to "Close" and set its action to close the panel.
+            self.sidebar.btn_cancel.setText("Close")
+            try: self.sidebar.btn_cancel.clicked.disconnect()
+            except: pass
+            self.sidebar.btn_cancel.clicked.connect(self.cancel_inline_scan)
+
         self.gog_sync_in_progress = False
         self.sidebar.btn_sync_gog.setEnabled(True)
-        self.sidebar.btn_sync_gog.setText("Synchroniser GOG")
+        self.sidebar.btn_sync_gog.setText("Sync GOG")
         self.sidebar.btn_scan_local.setEnabled(True)
-
-        # Fermeture automatique du panneau après 2 secondes
-        QTimer.singleShot(2000, lambda: [self.sidebar.scan_panel.hide(), self.restore_scan_panel()])
         self.refresh_data()
 
     def start_local_scan(self):
         if self.gog_sync_in_progress or self.local_scan_in_progress:
-            QMessageBox.information(self, "Info", "Une autre tâche est déjà en cours.")
+            QMessageBox.information(self, "Info", "Another task is already in progress.")
             return
 
         self.local_scan_in_progress = True
         self.sidebar.btn_scan_local.setEnabled(False)
-        self.sidebar.btn_scan_local.setText("Scan en cours...")
+        self.sidebar.btn_scan_local.setText("Scanning...")
         self.sidebar.btn_sync_gog.setEnabled(False)
 
         # Show the scan panel as a log viewer
         self.sidebar.scan_panel.show()
-        self.sidebar.scan_title_label.setText("Scan des dossiers locaux")
+        self.sidebar.scan_title_label.setText("Local Folders Scan")
         self.sidebar.scan_input.hide()
         self.sidebar.scan_btn.hide()
         self.sidebar.scan_limit_combo.hide()
-        self.sidebar.btn_confirm.hide() #
-        self.sidebar.btn_cancel.setText("Arrêter")
+        self.sidebar.btn_confirm.hide()
+        self.sidebar.btn_cancel.setText("Stop")
         self.sidebar.scan_results.clear()
-        self.sidebar.scan_results.addItem("Démarrage du scan des dossiers locaux...")
+        self.sidebar.scan_results.addItem("Starting local folders scan...")
 
         # Disconnect previous signals and connect the stop function
         try: self.sidebar.btn_cancel.clicked.disconnect()
@@ -716,7 +876,7 @@ class MainWindow(QMainWindow):
     def stop_local_scan(self):
         """Requests interruption of the local scan thread and closes the panel."""
         if self.local_scan_in_progress and hasattr(self, 'local_scan_worker'):
-            logging.info("--- Interruption du scan demandée par l'utilisateur. ---")
+            logging.info("--- Scan interrupted by user. ---")
             self.local_scan_worker.requestInterruption()
             self.sidebar.scan_panel.hide()
             self.restore_scan_panel()
@@ -726,15 +886,15 @@ class MainWindow(QMainWindow):
         
         self.local_scan_in_progress = False
         self.sidebar.btn_scan_local.setEnabled(True)
-        self.sidebar.btn_scan_local.setText("Scanner les dossiers locaux")
+        self.sidebar.btn_scan_local.setText("Scan Local Folders")
         self.sidebar.btn_sync_gog.setEnabled(True)
 
         # If the panel is still visible, it means the scan completed without interruption.
         if self.sidebar.scan_panel.isVisible():
-            self.sidebar.scan_results.addItem("--- Scan des dossiers terminé ! ---")
+            self.sidebar.scan_results.addItem("--- Folder scan finished! ---")
             self.sidebar.scan_results.scrollToBottom()
-            # Change button to "Fermer" and set its action to close the panel.
-            self.sidebar.btn_cancel.setText("Fermer")
+            # Change button to "Close" and set its action to close the panel.
+            self.sidebar.btn_cancel.setText("Close")
             try: self.sidebar.btn_cancel.clicked.disconnect()
             except: pass
             self.sidebar.btn_cancel.clicked.connect(self.cancel_inline_scan)
@@ -743,31 +903,28 @@ class MainWindow(QMainWindow):
 
     def start_inline_scan(self, game_data):
         self.current_scan_game = game_data
-        # On ne touche plus à filter_panel.hide() !
         self.sidebar.scan_panel.show()
 
         self.restore_scan_panel()
         
-        # Nettoyage du nom de dossier pour la recherche
+        # Clean up folder name for search
         raw_name = game_data.get('Folder_Name', '')
-        # 1. Retire l'année au début (ex: "1992 - Dune" -> "Dune")
+        # 1. Remove year at the beginning (e.g., "1992 - Dune" -> "Dune")
         clean_name = re.sub(r'^\d{4}\s*-\s*', '', raw_name)
-        # 2. Retire la dernière paire de parenthèses (ex: "Portal (Steam)" -> "Portal")
+        # 2. Remove the last pair of parentheses (e.g., "Portal (Steam)" -> "Portal")
         clean_name = re.sub(r'\s*\([^)]*\)$', '', clean_name).strip()
         self.sidebar.scan_input.setText(clean_name)
         
         self.sidebar.scan_results.clear()
         
-        # Message d'attente visuel
-        item = QListWidgetItem("Recherche sur IGDB en cours...")
+        item = QListWidgetItem("Searching on IGDB...")
         item.setTextAlignment(Qt.AlignCenter)
         item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
         self.sidebar.scan_results.addItem(item)
-        
         self.sidebar.scan_input.setFocus()
 
         # On diffère légèrement le lancement pour laisser l'interface s'afficher (message d'attente)
-        # Cette logique est maintenant ici pour garantir que le contexte est toujours le bon.
+        # This logic is now here to ensure the context is always correct.
         if hasattr(self, 'run_inline_search'):
             QTimer.singleShot(50, self.run_inline_search)
 
@@ -777,7 +934,7 @@ class MainWindow(QMainWindow):
         
         game_obj = manager.games.get(folder_name)
         if not game_obj:
-            QMessageBox.critical(self, "Erreur", f"Jeu '{folder_name}' non trouvé dans la base de données.")
+            QMessageBox.critical(self, "Error", f"Game '{folder_name}' not found in the database.")
             return
 
         # Met à jour les données du jeu
@@ -790,22 +947,22 @@ class MainWindow(QMainWindow):
                 manager.save_db()
                 break
             except PermissionError:
-                reply = QMessageBox.warning(self, "Fichier verrouillé", 
-                                    f"Le fichier {DB_FILE} est ouvert dans un autre programme (ex: Excel).\n\n"
-                                    "Veuillez le fermer, puis cliquez sur OK pour réessayer.",
+                reply = QMessageBox.warning(self, "File Locked",
+                                    f"The file {DB_FILE} is open in another program (e.g., Excel).\n\n"
+                                    "Please close it, then click OK to retry.",
                                     QMessageBox.Ok | QMessageBox.Cancel)
                 if reply == QMessageBox.Cancel:
                     return
         
-        QMessageBox.information(self, "Succès", "Les modifications ont été enregistrées.")
+        QMessageBox.information(self, "Success", "Changes have been saved.")
         
-        # Rafraîchit l'interface pour afficher les changements
-        # Le système d'ancrage existant se chargera de repositionner la vue
+        # Refresh the interface to show changes
+        # The existing anchoring system will handle repositioning the view
         self.refresh_data()
 
     def on_manual_search_trigger(self):
         self.sidebar.scan_results.clear()
-        item = QListWidgetItem("Recherche sur IGDB en cours...")
+        item = QListWidgetItem("Searching on IGDB...")
         item.setTextAlignment(Qt.AlignCenter)
         item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
         self.sidebar.scan_results.addItem(item)
@@ -813,10 +970,10 @@ class MainWindow(QMainWindow):
 
     def run_inline_search(self):
         term = self.sidebar.scan_input.text()
-        if not term: return # Sécurité
+        if not term: return
         
         if not self.current_scan_game:
-            QMessageBox.warning(self, "Erreur", "Aucun jeu sélectionné pour le scan. Veuillez cliquer sur l'icône de scan d'un jeu.")
+            QMessageBox.warning(self, "Error", "No game selected for scanning. Please click the scan icon on a game.")
             return
         
         manager = LibraryManager(r"\\madhdd02\Software\GAMES", "VGVDB.csv")
@@ -828,36 +985,48 @@ class MainWindow(QMainWindow):
         
         self.sidebar.scan_results.clear()
         for g in candidates:
-            item = QListWidgetItem(g.get('name'))
+            # Extract year
+            year = ''
+            if 'release_dates' in g and g['release_dates']:
+                dates = [d['date'] for d in g['release_dates'] if 'date' in d]
+                if dates:
+                    try:
+                        year = datetime.utcfromtimestamp(min(dates)).strftime('%Y')
+                    except Exception:
+                        pass # Ignore date conversion errors
+
+            display_text = g.get('name', 'Unknown')
+            if year:
+                display_text = f"{year} - {display_text}"
+
+            item = QListWidgetItem(display_text)
             item.setData(Qt.UserRole, g)
             
-            # Récupération et affichage de la cover
+            # Fetch and display cover
             if 'cover' in g and 'url' in g['cover']:
                 try:
-                    # URL IGDB commence par //, on ajoute https: et on prend une taille adaptée
                     img_url = "https:" + g['cover']['url'].replace("t_thumb", "t_cover_small")
-                    data = requests.get(img_url, timeout=1).content
+                    data = requests.get(img_url, timeout=2).content
                     pix = QPixmap()
                     pix.loadFromData(data)
                     item.setIcon(QIcon(pix))
                 except Exception:
                     pass # On ignore silencieusement les erreurs d'image pour ne pas bloquer
-            
             self.sidebar.scan_results.addItem(item)
-            
+
         if not candidates:
-            item = QListWidgetItem("Aucun résultat trouvé.")
-            item.setFlags(item.flags() & ~Qt.ItemIsEnabled) # Grise l'élément pour le rendre non-sélectionnable
+            item = QListWidgetItem("No results found.")
+            item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
             self.sidebar.scan_results.addItem(item)
 
     def restore_scan_panel(self):
         """Resets the scan panel to its default state for manual scanning."""
-        self.sidebar.scan_title_label.setText("Scan Manuel")
+        self.sidebar.scan_title_label.setText("Manual Scan")
         self.sidebar.scan_input.show()
         self.sidebar.scan_btn.show()
         self.sidebar.scan_limit_combo.show()
         self.sidebar.btn_confirm.show()
-        self.sidebar.btn_cancel.setText("Annuler")
+        self.sidebar.btn_cancel.setText("Cancel")
 
     def cancel_inline_scan(self):
         self.sidebar.scan_panel.hide()
@@ -880,42 +1049,59 @@ class MainWindow(QMainWindow):
                     manager.save_db()
                     break
                 except PermissionError:
-                    reply = QMessageBox.warning(self, "Fichier verrouillé", 
-                                        f"Le fichier {DB_FILE} est ouvert dans un autre programme (ex: Excel).\n\n"
-                                        "Veuillez le fermer, puis cliquez sur OK pour réessayer.",
+                    reply = QMessageBox.warning(self, "File Locked",
+                                        f"The file {DB_FILE} is open in another program (e.g., Excel).\n\n"
+                                        "Please close it, then click OK to retry.",
                                         QMessageBox.Ok | QMessageBox.Cancel)
                     if reply == QMessageBox.Cancel:
                         return
 
             self.refresh_data()
             
-            # Positionner la liste sur le jeu modifié
+            # Position the list on the modified game
             target_folder = self.current_scan_game.get('Folder_Name')
             
-            # On cherche la position du jeu dans la liste complète des données
+            # Find the position of the game in the full data list
             folders_list = self.current_df['Folder_Name'].tolist()
             if target_folder in folders_list:
                 row_index = folders_list.index(target_folder)
                 
-                # On force le chargement des items jusqu'à atteindre cette ligne
+                # Force loading items until this row is reached
                 while self.loaded_count <= row_index:
                     self.load_more_items()
                 
-                # Maintenant que l'item est créé, on peut le sélectionner
+                # Now that the item is created, we can select it
                 list_item = self.list_widget.item(row_index)
                 if list_item:
                     self.list_widget.scrollToItem(list_item)
                     self.list_widget.setCurrentItem(list_item)
             
-            # Feedback visuel dans la liste au lieu du popup
             self.sidebar.scan_results.clear()
-            item = QListWidgetItem("Mise à jour terminée !")
+            item = QListWidgetItem("Update complete!")
             item.setTextAlignment(Qt.AlignCenter)
             item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
             self.sidebar.scan_results.addItem(item)
             
             # Fermeture automatique du panneau après 2 secondes
             QTimer.singleShot(2000, self.cancel_inline_scan)
+
+    def select_all_platforms(self):
+        for chk in self.sidebar.platform_checkboxes:
+            chk.blockSignals(True)
+        for chk in self.sidebar.platform_checkboxes:
+            chk.setChecked(True)
+        for chk in self.sidebar.platform_checkboxes:
+            chk.blockSignals(False)
+        self.request_filter_update()
+
+    def select_none_platforms(self):
+        for chk in self.sidebar.platform_checkboxes:
+            chk.blockSignals(True)
+        for chk in self.sidebar.platform_checkboxes:
+            chk.setChecked(False)
+        for chk in self.sidebar.platform_checkboxes:
+            chk.blockSignals(False)
+        self.request_filter_update()
 
     def closeEvent(self, event):
         self.save_settings()
@@ -926,18 +1112,18 @@ class MainWindow(QMainWindow):
             "geometry": self.saveGeometry().toBase64().data().decode(),
             "sort_desc": self.sort_desc,
             "sort_index": self.sidebar.combo_sort.currentIndex(),
-            "platform_text": self.sidebar.combo_platform.currentText(),
+            "checked_platforms": [chk.text() for chk in self.sidebar.platform_checkboxes if chk.isChecked()],
             "search_text": self.sidebar.search_bar.text(),
             "scroll_value": self.list_widget.verticalScrollBar().value(),
-            "chk_new": self.sidebar.chk_new.isChecked(),
-            "chk_a_tester": self.sidebar.chk_a_tester.isChecked(),
-            "chk_vr": self.sidebar.chk_vr.isChecked()
+            "chk_new": self.sidebar.chk_new.isChecked() if hasattr(self.sidebar, 'chk_new') else False,
+            "chk_a_tester": self.sidebar.chk_a_tester.isChecked() if hasattr(self.sidebar, 'chk_a_tester') else False,
+            "chk_vr": self.sidebar.chk_vr.isChecked() if hasattr(self.sidebar, 'chk_vr') else False,
         }
         try:
             with open("settings.json", "w") as f:
                 json.dump(settings, f)
         except Exception as e:
-            print(f"Erreur sauvegarde settings: {e}")
+            print(f"Error saving settings: {e}")
 
     def load_settings(self):
         try:
@@ -949,49 +1135,52 @@ class MainWindow(QMainWindow):
                 
             self.sort_desc = settings.get("sort_desc", True)
             
-            # Bloquer les signaux pour éviter de déclencher apply_filters plusieurs fois
+            # Block signals to avoid triggering apply_filters multiple times
             self.sidebar.combo_sort.blockSignals(True)
-            self.sidebar.combo_platform.blockSignals(True)
-            self.sidebar.search_bar.blockSignals(True)
-            self.sidebar.chk_new.blockSignals(True)
-            self.sidebar.chk_a_tester.blockSignals(True)
-            self.sidebar.chk_vr.blockSignals(True)
             
             idx = settings.get("sort_index", 1)
             if 0 <= idx < self.sidebar.combo_sort.count():
                 self.sidebar.combo_sort.setCurrentIndex(idx)
                 
-            plat_text = settings.get("platform_text", "Toutes")
-            index = self.sidebar.combo_platform.findText(plat_text)
-            if index >= 0:
-                self.sidebar.combo_platform.setCurrentIndex(index)
-                
             self.sidebar.search_bar.setText(settings.get("search_text", ""))
             
-            self.sidebar.chk_new.setChecked(settings.get("chk_new", False))
-            self.sidebar.chk_a_tester.setChecked(settings.get("chk_a_tester", False))
-            self.sidebar.chk_vr.setChecked(settings.get("chk_vr", False))
+            # Block signals for filter checkboxes during setup
+            if hasattr(self.sidebar, 'chk_new'): self.sidebar.chk_new.blockSignals(True)
+            if hasattr(self.sidebar, 'chk_a_tester'): self.sidebar.chk_a_tester.blockSignals(True)
+            if hasattr(self.sidebar, 'chk_vr'): self.sidebar.chk_vr.blockSignals(True)
+            for chk in self.sidebar.platform_checkboxes: chk.blockSignals(True)
+
+            if hasattr(self.sidebar, 'chk_new'): self.sidebar.chk_new.setChecked(settings.get("chk_new", False))
+            if hasattr(self.sidebar, 'chk_a_tester'): self.sidebar.chk_a_tester.setChecked(settings.get("chk_a_tester", False))
+            if hasattr(self.sidebar, 'chk_vr'): self.sidebar.chk_vr.setChecked(settings.get("chk_vr", False))
+
+            # Restore platform selections
+            checked_platforms = settings.get("checked_platforms", [])
+            for chk in self.sidebar.platform_checkboxes:
+                chk.setChecked(chk.text() in checked_platforms)
             
             self.sidebar.combo_sort.blockSignals(False)
-            self.sidebar.combo_platform.blockSignals(False)
-            self.sidebar.search_bar.blockSignals(False)
-            self.sidebar.chk_new.blockSignals(False)
-            self.sidebar.chk_a_tester.blockSignals(False)
-            self.sidebar.chk_vr.blockSignals(False)
+            for chk in self.sidebar.platform_checkboxes: chk.blockSignals(False)
+            # Unblock signals for other filter checkboxes
+            if hasattr(self.sidebar, 'chk_new'): self.sidebar.chk_new.blockSignals(False)
+            if hasattr(self.sidebar, 'chk_a_tester'): self.sidebar.chk_a_tester.blockSignals(False)
+            if hasattr(self.sidebar, 'chk_vr'): self.sidebar.chk_vr.blockSignals(False)
 
             return settings.get("scroll_value", 0)
         except Exception as e:
-            print(f"Erreur chargement settings: {e}")
+            print(f"Error loading settings: {e}")
             return 0
 
     def refresh_data(self):
-        """Recharge le CSV et met à jour l'affichage"""
+        """Reloads the CSV and updates the display"""
         if os.path.exists(DB_FILE):
             self.master_df = pd.read_csv(DB_FILE, sep=';', encoding='utf-8').fillna('')
-            self.apply_filters() # Applique les filtres actuels pour garder la recherche/tri
+            # Re-add temporary sorting columns after reloading
+            self.master_df['temp_sort_date'] = pd.to_datetime(self.master_df['Original_Release_Date'], errors='coerce', dayfirst=True)
+            self.master_df['temp_sort_title'] = self.master_df['Clean_Title'].str.lower()
+            self.request_filter_update()
 
     def load_data(self):
-        # ... (ton code existant)
         for _, row in df.iterrows():
             item = QListWidgetItem(self.list_widget)
             # ICI : On passe 'self' (la MainWindow) en deuxième argument
@@ -1002,13 +1191,55 @@ class MainWindow(QMainWindow):
 
     def toggle_sort_order(self):
         self.sort_desc = not self.sort_desc
-        self.apply_filters()
+        self.request_filter_update()
         
-    def on_search_changed(self, text):
-        self.search_timer.start()
+    def request_filter_update(self):
+        """Starts the timer to apply filters after a short delay."""
+        self.filter_timer.start()
+
+    def start_filter_worker(self):
+        if not hasattr(self, 'master_df'): return
+
+        # Disable UI to prevent user interaction during filtering
+        self.sidebar.setEnabled(False)
+        self.list_widget.setEnabled(False)
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+
+        sort_col_map = {"Name": "temp_sort_title", "Release Date": "temp_sort_date", "Developer": "Developer"}
+        
+        selected_platforms = []
+        if hasattr(self.sidebar, 'platform_checkboxes'):
+            selected_platforms = [chk.text() for chk in self.sidebar.platform_checkboxes if chk.isChecked()]
+
+        params = {
+            'search_text': self.sidebar.search_bar.text(),
+            'selected_platforms': selected_platforms,
+            'chk_new': self.sidebar.chk_new.isChecked() if hasattr(self.sidebar, 'chk_new') else False,
+            'chk_a_tester': self.sidebar.chk_a_tester.isChecked() if hasattr(self.sidebar, 'chk_a_tester') else False,
+            'chk_vr': self.sidebar.chk_vr.isChecked() if hasattr(self.sidebar, 'chk_vr') else False,
+            'sort_col': sort_col_map[self.sidebar.combo_sort.currentText()],
+            'sort_desc': self.sort_desc,
+        }
+
+        self.filter_worker = FilterWorker(self.master_df, params)
+        self.filter_worker.finished.connect(self.on_filtering_finished)
+        self.filter_worker.start()
+
+    @Slot(object)
+    def on_filtering_finished(self, filtered_df):
+        self.update_display_with_results(filtered_df)
+        QApplication.restoreOverrideCursor()
+        self.sidebar.setEnabled(True)
+        self.list_widget.setEnabled(True)
+
+        if self.is_startup:
+            self.is_startup = False
+            if hasattr(self, 'pending_scroll') and self.pending_scroll > 0:
+                # Use a timer to ensure the list has time to render before scrolling
+                QTimer.singleShot(100, self.restore_scroll_position)
 
     def check_scroll_load(self, value):
-        # Si on est proche du bas (85%), on charge la suite
+        # If we are near the bottom (85%), load more
         maximum = self.list_widget.verticalScrollBar().maximum()
         if maximum > 0 and value >= maximum * 0.85:
             self.load_more_items()
@@ -1018,7 +1249,7 @@ class MainWindow(QMainWindow):
             self.background_loader.stop()
             return
             
-        # Détermine la fin du batch
+        # Determine the end of the batch
         end_index = min(self.loaded_count + self.batch_size, len(self.current_df))
         batch_df = self.current_df.iloc[self.loaded_count:end_index]
         
@@ -1032,76 +1263,33 @@ class MainWindow(QMainWindow):
             
         self.loaded_count = end_index
 
-    def apply_filters(self):
-        if not hasattr(self, 'master_df'): return
-        
-        # Arrête le chargement précédent s'il est en cours
+    def update_display_with_results(self, df):
+        # Stop the previous loading if it's in progress
         self.background_loader.stop()
-        
-        # --- ANCRAGE : Sauvegarde de la sélection ---
+
+        # --- ANCHORING: Save selection ---
         current_item = self.list_widget.currentItem()
         anchor_folder = current_item.data(Qt.UserRole) if current_item else None
-        
-        df = self.master_df.copy()
-        
-        # Filtre Texte
-        search = self.sidebar.search_bar.text().lower()
-        if search:
-            df = df[df['Clean_Title'].str.lower().str.contains(search)]
-            
-        # Filtre Plateforme
-        plat = self.sidebar.combo_platform.currentText()
-        if plat != "Toutes":
-            df = df[df['Platforms'] == plat]
 
-        # Filtres rapides
-        if self.sidebar.chk_new.isChecked():
-            df = df[df['Status_Flag'] != 'OK']
-        else:
-            df = df[df['Status_Flag'] == 'OK']
-        
-        if self.sidebar.chk_a_tester.isChecked():
-            # case=False pour ignorer la casse (_temp, _Temp, etc.)
-            df = df[df['Path_Root'].str.contains('_temp', case=False, na=False)]
-
-        if self.sidebar.chk_vr.isChecked():
-            df = df[df['Path_Root'].str.contains('VR', case=False, na=False)]
-            
-        # Tri
-        sort_col = {"Nom": "Clean_Title", "Date de sortie": "Original_Release_Date", "Développeur": "Developer"}[self.sidebar.combo_sort.currentText()]
-        
-        if sort_col == "Original_Release_Date":
-            # Conversion temporaire en datetime pour un tri chronologique réel
-            # 'coerce' transforme les erreurs ou vides en NaT (Not a Time)
-            df['temp_sort_date'] = pd.to_datetime(df[sort_col], errors='coerce', dayfirst=True)
-            # na_position='last' force les jeux sans date à la fin, peu importe l'ordre de tri
-            df = df.sort_values(by='temp_sort_date', ascending=not self.sort_desc, na_position='last')
-        elif sort_col == "Clean_Title":
-            # Bonus : Tri insensible à la casse pour le nom (Zelda ne sera plus après assassin's creed)
-            df['temp_sort_title'] = df[sort_col].str.lower()
-            df = df.sort_values(by='temp_sort_title', ascending=not self.sort_desc)
-        else:
-            df = df.sort_values(by=sort_col, ascending=not self.sort_desc)
-        
         # Update UI
         self.current_df = df
-        
+
         # Update Counter
         self.sidebar.lbl_counter.setText(f"{len(df)}/{len(self.master_df)}")
-        
+
         self.list_widget.clear()
         self.loaded_count = 0
-        
-        # Charge le premier batch
+
+        # Load the first batch
         self.load_more_items()
-        
-        # --- ANCRAGE : Restauration ---
+
+        # --- ANCHORING: Restoration ---
         if anchor_folder:
             folders_list = self.current_df['Folder_Name'].tolist()
             if anchor_folder in folders_list:
                 row_index = folders_list.index(anchor_folder)
                 
-                # On force le chargement jusqu'à l'élément pour pouvoir l'afficher
+                # Force loading until the item to be able to display it
                 while self.loaded_count <= row_index:
                     self.load_more_items()
                 
@@ -1109,8 +1297,8 @@ class MainWindow(QMainWindow):
                 if item:
                     self.list_widget.setCurrentItem(item)
                     self.list_widget.scrollToItem(item, QAbstractItemView.PositionAtCenter)
-        
-        # Lance le chargement du reste en arrière-plan
+
+        # Start loading the rest in the background
         self.background_loader.start()
 
     def restore_scroll_position(self):
@@ -1118,20 +1306,21 @@ class MainWindow(QMainWindow):
         
         sb = self.list_widget.verticalScrollBar()
         
-        # Si on peut encore charger et qu'on n'a pas atteint la cible
+        # If we can still load and haven't reached the target
         if sb.maximum() < self.pending_scroll and self.loaded_count < len(self.current_df):
             self.load_more_items()
-            # Force la mise à jour du layout pour recalculer le maximum immédiatement
+            # Force layout update to recalculate the maximum immediately
             self.list_widget.doItemsLayout() 
-            # Rappel immédiat pour continuer le chargement si nécessaire
+            # Immediate recall to continue loading if necessary
             QTimer.singleShot(0, self.restore_scroll_position)
         else:
-            # Cible atteinte ou tout chargé : on applique la position finale
+            # Target reached or everything loaded: apply final position
             sb.setValue(self.pending_scroll)
             del self.pending_scroll
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+
     window = MainWindow()
     window.show()
     window.raise_()
