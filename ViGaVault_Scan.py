@@ -872,7 +872,7 @@ class LibraryManager:
             logging.error(f"    [MANUAL SCAN CRITICAL] Erreur API : {response.status_code}")
             return []
 
-    def scan(self, retry_failures=False):
+    def scan(self, retry_failures=False, worker_thread=None):
         token = self.get_access_token()
         logging.info("--- DÉBUT DU SCAN ---")
         if retry_failures:
@@ -890,6 +890,10 @@ class LibraryManager:
         found_folders = set() # Pour suivre les jeux réellement présents sur le disque
 
         for root, dirs, files in os.walk(self.root_path):
+            if worker_thread and worker_thread.isInterruptionRequested():
+                logging.warning("Scan interrompu pendant l'analyse des dossiers.")
+                break # Sortir de la boucle os.walk
+
             dirs[:] = [d for d in dirs if not is_hidden(os.path.join(root, d))]
             rel_path = os.path.relpath(root, self.root_path)
             if rel_path == ".": continue
@@ -900,9 +904,9 @@ class LibraryManager:
             if depth == 1:
                 logging.info(f"Analyse catégorie : {os.path.basename(root)}")
             elif depth == 2:
-                stats['scanned'] += 1
                 for folder in dirs:
-                    found_folders.add(folder) # On marque ce dossier comme trouvé
+                    stats['scanned'] += 1 # Correction: On compte chaque dossier de jeu individuellement
+                    found_folders.add(folder)
                     full_path = os.path.join(root, folder)
                     if folder not in self.games:
                         logging.info(f"    [NEW] Découverte : {folder}")
@@ -922,6 +926,10 @@ class LibraryManager:
         # Nettoyage : Suppression des jeux qui ne sont plus sur le disque
         existing_folders = list(self.games.keys())
         for folder in existing_folders:
+            if worker_thread and worker_thread.isInterruptionRequested():
+                logging.warning("Scan interrompu pendant le nettoyage des fichiers orphelins.")
+                break # Sortir de la boucle de suppression
+
             if folder not in found_folders:
                 game_to_delete = self.games.get(folder)
                 
@@ -951,37 +959,40 @@ class LibraryManager:
         
         logging.info("--- VÉRIFICATION DES METADATA ---")
         for name, game in self.games.items():
+            if worker_thread and worker_thread.isInterruptionRequested():
+                logging.warning("Scan interrompu pendant la récupération des métadonnées.")
+                break # Sortir de la boucle de métadonnées
+
             # SÉCURITÉ : Vérification physique ultime avant requête
             if not os.path.exists(game.data.get('Path_Root', '')):
                 logging.warning(f"    [GHOST] Le dossier '{name}' n'existe plus physiquement. Ignoré.")
                 continue
             
             image_is_missing = not game.data.get('Image_Link') or not os.path.exists(game.data.get('Image_Link'))
+            status = game.data.get('Status_Flag')
 
-            # Cas 1: Le jeu n'est pas "OK", on lance une récupération complète des métadonnées
-            if game.data.get('Status_Flag') != 'OK':
-                reason_for_fetch = ""
-                is_local_unidentified = not game.data.get('game_ID') and game.data.get('Platforms') == 'Warez'
-
-                if game.data.get('Status_Flag') == 'NEW':
-                    reason_for_fetch = "Nouveau jeu"
-                elif game.data.get('Status_Flag') == 'NEEDS_ATTENTION':
-                    reason_for_fetch = "Précédent échec"
-                elif is_local_unidentified:
-                    reason_for_fetch = "Jeu local sans métadonnées"
-                
-                if reason_for_fetch:
-                    logging.info(f"    [FETCHING] Tentative pour : {name} (Raison: {reason_for_fetch})")
-                    if token and game.fetch_metadata(token):
-                        stats['fetched_success'] += 1
-                    else:
-                        logging.warning(f"    [FAILURE] Échec pour : {name}")
-                        stats['fetched_fail'] += 1
-            
-            # Cas 2: Le jeu est "OK", mais l'image manque. On la retélécharge sans toucher au reste.
-            elif image_is_missing:
-                logging.info(f"    [FETCHING] Tentative pour : {name} (Raison: Image manquante pour jeu OK)")
+            # Cas 1: Le jeu est NOUVEAU. On fetch toujours les métadonnées complètes.
+            if status == 'NEW':
+                logging.info(f"    [FETCHING] Tentative pour : {name} (Raison: Nouveau jeu)")
                 if token and game.fetch_metadata(token):
+                    stats['fetched_success'] += 1
+                else:
+                    logging.warning(f"    [FAILURE] Échec pour : {name}")
+                    stats['fetched_fail'] += 1
+            
+            # Cas 2: Le jeu est en échec (NEEDS_ATTENTION) et l'option retry est activée.
+            elif status == 'NEEDS_ATTENTION' and retry_failures:
+                logging.info(f"    [FETCHING] Tentative pour : {name} (Raison: Réessayer un échec précédent)")
+                if token and game.fetch_metadata(token):
+                    stats['fetched_success'] += 1
+                else:
+                    logging.warning(f"    [FAILURE] Échec pour : {name}")
+                    stats['fetched_fail'] += 1
+
+            # Cas 3: Le jeu est "OK", mais l'image manque. On ne récupère que l'image.
+            elif status == 'OK' and image_is_missing:
+                logging.info(f"    [COVER FETCH] Tentative pour : {name} (Raison: Image manquante pour jeu OK)")
+                if token and game.refetch_cover(token):
                     stats['fetched_success'] += 1
                 else:
                     logging.warning(f"    [FAILURE] Échec pour : {name}")
@@ -989,18 +1000,21 @@ class LibraryManager:
 
         
         # Rapport final
-        report = (
-            "\n=== RAPPORT DE SCAN LOCAL ===\n"
-            f"Dossiers scannés : {stats['scanned']}\n"
-            f"-----------------------------------\n"
-            f"Nouveaux jeux détectés : {stats['new']}\n"
-            f"Jeux existants vérifiés : {stats['updated']}\n"
-            f"Jeux supprimés (introuvables) : {stats['deleted']}\n"
-            f"-----------------------------------\n"
-            f"Métadonnées récupérées (IGDB) : {stats['fetched_success']}\n"
-            f"Échecs récupération IGDB : {stats['fetched_fail']}\n"
-            "==================================="
-        )
+        if worker_thread and worker_thread.isInterruptionRequested():
+            report = "\n=== SCAN INTERROMPU PAR L'UTILISATEUR ===\n"
+        else:
+            report = (
+                "\n=== RAPPORT DE SCAN LOCAL ===\n"
+                f"Dossiers scannés : {stats['scanned']}\n"
+                f"-----------------------------------\n"
+                f"Nouveaux jeux détectés : {stats['new']}\n"
+                f"Jeux existants vérifiés : {stats['updated']}\n"
+                f"Jeux supprimés (introuvables) : {stats['deleted']}\n"
+                f"-----------------------------------\n"
+                f"Métadonnées récupérées (IGDB) : {stats['fetched_success']}\n"
+                f"Échecs récupération IGDB : {stats['fetched_fail']}\n"
+                "==================================="
+            )
         logging.info(report)
         self.save_db()
 

@@ -56,7 +56,8 @@ class LocalScanWorker(QThread):
             # We create the manager inside the thread
             manager = LibraryManager(r"\\madhdd02\Software\GAMES", "VGVDB.csv")
             manager.load_db()
-            manager.scan(retry_failures=self.retry_failures)
+            # Pass the thread itself to the manager so it can check for interruption
+            manager.scan(retry_failures=self.retry_failures, worker_thread=self)
         except Exception as e:
             # Log any exceptions that happen inside the thread
             logging.error(f"Erreur critique dans le thread de scan local : {e}")
@@ -330,7 +331,8 @@ class Sidebar(QWidget):
         self.btns_layout.addWidget(self.btn_confirm)
         self.btns_layout.addWidget(self.btn_cancel)
         
-        self.scan_layout.addWidget(QLabel("Scan Manuel"))
+        self.scan_title_label = QLabel("Scan Manuel")
+        self.scan_layout.addWidget(self.scan_title_label)
         self.scan_layout.addWidget(self.scan_input)
         self.scan_layout.addLayout(scan_action_layout)
         self.scan_layout.addWidget(self.scan_results)
@@ -606,9 +608,11 @@ class MainWindow(QMainWindow):
 
         # Show the scan panel as a log viewer
         self.sidebar.scan_panel.show()
+        self.sidebar.scan_title_label.setText("Synchronisation GOG")
         self.sidebar.scan_input.hide()
         self.sidebar.scan_btn.hide()
-        self.sidebar.btn_confirm.hide()
+        self.sidebar.scan_limit_combo.hide()
+        self.sidebar.btn_confirm.hide() #
         self.sidebar.btn_cancel.setText("Fermer")
         self.sidebar.scan_results.clear()
         self.sidebar.scan_results.addItem("Démarrage de la synchronisation GOG...")
@@ -654,12 +658,19 @@ class MainWindow(QMainWindow):
 
         # Show the scan panel as a log viewer
         self.sidebar.scan_panel.show()
+        self.sidebar.scan_title_label.setText("Scan des dossiers locaux")
         self.sidebar.scan_input.hide()
         self.sidebar.scan_btn.hide()
-        self.sidebar.btn_confirm.hide()
-        self.sidebar.btn_cancel.setText("Fermer")
+        self.sidebar.scan_limit_combo.hide()
+        self.sidebar.btn_confirm.hide() #
+        self.sidebar.btn_cancel.setText("Arrêter")
         self.sidebar.scan_results.clear()
         self.sidebar.scan_results.addItem("Démarrage du scan des dossiers locaux...")
+
+        # Disconnect previous signals and connect the stop function
+        try: self.sidebar.btn_cancel.clicked.disconnect()
+        except: pass
+        self.sidebar.btn_cancel.clicked.connect(self.stop_local_scan)
 
         # Setup logging to UI
         self.log_signal = QtLogSignal()
@@ -673,25 +684,40 @@ class MainWindow(QMainWindow):
         self.local_scan_worker.finished.connect(self.finish_local_scan)
         self.local_scan_worker.start()
 
+    def stop_local_scan(self):
+        """Requests interruption of the local scan thread and closes the panel."""
+        if self.local_scan_in_progress and hasattr(self, 'local_scan_worker'):
+            logging.info("--- Interruption du scan demandée par l'utilisateur. ---")
+            self.local_scan_worker.requestInterruption()
+            self.sidebar.scan_panel.hide()
+            self.restore_scan_panel()
+
     def finish_local_scan(self):
         logging.getLogger().removeHandler(self.qt_log_handler)
-        self.sidebar.scan_results.addItem("--- Scan des dossiers terminé ! ---")
-        self.sidebar.scan_results.scrollToBottom()
         
         self.local_scan_in_progress = False
         self.sidebar.btn_scan_local.setEnabled(True)
         self.sidebar.btn_scan_local.setText("Scanner les dossiers locaux")
         self.sidebar.btn_sync_gog.setEnabled(True)
 
-        self.restore_scan_panel()
-        QMessageBox.information(self, "Succès", "Le scan des dossiers est terminé. La liste va être rafraîchie.")
-        self.sidebar.scan_panel.hide()
+        # If the panel is still visible, it means the scan completed without interruption.
+        if self.sidebar.scan_panel.isVisible():
+            self.sidebar.scan_results.addItem("--- Scan des dossiers terminé ! ---")
+            self.sidebar.scan_results.scrollToBottom()
+            # Change button to "Fermer" and set its action to close the panel.
+            self.sidebar.btn_cancel.setText("Fermer")
+            try: self.sidebar.btn_cancel.clicked.disconnect()
+            except: pass
+            self.sidebar.btn_cancel.clicked.connect(self.cancel_inline_scan)
+
         self.refresh_data()
 
     def start_inline_scan(self, game_data):
         self.current_scan_game = game_data
         # On ne touche plus à filter_panel.hide() !
-        self.sidebar.scan_panel.show() 
+        self.sidebar.scan_panel.show()
+
+        self.restore_scan_panel()
         
         # Nettoyage du nom de dossier pour la recherche
         raw_name = game_data.get('Folder_Name', '')
@@ -797,8 +823,10 @@ class MainWindow(QMainWindow):
 
     def restore_scan_panel(self):
         """Resets the scan panel to its default state for manual scanning."""
+        self.sidebar.scan_title_label.setText("Scan Manuel")
         self.sidebar.scan_input.show()
         self.sidebar.scan_btn.show()
+        self.sidebar.scan_limit_combo.show()
         self.sidebar.btn_confirm.show()
         self.sidebar.btn_cancel.setText("Annuler")
 
