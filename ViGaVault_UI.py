@@ -8,7 +8,6 @@ import logging
 import subprocess
 import shutil
 import webbrowser
-import inspect
 from ViGaVault_Scan import LibraryManager, get_safe_filename
 from PySide6.QtWidgets import (QApplication, QMainWindow, QListWidget, QListWidgetItem, 
                              QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QStackedLayout, QFileDialog,
@@ -16,15 +15,8 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QListWidget, QListWidg
 from PySide6.QtCore import Qt, QSize, QTimer, QByteArray, QEvent, QUrl, QThread, Signal, QObject, Slot
 from PySide6.QtGui import QPixmap, QIcon
 
+
 DB_FILE = "VGVDB.csv"
-
-try:
-    from PySide6.QtWebEngineWidgets import QWebEngineView
-    from PySide6.QtWebEngineCore import QWebEngineSettings
-except ImportError:
-    QWebEngineView = None
-    QWebEngineSettings = None
-
 
 # --- Custom Logging Handler for UI ---
 class QtLogSignal(QObject):
@@ -86,11 +78,10 @@ class ActionDialog(QDialog):
         # --- Left Column (Form) ---
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
-
-        form_widget = QWidget()
-        self.form_layout = QFormLayout(form_widget)
+ 
+        metadata_group = QGroupBox("Metadata")
+        self.form_layout = QFormLayout(metadata_group)
         self.inputs = {}
-
         fields_to_disable = [
             'Folder_Name', 'Path_Root', 'Path_Video', 'Status_Flag', 'Image_Link', 
             'Year_Folder', 'Platforms'
@@ -102,21 +93,17 @@ class ActionDialog(QDialog):
         for field, value in self.original_data.items():
             if field in fields_to_exclude:
                 continue
-
             label_text = field.replace('_', ' ').title()
-
             if field == "Summary":
                 inp = QTextEdit(str(value))
             else:
                 inp = QLineEdit(str(value))
-
             if field in fields_to_disable:
                 inp.setEnabled(False)
-
             self.form_layout.addRow(label_text, inp)
             self.inputs[field] = inp
-
-        left_layout.addWidget(form_widget)
+ 
+        left_layout.addWidget(metadata_group)
 
         # --- Right Column (Media) ---
         right_widget = QWidget()
@@ -141,13 +128,23 @@ class ActionDialog(QDialog):
         self.trailer_thumbnail_label = QLabel("No Trailer")
         self.trailer_thumbnail_label.setAlignment(Qt.AlignCenter)
         self.trailer_thumbnail_label.setFixedSize(320, 180)
-        trailer_buttons_layout = QHBoxLayout()
-        self.btn_play_trailer = QPushButton("▶ Play")
-        self.btn_download_trailer = QPushButton("💾 Download")
-        trailer_buttons_layout.addWidget(self.btn_play_trailer)
-        trailer_buttons_layout.addWidget(self.btn_download_trailer)
         self.trailer_layout.addWidget(self.trailer_thumbnail_label, 0, Qt.AlignHCenter)
-        self.trailer_layout.addLayout(trailer_buttons_layout)
+
+        # URL display and copy button
+        url_layout = QHBoxLayout()
+        url_layout.addWidget(QLabel("URL:"))
+        self.url_line_edit = QLineEdit()
+        self.url_line_edit.setReadOnly(True)
+        url_layout.addWidget(self.url_line_edit)
+        copy_btn = QPushButton("📋")
+        copy_btn.setToolTip("Copier l'URL dans le presse-papiers")
+        copy_btn.clicked.connect(self.copy_trailer_url)
+        url_layout.addWidget(copy_btn)
+        self.trailer_layout.addLayout(url_layout)
+
+        self.btn_play_trailer = QPushButton("Play in browser")
+        self.trailer_layout.addWidget(self.btn_play_trailer)
+
         self.setup_trailer_section()
         right_layout.addWidget(self.trailer_group)
 
@@ -196,12 +193,20 @@ class ActionDialog(QDialog):
             logging.error(f"Failed to copy new image: {e}")
             QMessageBox.critical(self, "Error", f"Could not copy the image: {e}")
 
+    def copy_trailer_url(self):
+        if self.trailer_link:
+            clipboard = QApplication.clipboard()
+            clipboard.setText(self.trailer_link)
+            logging.info(f"URL copiée dans le presse-papiers : {self.trailer_link}")
+
     def setup_trailer_section(self):
         self.trailer_link = self.original_data.get('Trailer_Link', '')
         if not self.trailer_link:
             self.trailer_group.hide()
             return
         thumbnail_data = None
+        self.url_line_edit.setText(self.trailer_link)
+
         if 'youtube.com' in self.trailer_link or 'youtu.be' in self.trailer_link:
             match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", self.trailer_link)
             if match:
@@ -214,11 +219,9 @@ class ActionDialog(QDialog):
                 except Exception as e:
                     logging.warning(f"Could not fetch YouTube thumbnail: {e}")
             self.btn_play_trailer.clicked.connect(self.play_trailer)
-            self.btn_download_trailer.clicked.connect(self.download_youtube_trailer)
         elif self.trailer_link.endswith('.mp4'):
             self.trailer_thumbnail_label.setText("MP4 Trailer")
             self.btn_play_trailer.clicked.connect(self.play_trailer)
-            self.btn_download_trailer.clicked.connect(self.download_mp4_trailer)
         else:
             self.trailer_group.hide()
             return
@@ -233,91 +236,10 @@ class ActionDialog(QDialog):
     def play_trailer(self):
         if not self.trailer_link:
             return
-
-        is_youtube = 'youtube.com' in self.trailer_link or 'youtu.be' in self.trailer_link
-
-        if is_youtube:
-            match = re.search(r"(?:v=|\/|embed\/)([0-9A-Za-z_-]{11}).*", self.trailer_link)
-            if match:
-                video_id = match.group(1)
-                embed_url = f"https://www.youtube.com/embed/{video_id}?autoplay=1"
-                
-                if QWebEngineView is not None:
-                    browser_dialog = SimpleBrowserDialog(embed_url, self.original_data.get('Clean_Title', 'Trailer'), self.parent())
-                    browser_dialog.exec()
-                else:
-                    QMessageBox.warning(self, "Dépendance manquante", "La lecture intégrée nécessite 'PySide6-WebEngine' (pip install PySide6-WebEngine).\n\nLa vidéo va s'ouvrir dans votre navigateur par défaut.")
-                    webbrowser.open(self.trailer_link)
-            else:
-                webbrowser.open(self.trailer_link)
-        else:
-            # Pour tout autre lien (ex: .mp4 direct), on ouvre dans le navigateur par défaut
-            webbrowser.open(self.trailer_link)
-
-    def download_youtube_trailer(self):
-        if not self.trailer_link:
-            return
-
-        if not shutil.which('yt-dlp'):
-            QMessageBox.warning(self, "Dépendance manquante", "Le téléchargement des vidéos YouTube nécessite 'yt-dlp'.\n\nVeuillez télécharger 'yt-dlp.exe' et le placer dans le dossier de l'application ou dans votre PATH système.")
-            return
-
-        try:
-            self.btn_download_trailer.setText("...")
-            self.btn_download_trailer.setEnabled(False)
-            QApplication.processEvents()
-            logging.info(f"Téléchargement de la vidéo YouTube avec yt-dlp : {self.trailer_link}")
-            
-            safe_filename = get_safe_filename(self.original_data.get('Folder_Name', ''))
-            dest_path = os.path.join("videos", f"{safe_filename}.mp4")
-            os.makedirs("videos", exist_ok=True)
-
-            command = ['yt-dlp', '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best', '--merge-output-format', 'mp4', '-o', dest_path, self.trailer_link]
-
-            startupinfo = None
-            if os.name == 'nt':
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-
-            result = subprocess.run(command, capture_output=True, text=True, startupinfo=startupinfo, encoding='utf-8', errors='ignore')
-
-            if result.returncode == 0:
-                logging.info(f"Vidéo téléchargée avec succès : {dest_path}")
-                self.updated_data['Path_Video'] = dest_path
-                QMessageBox.information(self, "Succès", f"Vidéo téléchargée et associée au jeu.\nN'oubliez pas de sauvegarder.")
-            else:
-                logging.error(f"Erreur yt-dlp (téléchargement) : {result.stderr}")
-                QMessageBox.critical(self, "Erreur yt-dlp", f"Impossible de télécharger la vidéo (Erreur 400 ou autre).\n\n{result.stderr}")
-        except Exception as e:
-            logging.error(f"Erreur critique (téléchargement) : {e}")
-            QMessageBox.critical(self, "Erreur", f"Une erreur inattendue est survenue durant le téléchargement.\n\n{e}")
-        finally:
-            self.btn_download_trailer.setText("💾 Download")
-            self.btn_download_trailer.setEnabled(True)
-
-    def download_mp4_trailer(self):
-        if not self.trailer_link:
-            return
-        try:
-            self.btn_download_trailer.setText("...")
-            self.btn_download_trailer.setEnabled(False)
-            QApplication.processEvents()
-            safe_filename = get_safe_filename(self.original_data.get('Folder_Name', ''))
-            dest_path = os.path.join("videos", f"{safe_filename}.mp4")
-            os.makedirs("videos", exist_ok=True)
-            response = requests.get(self.trailer_link, stream=True, timeout=10)
-            response.raise_for_status()
-            with open(dest_path, 'wb') as f:
-                shutil.copyfileobj(response.raw, f)
-            logging.info(f"Vidéo téléchargée avec succès : {dest_path}")
-            self.updated_data['Path_Video'] = dest_path
-            QMessageBox.information(self, "Succès", f"Vidéo téléchargée et associée au jeu.\nN'oubliez pas de sauvegarder.")
-        except Exception as e:
-            logging.error(f"Erreur de téléchargement MP4 : {e}")
-            QMessageBox.critical(self, "Erreur", f"Impossible de télécharger la vidéo.\n\n{e}")
-        finally:
-            self.btn_download_trailer.setText("💾 Download")
-            self.btn_download_trailer.setEnabled(True)
+        logging.info(f"Ouverture du trailer dans le navigateur par défaut : {self.trailer_link}")
+        # new=1 tente d'ouvrir une nouvelle fenêtre de navigateur au lieu d'un nouvel onglet.
+        # Le positionnement sur l'écran est géré par le système d'exploitation.
+        webbrowser.open(self.trailer_link, new=1)
 
     def get_data(self):
         new_data = {}
@@ -329,34 +251,6 @@ class ActionDialog(QDialog):
                     new_data[field] = inp.text()
         new_data.update(self.updated_data)
         return new_data
-
-class SimpleBrowserDialog(QDialog):
-    def __init__(self, url, title, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(title)
-        self.setLayout(QVBoxLayout())
-        self.layout().setContentsMargins(0, 0, 0, 0)
-
-        self.browser = QWebEngineView()
-        # Activer les plugins/javascript est souvent nécessaire pour les lecteurs vidéo
-        if QWebEngineSettings:
-            settings = self.browser.settings()
-            settings.setAttribute(QWebEngineSettings.WebAttribute.PluginsEnabled, True)
-            settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
-            settings.setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, True)
-            settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, True)
-        
-        self.browser.setUrl(QUrl(url))
-        self.layout().addWidget(self.browser)
-
-        self.resize(1280, 720)
-
-        # Centrer sur l'écran de la fenêtre parente
-        if parent and parent.window():
-            parent_screen = parent.window().screen()
-            if parent_screen:
-                screen_geometry = parent_screen.geometry()
-                self.move(screen_geometry.center() - self.rect().center())
 
 class Sidebar(QWidget):
     def __init__(self, parent):
