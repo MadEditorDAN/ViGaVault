@@ -8,6 +8,7 @@ import logging
 import subprocess
 import shutil
 import webbrowser
+import inspect
 from ViGaVault_Scan import LibraryManager, get_safe_filename
 from PySide6.QtWidgets import (QApplication, QMainWindow, QListWidget, QListWidgetItem, 
                              QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QStackedLayout, QFileDialog,
@@ -16,13 +17,6 @@ from PySide6.QtCore import Qt, QSize, QTimer, QByteArray, QEvent, QUrl, QThread,
 from PySide6.QtGui import QPixmap, QIcon
 
 DB_FILE = "VGVDB.csv"
-
-try:
-    from pytube import YouTube
-    from pytube.innertube import InnerTube
-except ImportError:
-    YouTube = None
-    InnerTube = None
 
 try:
     from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -87,11 +81,11 @@ class ActionDialog(QDialog):
         self.original_data = data.copy()
         self.updated_data = {}
 
-        main_layout = QHBoxLayout(self)
+        super_main_layout = QVBoxLayout(self)
 
         # --- Left Column (Form) ---
         left_widget = QWidget()
-        left_and_buttons_layout = QVBoxLayout(left_widget)
+        left_layout = QVBoxLayout(left_widget)
 
         form_widget = QWidget()
         self.form_layout = QFormLayout(form_widget)
@@ -122,19 +116,7 @@ class ActionDialog(QDialog):
             self.form_layout.addRow(label_text, inp)
             self.inputs[field] = inp
 
-        left_and_buttons_layout.addWidget(form_widget)
-        left_and_buttons_layout.addStretch()
-
-        # --- Bottom Buttons ---
-        button_box = QHBoxLayout()
-        button_box.addStretch()
-        btn_save = QPushButton("Sauvegarder")
-        btn_cancel = QPushButton("Annuler")
-        btn_save.clicked.connect(self.accept)
-        btn_cancel.clicked.connect(self.reject)
-        button_box.addWidget(btn_save)
-        button_box.addWidget(btn_cancel)
-        left_and_buttons_layout.addLayout(button_box)
+        left_layout.addWidget(form_widget)
 
         # --- Right Column (Media) ---
         right_widget = QWidget()
@@ -171,9 +153,21 @@ class ActionDialog(QDialog):
 
         right_layout.addStretch()
 
-        # Add columns to main layout
-        main_layout.addWidget(left_widget, 2)
-        main_layout.addWidget(right_widget, 1)
+        columns_layout = QHBoxLayout()
+        columns_layout.addWidget(left_widget, 2)
+        columns_layout.addWidget(right_widget, 1)
+        super_main_layout.addLayout(columns_layout)
+
+        # --- Bottom Buttons ---
+        button_box = QHBoxLayout()
+        btn_save = QPushButton("Sauvegarder")
+        btn_cancel = QPushButton("Annuler")
+        btn_save.clicked.connect(self.accept)
+        btn_cancel.clicked.connect(self.reject)
+        button_box.addWidget(btn_save)
+        button_box.addStretch()
+        button_box.addWidget(btn_cancel)
+        super_main_layout.addLayout(button_box)
 
     def update_cover_display(self):
         img_path = self.updated_data.get('Image_Link') or self.original_data.get('Image_Link', '')
@@ -246,7 +240,7 @@ class ActionDialog(QDialog):
             match = re.search(r"(?:v=|\/|embed\/)([0-9A-Za-z_-]{11}).*", self.trailer_link)
             if match:
                 video_id = match.group(1)
-                embed_url = f"https://www.youtube.com/embed/{video_id}?autoplay=1&enablejsapi=1&origin=https://www.youtube.com"
+                embed_url = f"https://www.youtube.com/embed/{video_id}?autoplay=1"
                 
                 if QWebEngineView is not None:
                     browser_dialog = SimpleBrowserDialog(embed_url, self.original_data.get('Clean_Title', 'Trailer'), self.parent())
@@ -261,32 +255,42 @@ class ActionDialog(QDialog):
             webbrowser.open(self.trailer_link)
 
     def download_youtube_trailer(self):
-        if not self.trailer_link or not YouTube or not InnerTube:
-            if not YouTube or not InnerTube:
-                QMessageBox.warning(self, "Dépendance manquante", "Le téléchargement des vidéos YouTube nécessite la librairie 'pytube'.\n\nVeuillez l'installer avec : pip install pytube")
+        if not self.trailer_link:
             return
+
+        if not shutil.which('yt-dlp'):
+            QMessageBox.warning(self, "Dépendance manquante", "Le téléchargement des vidéos YouTube nécessite 'yt-dlp'.\n\nVeuillez télécharger 'yt-dlp.exe' et le placer dans le dossier de l'application ou dans votre PATH système.")
+            return
+
         try:
             self.btn_download_trailer.setText("...")
             self.btn_download_trailer.setEnabled(False)
             QApplication.processEvents()
-            logging.info(f"Téléchargement de la vidéo YouTube : {self.trailer_link}")
-            # On utilise un client alternatif pour contourner les erreurs 400 de YouTube
-            client = InnerTube(client="ANDROID")
-            yt = YouTube(self.trailer_link, innertube_client=client)
-            stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
-            if not stream:
-                QMessageBox.critical(self, "Erreur", "Aucun flux vidéo compatible trouvé pour le téléchargement.")
-                return
+            logging.info(f"Téléchargement de la vidéo YouTube avec yt-dlp : {self.trailer_link}")
+            
             safe_filename = get_safe_filename(self.original_data.get('Folder_Name', ''))
             dest_path = os.path.join("videos", f"{safe_filename}.mp4")
             os.makedirs("videos", exist_ok=True)
-            stream.download(output_path="videos", filename=f"{safe_filename}.mp4")
-            logging.info(f"Vidéo téléchargée avec succès : {dest_path}")
-            self.updated_data['Path_Video'] = dest_path
-            QMessageBox.information(self, "Succès", f"Vidéo téléchargée et associée au jeu.\nN'oubliez pas de sauvegarder.")
+
+            command = ['yt-dlp', '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best', '--merge-output-format', 'mp4', '-o', dest_path, self.trailer_link]
+
+            startupinfo = None
+            if os.name == 'nt':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+            result = subprocess.run(command, capture_output=True, text=True, startupinfo=startupinfo, encoding='utf-8', errors='ignore')
+
+            if result.returncode == 0:
+                logging.info(f"Vidéo téléchargée avec succès : {dest_path}")
+                self.updated_data['Path_Video'] = dest_path
+                QMessageBox.information(self, "Succès", f"Vidéo téléchargée et associée au jeu.\nN'oubliez pas de sauvegarder.")
+            else:
+                logging.error(f"Erreur yt-dlp (téléchargement) : {result.stderr}")
+                QMessageBox.critical(self, "Erreur yt-dlp", f"Impossible de télécharger la vidéo (Erreur 400 ou autre).\n\n{result.stderr}")
         except Exception as e:
-            logging.error(f"Erreur Pytube (téléchargement) : {e}")
-            QMessageBox.critical(self, "Erreur Pytube", f"Impossible de télécharger la vidéo.\n\n{e}")
+            logging.error(f"Erreur critique (téléchargement) : {e}")
+            QMessageBox.critical(self, "Erreur", f"Une erreur inattendue est survenue durant le téléchargement.\n\n{e}")
         finally:
             self.btn_download_trailer.setText("💾 Download")
             self.btn_download_trailer.setEnabled(True)

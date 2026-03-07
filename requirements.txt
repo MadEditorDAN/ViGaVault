@@ -1,4 +1,4 @@
 pandas
 pyside6
 requests
-pytube
+yt-dlp
