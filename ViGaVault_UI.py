@@ -6,16 +6,26 @@ import requests
 import json
 import logging
 import subprocess
-from ViGaVault_Scan import LibraryManager
+import shutil
+import webbrowser
+from ViGaVault_Scan import LibraryManager, get_safe_filename
 from PySide6.QtWidgets import (QApplication, QMainWindow, QListWidget, QListWidgetItem, 
-                             QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QStackedLayout,
-                             QLineEdit, QComboBox, QDialog, QTextEdit, QFormLayout, QMessageBox, QFrame, QAbstractItemView, QCheckBox, QSlider, QStyle)
+                             QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QStackedLayout, QFileDialog,
+                             QLineEdit, QComboBox, QDialog, QTextEdit, QFormLayout, QMessageBox, QFrame, QAbstractItemView, QCheckBox, QSlider, QStyle, QGroupBox)
 from PySide6.QtCore import Qt, QSize, QTimer, QByteArray, QEvent, QUrl, QThread, Signal, QObject
 from PySide6.QtGui import QPixmap, QIcon
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
 
 DB_FILE = "VGVDB.csv"
+
+try:
+    from pytube import YouTube
+    from pytube.innertube import InnerTube
+except ImportError:
+    YouTube = None
+    InnerTube = None
+
 
 # --- Custom Logging Handler for UI ---
 class QtLogSignal(QObject):
@@ -68,47 +78,271 @@ class ActionDialog(QDialog):
     def __init__(self, title, data, parent=None):
         super().__init__(parent)
         self.setWindowTitle(title)
-        self.setMinimumWidth(400)
-        self.layout = QFormLayout(self)
+        self.setMinimumWidth(850)
+        self.original_data = data.copy()
+        self.updated_data = {}
+
+        main_layout = QHBoxLayout(self)
+
+        # --- Left Column (Form) ---
+        left_widget = QWidget()
+        left_and_buttons_layout = QVBoxLayout(left_widget)
+
+        form_widget = QWidget()
+        self.form_layout = QFormLayout(form_widget)
         self.inputs = {}
-        
-        # Liste des champs à afficher en lecture seule
+
         fields_to_disable = [
             'Folder_Name', 'Path_Root', 'Path_Video', 'Status_Flag', 'Image_Link', 
             'Year_Folder', 'Platforms'
         ]
-        
-        for field, value in data.items():
-            # Création des champs
+        fields_to_exclude = [
+            'Trailer_Link', 'game_ID', 'Image_Link', 'temp_sort_date', 'temp_sort_title'
+        ]
+
+        for field, value in self.original_data.items():
+            if field in fields_to_exclude:
+                continue
+
+            label_text = field.replace('_', ' ').title()
+
             if field == "Summary":
                 inp = QTextEdit(str(value))
             else:
                 inp = QLineEdit(str(value))
-            
-            # Griser les champs non modifiables
+
             if field in fields_to_disable:
                 inp.setEnabled(False)
-            
-            self.layout.addRow(field, inp)
+
+            self.form_layout.addRow(label_text, inp)
             self.inputs[field] = inp
-            
-        btn_save = QPushButton("Valider")
+
+        left_and_buttons_layout.addWidget(form_widget)
+        left_and_buttons_layout.addStretch()
+
+        # --- Bottom Buttons ---
+        button_box = QHBoxLayout()
+        button_box.addStretch()
+        btn_save = QPushButton("Sauvegarder")
+        btn_cancel = QPushButton("Annuler")
         btn_save.clicked.connect(self.accept)
-        self.layout.addRow(btn_save)
+        btn_cancel.clicked.connect(self.reject)
+        button_box.addWidget(btn_save)
+        button_box.addWidget(btn_cancel)
+        left_and_buttons_layout.addLayout(button_box)
+
+        # --- Right Column (Media) ---
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+
+        # Section 1: Cover Image
+        cover_group = QGroupBox("Cover Image")
+        cover_layout = QVBoxLayout(cover_group)
+        self.cover_image_label = QLabel("No Cover")
+        self.cover_image_label.setAlignment(Qt.AlignCenter)
+        self.cover_image_label.setFixedSize(200, 266)
+        self.update_cover_display()
+        btn_select_image = QPushButton("Select another Image From Disk")
+        btn_select_image.clicked.connect(self.select_new_image)
+        cover_layout.addWidget(self.cover_image_label, 0, Qt.AlignHCenter)
+        cover_layout.addWidget(btn_select_image)
+        right_layout.addWidget(cover_group)
+
+        # Section 2: Trailer
+        self.trailer_group = QGroupBox("Trailer")
+        self.trailer_layout = QVBoxLayout(self.trailer_group)
+        self.trailer_thumbnail_label = QLabel("No Trailer")
+        self.trailer_thumbnail_label.setAlignment(Qt.AlignCenter)
+        self.trailer_thumbnail_label.setFixedSize(320, 180)
+        trailer_buttons_layout = QHBoxLayout()
+        self.btn_play_trailer = QPushButton("▶ Play")
+        self.btn_download_trailer = QPushButton("💾 Download")
+        trailer_buttons_layout.addWidget(self.btn_play_trailer)
+        trailer_buttons_layout.addWidget(self.btn_download_trailer)
+        self.trailer_layout.addWidget(self.trailer_thumbnail_label, 0, Qt.AlignHCenter)
+        self.trailer_layout.addLayout(trailer_buttons_layout)
+        self.setup_trailer_section()
+        right_layout.addWidget(self.trailer_group)
+
+        right_layout.addStretch()
+
+        # Add columns to main layout
+        main_layout.addWidget(left_widget, 2)
+        main_layout.addWidget(right_widget, 1)
+
+    def update_cover_display(self):
+        img_path = self.updated_data.get('Image_Link') or self.original_data.get('Image_Link', '')
+        if img_path and os.path.exists(img_path):
+            pixmap = QPixmap(img_path).scaled(200, 266, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.cover_image_label.setPixmap(pixmap)
+        else:
+            self.cover_image_label.setText("No Cover Image")
+            self.cover_image_label.setStyleSheet("border: 1px solid #555;")
+
+    def select_new_image(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select Image", "", "Image Files (*.png *.jpg *.jpeg *.webp)")
+        if not file_path:
+            return
+        safe_filename_base = get_safe_filename(self.original_data.get('Folder_Name', ''))
+        _, ext = os.path.splitext(file_path)
+        new_filename = f"{safe_filename_base}{ext}"
+        dest_path = os.path.join("images", new_filename)
+        try:
+            os.makedirs("images", exist_ok=True)
+            shutil.copy(file_path, dest_path)
+            logging.info(f"Image manually changed. New image at: {dest_path}")
+            self.updated_data['Image_Link'] = dest_path
+            self.update_cover_display()
+        except Exception as e:
+            logging.error(f"Failed to copy new image: {e}")
+            QMessageBox.critical(self, "Error", f"Could not copy the image: {e}")
+
+    def setup_trailer_section(self):
+        self.trailer_link = self.original_data.get('Trailer_Link', '')
+        if not self.trailer_link:
+            self.trailer_group.hide()
+            return
+        thumbnail_data = None
+        if 'youtube.com' in self.trailer_link or 'youtu.be' in self.trailer_link:
+            match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", self.trailer_link)
+            if match:
+                video_id = match.group(1)
+                thumbnail_url = f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg"
+                try:
+                    response = requests.get(thumbnail_url, timeout=2)
+                    if response.status_code == 200:
+                        thumbnail_data = response.content
+                except Exception as e:
+                    logging.warning(f"Could not fetch YouTube thumbnail: {e}")
+            self.btn_play_trailer.clicked.connect(self.play_trailer_internal)
+            self.btn_download_trailer.clicked.connect(self.download_youtube_trailer)
+        elif self.trailer_link.endswith('.mp4'):
+            self.trailer_thumbnail_label.setText("MP4 Trailer")
+            self.btn_play_trailer.clicked.connect(self.play_trailer_internal)
+            self.btn_download_trailer.clicked.connect(self.download_mp4_trailer)
+        else:
+            self.trailer_group.hide()
+            return
+        if thumbnail_data:
+            pixmap = QPixmap()
+            pixmap.loadFromData(thumbnail_data)
+            self.trailer_thumbnail_label.setPixmap(pixmap.scaled(320, 180, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        else:
+            self.trailer_thumbnail_label.setText("Trailer Available")
+            self.trailer_thumbnail_label.setStyleSheet("border: 1px solid #555;")
+
+    def play_trailer_internal(self):
+        if not self.trailer_link:
+            return
+
+        source_url = None
+        is_youtube = 'youtube.com' in self.trailer_link or 'youtu.be' in self.trailer_link
+        is_mp4 = self.trailer_link.endswith('.mp4')
+
+        if is_youtube:
+            if not YouTube or not InnerTube:
+                QMessageBox.warning(self, "Dépendance manquante", "La lecture des vidéos YouTube nécessite la librairie 'pytube'.\n\nVeuillez l'installer avec : pip install pytube")
+            else:
+                try:
+                    self.btn_play_trailer.setText("...")
+                    self.btn_play_trailer.setEnabled(False)
+                    QApplication.processEvents()
+                    logging.info(f"Récupération du flux pour la vidéo YouTube : {self.trailer_link}")
+                    # On utilise un client alternatif pour contourner les erreurs 400 de YouTube
+                    client = InnerTube(client="ANDROID")
+                    yt = YouTube(self.trailer_link, innertube_client=client)
+                    stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
+                    if stream:
+                        source_url = QUrl(stream.url)
+                        logging.info(f"Flux trouvé : {stream.url}")
+                    else:
+                        QMessageBox.critical(self, "Erreur", "Aucun flux vidéo compatible n'a été trouvé pour cette vidéo YouTube.")
+                except Exception as e:
+                    logging.error(f"Erreur Pytube : {e}")
+                    QMessageBox.critical(self, "Erreur Pytube", f"Impossible de récupérer le flux de la vidéo.\n\n{e}")
+                finally:
+                    self.btn_play_trailer.setText("▶ Play")
+                    self.btn_play_trailer.setEnabled(True)
+        elif is_mp4:
+            source_url = QUrl(self.trailer_link)
+
+        if source_url:
+            player_dialog = VideoPlayerDialog(source_url, self.original_data.get('Clean_Title', 'Trailer'), self)
+            player_dialog.exec()
+        else:
+            logging.info("Impossible de lire en interne, ouverture dans le navigateur.")
+            webbrowser.open(self.trailer_link)
+
+    def download_youtube_trailer(self):
+        if not self.trailer_link or not YouTube or not InnerTube:
+            if not YouTube or not InnerTube:
+                QMessageBox.warning(self, "Dépendance manquante", "Le téléchargement des vidéos YouTube nécessite la librairie 'pytube'.\n\nVeuillez l'installer avec : pip install pytube")
+            return
+        try:
+            self.btn_download_trailer.setText("...")
+            self.btn_download_trailer.setEnabled(False)
+            QApplication.processEvents()
+            logging.info(f"Téléchargement de la vidéo YouTube : {self.trailer_link}")
+            # On utilise un client alternatif pour contourner les erreurs 400 de YouTube
+            client = InnerTube(client="ANDROID")
+            yt = YouTube(self.trailer_link, innertube_client=client)
+            stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
+            if not stream:
+                QMessageBox.critical(self, "Erreur", "Aucun flux vidéo compatible trouvé pour le téléchargement.")
+                return
+            safe_filename = get_safe_filename(self.original_data.get('Folder_Name', ''))
+            dest_path = os.path.join("videos", f"{safe_filename}.mp4")
+            os.makedirs("videos", exist_ok=True)
+            stream.download(output_path="videos", filename=f"{safe_filename}.mp4")
+            logging.info(f"Vidéo téléchargée avec succès : {dest_path}")
+            self.updated_data['Path_Video'] = dest_path
+            QMessageBox.information(self, "Succès", f"Vidéo téléchargée et associée au jeu.\nN'oubliez pas de sauvegarder.")
+        except Exception as e:
+            logging.error(f"Erreur Pytube (téléchargement) : {e}")
+            QMessageBox.critical(self, "Erreur Pytube", f"Impossible de télécharger la vidéo.\n\n{e}")
+        finally:
+            self.btn_download_trailer.setText("💾 Download")
+            self.btn_download_trailer.setEnabled(True)
+
+    def download_mp4_trailer(self):
+        if not self.trailer_link:
+            return
+        try:
+            self.btn_download_trailer.setText("...")
+            self.btn_download_trailer.setEnabled(False)
+            QApplication.processEvents()
+            safe_filename = get_safe_filename(self.original_data.get('Folder_Name', ''))
+            dest_path = os.path.join("videos", f"{safe_filename}.mp4")
+            os.makedirs("videos", exist_ok=True)
+            response = requests.get(self.trailer_link, stream=True, timeout=10)
+            response.raise_for_status()
+            with open(dest_path, 'wb') as f:
+                shutil.copyfileobj(response.raw, f)
+            logging.info(f"Vidéo téléchargée avec succès : {dest_path}")
+            self.updated_data['Path_Video'] = dest_path
+            QMessageBox.information(self, "Succès", f"Vidéo téléchargée et associée au jeu.\nN'oubliez pas de sauvegarder.")
+        except Exception as e:
+            logging.error(f"Erreur de téléchargement MP4 : {e}")
+            QMessageBox.critical(self, "Erreur", f"Impossible de télécharger la vidéo.\n\n{e}")
+        finally:
+            self.btn_download_trailer.setText("💾 Download")
+            self.btn_download_trailer.setEnabled(True)
 
     def get_data(self):
         new_data = {}
         for field, inp in self.inputs.items():
-            if inp.isEnabled(): # On ne récupère que les données des champs modifiables
+            if inp.isEnabled():
                 if isinstance(inp, QTextEdit):
                     new_data[field] = inp.toPlainText()
                 else:
                     new_data[field] = inp.text()
+        new_data.update(self.updated_data)
         return new_data
 
 class VideoPlayerDialog(QDialog):
-    def __init__(self, video_path, title, parent=None):
+    def __init__(self, source, title, parent=None):
         super().__init__(parent)
+        self.source = source
         self.setWindowTitle(title)
         self.resize(1600, 900)
         # Fenêtre sans bordure
@@ -141,6 +375,13 @@ class VideoPlayerDialog(QDialog):
         self.btn_stop.setIcon(self.style().standardIcon(QStyle.SP_MediaStop))
         self.btn_stop.clicked.connect(self.stop_video)
         controls_layout.addWidget(self.btn_stop)
+
+        # Bouton Lecteur Externe
+        self.btn_external = QPushButton("⧉")
+        self.btn_external.setFixedSize(24, 24)
+        self.btn_external.setToolTip("Ouvrir avec le lecteur par défaut (VLC, MPC...)")
+        self.btn_external.clicked.connect(self.open_externally)
+        controls_layout.addWidget(self.btn_external)
         
         # Slider (Barre de temps)
         self.slider = QSlider(Qt.Horizontal)
@@ -163,7 +404,15 @@ class VideoPlayerDialog(QDialog):
         self.audio = QAudioOutput()
         self.player.setAudioOutput(self.audio)
         self.player.setVideoOutput(self.video_widget)
-        self.player.setSource(QUrl.fromLocalFile(video_path))
+        
+        if isinstance(source, QUrl):
+            self.player.setSource(source)
+            self.btn_external.hide()
+        else: # C'est un chemin de fichier local (str)
+            self.player.setSource(QUrl.fromLocalFile(source))
+            if not os.path.exists(source):
+                self.btn_external.setEnabled(False)
+
         self.audio.setVolume(1.0)
         
         # Connexions signaux lecteur
@@ -173,6 +422,16 @@ class VideoPlayerDialog(QDialog):
         
         self.is_seeking = False
         self.player.play()
+
+    def open_externally(self):
+        if not isinstance(self.source, QUrl) and os.path.exists(self.source):
+            try:
+                logging.info(f"Ouverture du lecteur externe pour : {self.source}")
+                os.startfile(self.source)
+                self.accept() # Ferme le lecteur interne
+            except Exception as e:
+                logging.error(f"Impossible d'ouvrir le fichier externe : {e}")
+                QMessageBox.warning(self, "Erreur", "Impossible d'ouvrir le fichier avec le lecteur externe.")
 
     def toggle_play(self):
         if self.player.playbackState() == QMediaPlayer.PlayingState:
