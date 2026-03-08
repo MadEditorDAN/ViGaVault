@@ -12,9 +12,10 @@ import webbrowser
 from ViGaVault_Scan import LibraryManager, get_safe_filename, get_platform_config
 from PySide6.QtWidgets import (QApplication, QMainWindow, QListWidget, QListWidgetItem, 
                              QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QPushButton, QStackedLayout, QFileDialog, QScrollArea,
-                             QLineEdit, QComboBox, QDialog, QTextEdit, QFormLayout, QMessageBox, QFrame, QAbstractItemView, QCheckBox, QSlider, QStyle, QGroupBox)
+                             QLineEdit, QComboBox, QDialog, QTextEdit, QFormLayout, QMessageBox, QFrame, QAbstractItemView, QCheckBox, QSlider, QStyle, QGroupBox,
+                             QTabWidget, QMenuBar, QMenu)
 from PySide6.QtCore import Qt, QSize, QTimer, QByteArray, QEvent, QUrl, QThread, Signal, QObject, Slot
-from PySide6.QtGui import QPixmap, QIcon
+from PySide6.QtGui import QPixmap, QIcon, QAction
 
 
 DB_FILE = "VGVDB.csv"
@@ -94,25 +95,15 @@ class FilterWorker(QThread):
         if search:
             df = df[df['Clean_Title'].str.lower().str.contains(search)]
             
-        # Platform Filter
-        selected_platforms = self.params['selected_platforms']
-        if selected_platforms:
-            regex_pattern = '|'.join([re.escape(p) for p in selected_platforms])
-            df = df[df['Platforms'].astype(str).str.contains(regex_pattern, case=False, na=False)]
-        else:
-            df = df.iloc[0:0]
-
-        # Quick Filters
-        if self.params['chk_new']:
-            df = df[df['Status_Flag'] != 'OK']
-        else:
-            df = df[df['Status_Flag'] == 'OK']
-        
-        if self.params['chk_a_tester']:
-            df = df[df['Path_Root'].str.contains('_temp', case=False, na=False)]
-
-        if self.params['chk_vr']:
-            df = df[df['Path_Root'].str.contains('VR', case=False, na=False)]
+        # Dynamic Filters
+        active_filters = self.params.get('active_filters', {})
+        for col, selected_values in active_filters.items():
+            if not selected_values:
+                df = df.iloc[0:0] # Empty result if nothing selected in a category
+                break
+            
+            regex_pattern = '|'.join([re.escape(v) for v in selected_values])
+            df = df[df[col].astype(str).str.contains(regex_pattern, case=False, na=False)]
             
         # Sorting
         sort_col = self.params['sort_col']
@@ -354,6 +345,336 @@ class ActionDialog(QDialog):
 
         return new_data
 
+class SettingsDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Settings")
+        self.resize(700, 500)
+        
+        layout = QVBoxLayout(self)
+        self.tabs = QTabWidget()
+        layout.addWidget(self.tabs)
+        
+        # Tab 1: Display
+        self.tab_display = QWidget()
+        self.setup_display_tab()
+        self.tabs.addTab(self.tab_display, "Display")
+        
+        # Tab 2: Local Folders
+        self.tab_folders = QWidget()
+        self.setup_folders_tab()
+        self.tabs.addTab(self.tab_folders, "Local Folders")
+        
+        # Tab 3: Data Sources
+        self.tab_data = QWidget()
+        self.setup_data_tab()
+        self.tabs.addTab(self.tab_data, "Data Sources")
+        
+        # Buttons
+        btn_layout = QHBoxLayout()
+        btn_save = QPushButton("Save")
+        btn_cancel = QPushButton("Cancel")
+        btn_save.clicked.connect(self.accept)
+        btn_cancel.clicked.connect(self.reject)
+        btn_layout.addStretch()
+        btn_layout.addWidget(btn_save)
+        btn_layout.addWidget(btn_cancel)
+        layout.addLayout(btn_layout)
+
+        self.load_settings()
+
+    def setup_display_tab(self):
+        layout = QFormLayout(self.tab_display)
+        
+        # Theme
+        self.combo_theme = QComboBox()
+        self.combo_theme.addItems(["System", "Dark", "Light"])
+        layout.addRow("Theme:", self.combo_theme)
+        
+        # Language
+        self.combo_lang = QComboBox()
+        self.combo_lang.addItems(["English", "French"])
+        layout.addRow("Language:", self.combo_lang)
+        
+        # Card Size
+        self.slider_size = QSlider(Qt.Horizontal)
+        self.slider_size.setRange(100, 300)
+        self.slider_size.setValue(200)
+        layout.addRow("Card Size:", self.slider_size)
+
+    def setup_folders_tab(self):
+        layout = QVBoxLayout(self.tab_folders)
+        
+        grp_root = QGroupBox("Root")
+        layout_root = QFormLayout(grp_root)
+        self.root_path_input = QLineEdit(r"\\madhdd02\Software\GAMES")
+        layout_root.addRow("Main Path:", self.root_path_input)
+        layout.addWidget(grp_root)
+        
+        grp_structure = QGroupBox("Folder Structure")
+        self.struct_layout = QVBoxLayout(grp_structure)
+        
+        self.chk_ignore_hidden = QCheckBox("Ignore Hidden Folders (Global)")
+        self.struct_layout.addWidget(self.chk_ignore_hidden)
+
+        # --- MODE 1: SIMPLE / GLOBAL (Depth 1 or 2) ---
+        self.mode_simple_widget = QWidget()
+        simple_layout = QVBoxLayout(self.mode_simple_widget)
+        simple_layout.setContentsMargins(0, 10, 0, 0)
+        
+        lbl_simple = QLabel("Mode: Global Structure")
+        lbl_simple.setStyleSheet("font-weight: bold; color: #4CAF50;")
+        simple_layout.addWidget(lbl_simple)
+        
+        form_simple = QFormLayout()
+        self.combo_global_type = QComboBox()
+        self.combo_global_type.addItems(["Direct (Root -> Games)", "Genre", "Collection", "Publisher", "Developer", "Year", "Other", "None"])
+        form_simple.addRow("Content of Root Folders:", self.combo_global_type)
+        
+        self.chk_global_filter = QCheckBox("Add to Filters")
+        form_simple.addRow("", self.chk_global_filter)
+        simple_layout.addLayout(form_simple)
+        
+        self.btn_switch_advanced = QPushButton("Add Folder Level (Advanced Mode)")
+        self.btn_switch_advanced.clicked.connect(self.switch_to_advanced)
+        simple_layout.addWidget(self.btn_switch_advanced)
+        simple_layout.addStretch()
+        
+        self.struct_layout.addWidget(self.mode_simple_widget)
+
+        # --- MODE 2: ADVANCED / PER-FOLDER (Depth 3) ---
+        self.mode_advanced_widget = QWidget()
+        adv_layout = QVBoxLayout(self.mode_advanced_widget)
+        adv_layout.setContentsMargins(0, 10, 0, 0)
+        
+        lbl_adv = QLabel("Mode: Per-Folder Rules (Root -> Folders -> Categories -> Games)")
+        lbl_adv.setStyleSheet("font-weight: bold; color: #2196F3;")
+        adv_layout.addWidget(lbl_adv)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        
+        self.levels_container = QWidget()
+        self.folders_grid = QGridLayout(self.levels_container)
+        self.folders_grid.setAlignment(Qt.AlignTop)
+        self.folders_grid.setContentsMargins(0, 0, 0, 0)
+        
+        scroll.setWidget(self.levels_container)
+        adv_layout.addWidget(scroll)
+
+        btn_layout = QHBoxLayout()
+        self.btn_switch_simple = QPushButton("Remove Folder Level")
+        self.btn_switch_simple.clicked.connect(self.switch_to_simple)
+        btn_layout.addWidget(self.btn_switch_simple)
+        btn_layout.addStretch()
+        adv_layout.addLayout(btn_layout)
+        
+        self.struct_layout.addWidget(self.mode_advanced_widget)
+        
+        layout.addWidget(grp_structure, 1)
+
+    def switch_to_simple(self):
+        self.mode_advanced_widget.hide()
+        self.mode_simple_widget.show()
+        self.current_scan_mode = "simple"
+
+    def switch_to_advanced(self):
+        self.mode_simple_widget.hide()
+        self.mode_advanced_widget.show()
+        self.current_scan_mode = "advanced"
+
+    def populate_folders_list(self, saved_rules):
+        # Clear existing
+        while self.folders_grid.count():
+            item = self.folders_grid.takeAt(0)
+            if item.widget(): item.widget().deleteLater()
+
+        # Headers
+        self.folders_grid.addWidget(QLabel("Folder"), 0, 0)
+        self.folders_grid.addWidget(QLabel("Content Type"), 0, 1)
+        self.folders_grid.addWidget(QLabel("Filter"), 0, 2)
+        self.folders_grid.addWidget(QLabel("Scan"), 0, 3)
+
+        # Get folders from disk
+        root = self.root_path_input.text().strip()
+        disk_folders = set()
+        if os.path.exists(root):
+            try:
+                disk_folders = {f for f in os.listdir(root) if os.path.isdir(os.path.join(root, f))}
+            except: pass
+        
+        # Merge with saved rules (to keep rules for disconnected drives)
+        all_folders = sorted(list(disk_folders.union(saved_rules.keys())))
+        
+        self.folder_widgets = {}
+        
+        row = 1
+        for folder in all_folders:
+            # Label
+            lbl = QLabel(folder)
+            if folder not in disk_folders:
+                lbl.setStyleSheet("color: red;") # Indicate missing from disk
+                lbl.setToolTip("Folder not found on disk")
+            
+            # Controls
+            combo = QComboBox()
+            combo.addItems(["None", "Genre", "Collection", "Publisher", "Developer", "Year", "Other"])
+            
+            chk_filter = QCheckBox()
+            chk_scan = QCheckBox()
+            
+            # Defaults
+            default_scan = False # Default to NO SCAN for new folders
+            
+            if folder in saved_rules:
+                rule = saved_rules[folder]
+                combo.setCurrentText(rule.get("type", "None"))
+                chk_filter.setChecked(rule.get("filter", False))
+                chk_scan.setChecked(rule.get("scan", True))
+            else:
+                chk_scan.setChecked(default_scan)
+            
+            # Logic: Disable controls if Scan is unchecked
+            combo.setEnabled(chk_scan.isChecked())
+            chk_filter.setEnabled(chk_scan.isChecked())
+            
+            chk_scan.stateChanged.connect(lambda state, c=combo, f=chk_filter: (c.setEnabled(state), f.setEnabled(state)))
+            
+            self.folders_grid.addWidget(lbl, row, 0)
+            self.folders_grid.addWidget(combo, row, 1)
+            self.folders_grid.addWidget(chk_filter, row, 2)
+            self.folders_grid.addWidget(chk_scan, row, 3)
+            
+            self.folder_widgets[folder] = {
+                "combo": combo,
+                "filter": chk_filter,
+                "scan": chk_scan
+            }
+            row += 1
+
+    def setup_data_tab(self):
+        layout = QVBoxLayout(self.tab_data)
+        
+        grp_gog = QGroupBox("GOG Galaxy")
+        layout_gog = QFormLayout(grp_gog)
+        
+        self.gog_db_input = QLineEdit()
+        default_path = os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db')
+        self.gog_db_input.setText(default_path)
+        
+        btn_browse = QPushButton("...")
+        btn_browse.setFixedWidth(40)
+        btn_browse.clicked.connect(self.browse_gog_db)
+        
+        path_layout = QHBoxLayout()
+        path_layout.addWidget(self.gog_db_input)
+        path_layout.addWidget(btn_browse)
+        
+        layout_gog.addRow("DB Path:", path_layout)
+        layout.addWidget(grp_gog)
+        
+        grp_media = QGroupBox("Media Download")
+        layout_media = QFormLayout(grp_media)
+        self.chk_download_videos = QCheckBox("Download automatically")
+        layout_media.addRow("Videos:", self.chk_download_videos)
+        layout.addWidget(grp_media)
+        
+        layout.addStretch()
+
+    def browse_gog_db(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select GOG Database", self.gog_db_input.text(), "SQLite DB (*.db);;All Files (*.*)")
+        if file_path:
+            self.gog_db_input.setText(file_path)
+
+    def load_settings(self):
+        if os.path.exists("settings.json"):
+            try:
+                with open("settings.json", "r") as f:
+                    settings = json.load(f)
+                
+                # Display
+                self.combo_theme.setCurrentText(settings.get("theme", "System"))
+                self.combo_lang.setCurrentText(settings.get("language", "English"))
+                self.slider_size.setValue(settings.get("card_size", 200))
+                
+                # Folders
+                self.root_path_input.setText(settings.get("root_path", r"\\madhdd02\Software\GAMES"))
+                
+                local_config = settings.get("local_scan_config", {})
+                self.chk_ignore_hidden.setChecked(local_config.get("ignore_hidden", True))
+                
+                self.current_scan_mode = local_config.get("scan_mode", "advanced")
+                self.combo_global_type.setCurrentText(local_config.get("global_type", "Genre"))
+                self.chk_global_filter.setChecked(local_config.get("global_filter", True))
+
+                if self.current_scan_mode == "simple":
+                    self.switch_to_simple()
+                else:
+                    self.switch_to_advanced()
+                
+                self.populate_folders_list(local_config.get("folder_rules", {}))
+                
+                # Data
+                self.gog_db_input.setText(settings.get("gog_db_path", self.gog_db_input.text()))
+                self.chk_download_videos.setChecked(settings.get("download_videos", False))
+                
+            except Exception as e:
+                print(f"Error loading settings in dialog: {e}")
+                self.populate_folders_list({})
+                self.switch_to_advanced() # Default
+        else:
+            # Defaults
+            self.populate_folders_list({})
+            self.switch_to_advanced()
+
+    def save_settings(self):
+        current_settings = {}
+        if os.path.exists("settings.json"):
+            try:
+                with open("settings.json", "r") as f:
+                    current_settings = json.load(f)
+            except: pass
+            
+        current_settings["theme"] = self.combo_theme.currentText()
+        current_settings["language"] = self.combo_lang.currentText()
+        current_settings["card_size"] = self.slider_size.value()
+        
+        current_settings["root_path"] = self.root_path_input.text()
+        
+        folder_rules = {}
+        for folder, widgets in self.folder_widgets.items():
+            folder_rules[folder] = {
+                "type": widgets["combo"].currentText(),
+                "filter": widgets["filter"].isChecked(),
+                "scan": widgets["scan"].isChecked()
+            }
+        
+        current_settings["local_scan_config"] = {
+            "ignore_hidden": self.chk_ignore_hidden.isChecked(),
+            "scan_mode": self.current_scan_mode,
+            "global_type": self.combo_global_type.currentText(),
+            "global_filter": self.chk_global_filter.isChecked(),
+            "folder_rules": folder_rules
+        }
+        
+        current_settings["gog_db_path"] = self.gog_db_input.text()
+        current_settings["download_videos"] = self.chk_download_videos.isChecked()
+        
+        try:
+            with open("settings.json", "w") as f:
+                json.dump(current_settings, f, indent=4)
+        except Exception as e:
+            print(f"Error saving settings: {e}")
+
+    def accept(self):
+        self.save_settings()
+        super().accept()
+        
+        # Refresh the main window filters if parent is MainWindow
+        if self.parent() and hasattr(self.parent(), 'populate_dynamic_filters'):
+            self.parent().populate_dynamic_filters()
+
 class Sidebar(QWidget):
     def __init__(self, parent):
         super().__init__()
@@ -367,7 +688,7 @@ class Sidebar(QWidget):
         
         label_style = "font-weight: bold; font-size: 16px;"
         
-        # 1. Header (Recherche + Compteur)
+        # 1. Header (Search + Counter)
         header_layout = QHBoxLayout()
         lbl_search = QLabel("Search")
         lbl_search.setStyleSheet(label_style)
@@ -383,7 +704,7 @@ class Sidebar(QWidget):
         self.search_bar.setClearButtonEnabled(True)
         self.filter_layout.addWidget(self.search_bar)
         
-        # 3. Tri
+        # 3. Sort
         lbl_sort = QLabel("Sort by")
         lbl_sort.setStyleSheet(label_style)
         self.filter_layout.addWidget(lbl_sort)
@@ -403,14 +724,6 @@ class Sidebar(QWidget):
         self.filters_layout = QGridLayout(filters_group)
         self.filter_layout.addWidget(filters_group)
 
-        # --- PLATFORMS ---
-        self.platforms_group = QGroupBox("Platforms")
-        self.platforms_layout = QGridLayout(self.platforms_group)
-        self.filter_layout.addWidget(self.platforms_group)
-
-        self.platform_checkboxes = []
-
-
         # --- GOG SYNC BUTTON ---
         self.btn_sync_gog = QPushButton("Sync GOG")
         self.filter_layout.addWidget(self.btn_sync_gog)
@@ -427,14 +740,14 @@ class Sidebar(QWidget):
         self.filter_layout.addLayout(scan_local_layout)
 
         # --- FULL SCAN BUTTON ---
-        self.btn_full_scan = QPushButton("Full Scan (GOG + Local)")
+        self.btn_full_scan = QPushButton("FULL Scan")
         self.filter_layout.addWidget(self.btn_full_scan)
 
-        # --- PANNEAU SCAN ---
+        # --- SCAN PANEL ---
         self.scan_panel = QWidget()
         self.scan_layout = QVBoxLayout(self.scan_panel)
         
-        # Ligne de séparation
+        # Separator line
         line = QFrame()
         line.setFrameShape(QFrame.HLine)
         line.setFrameShadow(QFrame.Sunken)
@@ -694,6 +1007,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("ViGaVault Library")
         self.resize(1200, 800)
         self.is_startup = True
+        self.create_menu_bar()
         self.sort_desc = True
         
         
@@ -748,22 +1062,8 @@ class MainWindow(QMainWindow):
             self.master_df['temp_sort_date'] = pd.to_datetime([])
             self.master_df['temp_sort_title'] = []
             
-        # Populate Filters section (Static)
-        self.sidebar.chk_new = QCheckBox("NEW")
-        self.sidebar.chk_a_tester = QCheckBox("TO TEST")
-        self.sidebar.chk_vr = QCheckBox("VR")
-
-        # Add main filters
-        self.sidebar.filters_layout.addWidget(self.sidebar.chk_new, 0, 0)
-        self.sidebar.filters_layout.addWidget(self.sidebar.chk_a_tester, 0, 1)
-        self.sidebar.filters_layout.addWidget(self.sidebar.chk_vr, 0, 2)
-
-        self.sidebar.chk_new.stateChanged.connect(self.request_filter_update)
-        self.sidebar.chk_a_tester.stateChanged.connect(self.request_filter_update)
-        self.sidebar.chk_vr.stateChanged.connect(self.request_filter_update)
-
-        # Populate platforms in the sidebar (Dynamic)
-        self.populate_platforms()
+        # Populate dynamic filters
+        self.populate_dynamic_filters()
             
         # --- RESTORATION ---
         if os.path.exists("settings.json"):
@@ -777,63 +1077,178 @@ class MainWindow(QMainWindow):
         # Initial display
         self.request_filter_update()
 
-    def populate_platforms(self):
-        """Rebuilds the platform checkboxes based on the current master_df."""
+    def create_menu_bar(self):
+        menu_bar = self.menuBar()
+        menu_bar.setStyleSheet("""
+            QMenuBar {
+                font-size: 16px;
+            }
+            QMenu {
+                font-size: 16px;
+            }
+        """)
+        
+        # --- File ---
+        file_menu = menu_bar.addMenu("File")
+        
+        action_new_lib = QAction("New Library...", self)
+        file_menu.addAction(action_new_lib)
+        
+        action_change_lib = QAction("Switch Library...", self)
+        file_menu.addAction(action_change_lib)
+        
+        action_save = QAction("Save", self)
+        action_save.setShortcut("Ctrl+S")
+        file_menu.addAction(action_save)
+        
+        file_menu.addSeparator()
+        
+        action_settings = QAction("Settings", self)
+        action_settings.triggered.connect(self.open_settings)
+        file_menu.addAction(action_settings)
+        
+        action_quit = QAction("Exit", self)
+        action_quit.triggered.connect(self.close)
+        file_menu.addAction(action_quit)
+        
+        # --- Library ---
+        lib_menu = menu_bar.addMenu("Library")
+        
+        action_full_scan = QAction("Full Scan", self)
+        lib_menu.addAction(action_full_scan)
+        
+        lib_menu.addSeparator()
+        
+        action_sync_gog = QAction("Sync GOG", self)
+        lib_menu.addAction(action_sync_gog)
+        
+        action_scan_local = QAction("Scan Local Folders", self)
+        lib_menu.addAction(action_scan_local)
+        
+        lib_menu.addSeparator()
+        
+        action_clean = QAction("Clean Library", self)
+        lib_menu.addAction(action_clean)
+        
+        # --- Tools ---
+        tools_menu = menu_bar.addMenu("Tools")
+        
+        action_media = QAction("Media Manager", self)
+        tools_menu.addAction(action_media)
+        
+        action_platforms = QAction("Platform Manager", self)
+        tools_menu.addAction(action_platforms)
+        
+        action_stats = QAction("Statistics / Report", self)
+        tools_menu.addAction(action_stats)
+        
+        # --- Help ---
+        help_menu = menu_bar.addMenu("Help")
+        
+        action_about = QAction("About", self)
+        help_menu.addAction(action_about)
+
+    def populate_dynamic_filters(self):
+        """Rebuilds the sidebar filters based on settings and data."""
         # Clear existing items in the layout
-        layout = self.sidebar.platforms_layout
+        layout = self.sidebar.filters_layout
         while layout.count():
             item = layout.takeAt(0)
             widget = item.widget()
             if widget:
                 widget.deleteLater()
         
-        self.sidebar.platform_checkboxes = []
+        self.dynamic_filters = {}
 
-        # Get platforms
-        all_platforms = set()
-        if hasattr(self, 'master_df') and not self.master_df.empty and 'Platforms' in self.master_df.columns:
-            for platform_list in self.master_df['Platforms'].dropna().unique():
-                for platform in str(platform_list).split(','):
-                    p = platform.strip()
-                    if p:
-                        all_platforms.add(p)
+        # Load rules
+        local_config = {}
+        rules = {}
+        if os.path.exists("settings.json"):
+            try:
+                with open("settings.json", "r") as f:
+                    local_config = json.load(f).get("local_scan_config", {})
+            except: pass
+            
+        scan_mode = local_config.get("scan_mode", "advanced")
+        rules = local_config.get("folder_rules", {})
+
+        # 1. Always add Platform filter (it's core)
+        self.add_filter_group("Platforms", "Platforms", layout)
+
+        # 2. Add dynamic filters based on rules
+        # We group by Type (e.g. if multiple folders map to "Genre", we show one "Genre" filter)
+        active_types = set()
         
-        has_warez = "Warez" in all_platforms
-        if has_warez:
-            all_platforms.remove("Warez")
-
-        # Re-add buttons
-        btn_all_platforms = QPushButton("All")
-        btn_none_platforms = QPushButton("None")
+        if scan_mode == "advanced":
+            for folder, rule in rules.items():
+                if rule.get("filter", False):
+                    active_types.add(rule.get("type"))
+        else:
+            # Simple mode
+            if local_config.get("global_filter", False):
+                g_type = local_config.get("global_type", "Genre")
+                if "Direct" not in g_type and "None" not in g_type:
+                    active_types.add(g_type)
         
-        btn_all_platforms.clicked.connect(self.select_all_platforms)
-        btn_none_platforms.clicked.connect(self.select_none_platforms)
-
-        layout.addWidget(btn_all_platforms, 0, 0)
-        layout.addWidget(btn_none_platforms, 0, 1)
+        type_map = {
+            "Genre": "Genre",
+            "Collection": "Collection",
+            "Publisher": "Publisher",
+            "Developer": "Developer",
+            "Year": "Year_Folder"
+        }
         
-        row, col = 0, 2 # Start after buttons
+        for type_name, col_name in type_map.items():
+            if type_name in active_types:
+                self.add_filter_group(type_name, col_name, layout)
 
-        if has_warez:
-            self.sidebar.chk_warez = QCheckBox("Warez")
-            self.sidebar.chk_warez.stateChanged.connect(self.request_filter_update)
-            layout.addWidget(self.sidebar.chk_warez, row, col)
-            self.sidebar.platform_checkboxes.append(self.sidebar.chk_warez)
+    def add_filter_group(self, title, col_name, parent_layout):
+        group = QGroupBox(title)
+        grid = QGridLayout(group)
+        
+        # Add All/None buttons for Platform and Genre
+        if title in ["Platforms", "Genre"]:
+            btn_all = QPushButton("All")
+            btn_none = QPushButton("None")
+            btn_all.clicked.connect(lambda: self.set_filter_group_state(col_name, True))
+            btn_none.clicked.connect(lambda: self.set_filter_group_state(col_name, False))
+            grid.addWidget(btn_all, 0, 0)
+            grid.addWidget(btn_none, 0, 1)
+            start_row = 1
+        else:
+            start_row = 0
+        
+        # Get unique values
+        values = set()
+        if hasattr(self, 'master_df') and not self.master_df.empty and col_name in self.master_df.columns:
+            for val_list in self.master_df[col_name].dropna().unique():
+                for val in str(val_list).split(','):
+                    v = val.strip()
+                    if v: values.add(v)
+        
+        checkboxes = []
+        row, col = start_row, 0
+        for val in sorted(list(values)):
+            chk = QCheckBox(val)
+            chk.setChecked(True) # Default all checked
+            chk.stateChanged.connect(self.request_filter_update)
+            grid.addWidget(chk, row, col)
+            checkboxes.append(chk)
             col += 1
-        
-        for platform in sorted(list(all_platforms)):
-            if col > 2:
+            if col > 1: # 2 columns
                 col = 0
                 row += 1
-            chk = QCheckBox(platform)
-            chk.stateChanged.connect(self.request_filter_update)
-            layout.addWidget(chk, row, col)
-            self.sidebar.platform_checkboxes.append(chk)
-            col += 1
-            
-        # Default to checked to ensure visibility of new data
-        for chk in self.sidebar.platform_checkboxes:
-            chk.setChecked(True)
+        
+        self.dynamic_filters[col_name] = checkboxes
+        parent_layout.addWidget(group)
+
+    def set_filter_group_state(self, col_name, state):
+        if col_name in self.dynamic_filters:
+            for chk in self.dynamic_filters[col_name]:
+                chk.blockSignals(True)
+                chk.setChecked(state)
+                chk.blockSignals(False)
+            self.request_filter_update()
 
     def start_gog_sync(self):
         if self.gog_sync_in_progress or self.local_scan_in_progress or self.full_scan_in_progress:
@@ -1083,7 +1498,7 @@ class MainWindow(QMainWindow):
         self.sidebar.scan_results.addItem(item)
         self.sidebar.scan_input.setFocus()
 
-        # On diffère légèrement le lancement pour laisser l'interface s'afficher (message d'attente)
+        # Slightly delay the launch to let the interface display (waiting message)
         # This logic is now here to ensure the context is always correct.
         if hasattr(self, 'run_inline_search'):
             QTimer.singleShot(50, self.run_inline_search)
@@ -1097,11 +1512,11 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", f"Game '{folder_name}' not found in the database.")
             return
 
-        # Met à jour les données du jeu
+        # Updates game data
         for key, value in new_data.items():
             game_obj.data[key] = value
         
-        # Sauvegarde dans le CSV
+        # Save to CSV
         while True:
             try:
                 manager.save_db()
@@ -1171,7 +1586,7 @@ class MainWindow(QMainWindow):
                     pix.loadFromData(data)
                     item.setIcon(QIcon(pix))
                 except Exception:
-                    pass # On ignore silencieusement les erreurs d'image pour ne pas bloquer
+                    pass # Silently ignore image errors to avoid blocking
             self.sidebar.scan_results.addItem(item)
 
         if not candidates:
@@ -1242,30 +1657,16 @@ class MainWindow(QMainWindow):
             item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
             self.sidebar.scan_results.addItem(item)
             
-            # Fermeture automatique du panneau après 2 secondes
+            # Automatically close the panel after 2 seconds
             QTimer.singleShot(2000, self.cancel_inline_scan)
-
-    def select_all_platforms(self):
-        for chk in self.sidebar.platform_checkboxes:
-            chk.blockSignals(True)
-        for chk in self.sidebar.platform_checkboxes:
-            chk.setChecked(True)
-        for chk in self.sidebar.platform_checkboxes:
-            chk.blockSignals(False)
-        self.request_filter_update()
-
-    def select_none_platforms(self):
-        for chk in self.sidebar.platform_checkboxes:
-            chk.blockSignals(True)
-        for chk in self.sidebar.platform_checkboxes:
-            chk.setChecked(False)
-        for chk in self.sidebar.platform_checkboxes:
-            chk.blockSignals(False)
-        self.request_filter_update()
 
     def closeEvent(self, event):
         self.save_settings()
         event.accept()
+
+    def open_settings(self):
+        dlg = SettingsDialog(self)
+        dlg.exec()
 
     def save_settings(self):
         # Load existing settings first to preserve keys not managed by UI (like platform_map)
@@ -1280,12 +1681,8 @@ class MainWindow(QMainWindow):
             "geometry": self.saveGeometry().toBase64().data().decode(),
             "sort_desc": self.sort_desc,
             "sort_index": self.sidebar.combo_sort.currentIndex(),
-            "checked_platforms": [chk.text() for chk in self.sidebar.platform_checkboxes if chk.isChecked()],
             "search_text": self.sidebar.search_bar.text(),
             "scroll_value": self.list_widget.verticalScrollBar().value(),
-            "chk_new": self.sidebar.chk_new.isChecked() if hasattr(self.sidebar, 'chk_new') else False,
-            "chk_a_tester": self.sidebar.chk_a_tester.isChecked() if hasattr(self.sidebar, 'chk_a_tester') else False,
-            "chk_vr": self.sidebar.chk_vr.isChecked() if hasattr(self.sidebar, 'chk_vr') else False,
         })
 
         # Ensure platform config exists in file if it wasn't there
@@ -1323,7 +1720,11 @@ class MainWindow(QMainWindow):
             if hasattr(self.sidebar, 'chk_new'): self.sidebar.chk_new.blockSignals(True)
             if hasattr(self.sidebar, 'chk_a_tester'): self.sidebar.chk_a_tester.blockSignals(True)
             if hasattr(self.sidebar, 'chk_vr'): self.sidebar.chk_vr.blockSignals(True)
-            for chk in self.sidebar.platform_checkboxes: chk.blockSignals(True)
+            
+            if hasattr(self.sidebar, 'dynamic_filters'):
+                for checkboxes in self.sidebar.dynamic_filters.values():
+                    for chk in checkboxes:
+                        chk.blockSignals(True)
 
             if hasattr(self.sidebar, 'chk_new'): self.sidebar.chk_new.setChecked(settings.get("chk_new", False))
             if hasattr(self.sidebar, 'chk_a_tester'): self.sidebar.chk_a_tester.setChecked(settings.get("chk_a_tester", False))
@@ -1331,12 +1732,16 @@ class MainWindow(QMainWindow):
 
             # Restore platform selections
             checked_platforms = settings.get("checked_platforms", [])
-            for chk in self.sidebar.platform_checkboxes:
-                chk.setChecked(chk.text() in checked_platforms)
+            if hasattr(self.sidebar, 'dynamic_filters') and "Platforms" in self.sidebar.dynamic_filters:
+                for chk in self.sidebar.dynamic_filters["Platforms"]:
+                    chk.setChecked(chk.text() in checked_platforms)
             
             self.sidebar.combo_sort.blockSignals(False)
-            for chk in self.sidebar.platform_checkboxes: chk.blockSignals(False)
-            # Unblock signals for other filter checkboxes
+            if hasattr(self.sidebar, 'dynamic_filters'):
+                for checkboxes in self.sidebar.dynamic_filters.values():
+                    for chk in checkboxes:
+                        chk.blockSignals(False)
+            
             if hasattr(self.sidebar, 'chk_new'): self.sidebar.chk_new.blockSignals(False)
             if hasattr(self.sidebar, 'chk_a_tester'): self.sidebar.chk_a_tester.blockSignals(False)
             if hasattr(self.sidebar, 'chk_vr'): self.sidebar.chk_vr.blockSignals(False)
@@ -1353,13 +1758,13 @@ class MainWindow(QMainWindow):
             # Re-add temporary sorting columns after reloading
             self.master_df['temp_sort_date'] = pd.to_datetime(self.master_df['Original_Release_Date'], errors='coerce', dayfirst=True)
             self.master_df['temp_sort_title'] = self.master_df['Clean_Title'].str.lower()
-            self.populate_platforms()
+            self.populate_dynamic_filters()
             self.request_filter_update()
 
     def load_data(self):
         for _, row in df.iterrows():
             item = QListWidgetItem(self.list_widget)
-            # ICI : On passe 'self' (la MainWindow) en deuxième argument
+            # HERE: We pass 'self' (the MainWindow) as the second argument
             card = GameCard(row.to_dict(), self) 
             item.setSizeHint(card.sizeHint())
             self.list_widget.addItem(item)
@@ -1383,16 +1788,17 @@ class MainWindow(QMainWindow):
 
         sort_col_map = {"Name": "temp_sort_title", "Release Date": "temp_sort_date", "Developer": "Developer"}
         
-        selected_platforms = []
-        if hasattr(self.sidebar, 'platform_checkboxes'):
-            selected_platforms = [chk.text() for chk in self.sidebar.platform_checkboxes if chk.isChecked()]
+        # Gather active filters
+        active_filters = {}
+        if hasattr(self, 'dynamic_filters'):
+            for col, checkboxes in self.dynamic_filters.items():
+                # Only apply filter if there are checkboxes in this group
+                if checkboxes:
+                    active_filters[col] = [chk.text() for chk in checkboxes if chk.isChecked()]
 
         params = {
             'search_text': self.sidebar.search_bar.text(),
-            'selected_platforms': selected_platforms,
-            'chk_new': self.sidebar.chk_new.isChecked() if hasattr(self.sidebar, 'chk_new') else False,
-            'chk_a_tester': self.sidebar.chk_a_tester.isChecked() if hasattr(self.sidebar, 'chk_a_tester') else False,
-            'chk_vr': self.sidebar.chk_vr.isChecked() if hasattr(self.sidebar, 'chk_vr') else False,
+            'active_filters': active_filters,
             'sort_col': sort_col_map[self.sidebar.combo_sort.currentText()],
             'sort_desc': self.sort_desc,
         }

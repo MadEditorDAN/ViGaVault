@@ -1,8 +1,12 @@
 {
-    "geometry": "AdnQywADAAAAABQAAAAAegAAG38AAASJAAAWzwAAAWkAABt+AAAEiAAAAAICAAAAB4AAABQAAAAAmQAAG38AAASJ",
+    "geometry": "AdnQywADAAAAABQAAAAAegAAG38AAASJAAAUAQAAAKIAABt+AAAEiAAAAAICAAAAB4AAABQAAAAAmQAAG38AAASJ",
     "sort_desc": true,
-    "sort_index": 0,
-    "checked_platforms": [],
+    "sort_index": 1,
+    "checked_platforms": [
+        "Amazon",
+        "Battle.net",
+        "Epic Games Store"
+    ],
     "search_text": "",
     "scroll_value": 0,
     "chk_new": false,
@@ -57,5 +61,44 @@
         "gameuk",
         "playfire",
         "weplay"
-    ]
+    ],
+    "theme": "System",
+    "language": "English",
+    "card_size": 200,
+    "root_path": "\\\\madhdd02\\Software\\GAMES",
+    "local_scan_config": {
+        "ignore_hidden": false,
+        "scan_mode": "advanced",
+        "global_type": "Genre",
+        "global_filter": true,
+        "folder_rules": {
+            "GAMES": {
+                "type": "Genre",
+                "filter": true,
+                "scan": true
+            },
+            "GAMES COMPIL": {
+                "type": "Collection",
+                "filter": true,
+                "scan": true
+            },
+            "GAMES VR": {
+                "type": "Genre",
+                "filter": true,
+                "scan": true
+            },
+            "GOG REPO": {
+                "type": "None",
+                "filter": false,
+                "scan": false
+            },
+            "_TEMP": {
+                "type": "None",
+                "filter": false,
+                "scan": true
+            }
+        }
+    },
+    "gog_db_path": "C:\\ProgramData\\GOG.com\\Galaxy\\storage\\galaxy-2.0.db",
+    "download_videos": false
 }

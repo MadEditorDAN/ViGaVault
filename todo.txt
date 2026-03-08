@@ -1,21 +1,3 @@
-On va ajouter une barre de menu tout en haut
-Avec les menus  suivants
-Fichier
-	Nouvelle bibliothèque : permet de créer une nouvelle bibliothèque(différents fichiers csv)
-	Changer de bibliothéque : permet de choisir la bibliothèqie active (différents fichiers csv)
-	Nettoyer la bibliotheque :  recherche de doublons incohérences etc..
-	Sauver : sauvegarde manuel de la db
-	Fermer : quitter l'application
-Tools
-	Medias : Nettoyage de fichier media orphelins
-	Plateformes : Liste des platformes et leur clean name + platforme à ignorer, et autres parametres concernant les plateformes
-	Rapport : fait un rapport du nbr de jeux du nbr d'image et de video, du nbr d'image manquante et de vidéos manquantes. le pluis de statistiques possibles
-
-Parametres
-	Affichage - ouvre une fenetre avec les options d'affichage, langue de l'application, mode dark(oui, non ou system defaut) et d'autre options liées à l'affichage... (à réfléchir fait moi des propositions)
-	Dossiers locaux - ouvre une fenetre de configuration permettant de configurer les dossiers pour le scan des fichiers locaux. On y trouvera la possibilité de définir le root path, mais aussi si on veux utiliser 1 2 3 ou autant de sous dossiers que l'on veux, et on pourras définir à quels type de classification chaque niveaux de dossier correspond (genre, année, éditeur, developpeur, collection, ou autre (à réfléchir fait moi des propositions) et utiliser ces parametres dans les différents scan locaux et pour les filtrage dans l'interface.
-	Source de données : Utiliser le DB de Gog Galaxy (recommendé) ou utilisé les intyégrations. (On vas essaye d'utiliser les intégration de gog galaxy dans ViGaVaolt!)	
-	
 Steam integration recupérer le TAG VR
 
 dowload background image from gog sb and use it as gamecard backbround

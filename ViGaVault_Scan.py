@@ -117,6 +117,24 @@ def get_platform_config():
     
     return default_map, default_ignore
 
+def get_local_scan_config():
+    """Loads local scan configuration from settings.json."""
+    default_config = {
+        "ignore_hidden": True,
+        "scan_mode": "advanced",
+        "global_type": "Genre",
+        "folder_rules": {}
+    }
+    settings_path = "settings.json"
+    if os.path.exists(settings_path):
+        try:
+            with open(settings_path, "r", encoding='utf-8') as f:
+                settings = json.load(f)
+                return settings.get("local_scan_config", default_config)
+        except:
+            pass
+    return default_config
+
 def is_hidden(filepath):
     try:
         attrs = ctypes.windll.kernel32.GetFileAttributesW(filepath)
@@ -131,6 +149,7 @@ class Game:
         self.data.setdefault('Path_Root', '')
         self.data.setdefault('Status_Flag', 'NEW')
         self.data.setdefault('Platforms', '')
+        self.data.setdefault('Collection', '')
         if not self.data.get('Clean_Title'):
             self._parse_folder_name()
         self._find_video()
@@ -1174,6 +1193,12 @@ class LibraryManager:
 
     def scan(self, retry_failures=False, worker_thread=None):
         token = self.get_access_token()
+        scan_config = get_local_scan_config()
+        ignore_hidden_global = scan_config.get("ignore_hidden", True)
+        scan_mode = scan_config.get("scan_mode", "advanced")
+        folder_rules = scan_config.get("folder_rules", {})
+        global_type = scan_config.get("global_type", "Genre")
+
         logging.info("--- START OF SCAN ---")
         if retry_failures:
             logging.info("'Retry failures' mode enabled.")
@@ -1189,22 +1214,50 @@ class LibraryManager:
         
         found_folders = set() # To track games actually present on disk
 
+        # Determine Target Depth based on mode
+        target_game_depth = 3 # Default Advanced
+        if scan_mode == "simple":
+            if "Direct" in global_type:
+                target_game_depth = 1
+            else:
+                target_game_depth = 2
+        
+        logging.info(f"Scan Mode: {scan_mode} | Target Game Depth: {target_game_depth}")
+
         for root, dirs, files in os.walk(self.root_path):
             if worker_thread and worker_thread.isInterruptionRequested():
                 logging.warning("Scan interrupted during folder analysis.")
                 break # Exit the os.walk loop
-
-            dirs[:] = [d for d in dirs if not is_hidden(os.path.join(root, d))]
-            dirs.sort() # Ensure sequential scanning (alphabetical order)
+            
+            # Apply global hidden filter
+            if ignore_hidden_global:
+                dirs[:] = [d for d in dirs if not is_hidden(os.path.join(root, d))]
+            
             rel_path = os.path.relpath(root, self.root_path)
             if rel_path == ".": continue
             
-            # Here, we restore the depth check
             depth = rel_path.count(os.sep) + 1
+            path_parts = rel_path.split(os.sep)
+            lvl1_folder = path_parts[0]
+
+            # --- LEVEL 1 CHECK ---
+            # Check if this Lvl 1 folder is allowed to be scanned
+            rule = folder_rules.get(lvl1_folder)
+            
+            # If no rule exists, or scan is False, skip this entire branch
+            if not rule or not rule.get("scan", False):
+                if depth == 1:
+                    logging.info(f"Skipping folder (Scan disabled or new): {lvl1_folder}")
+                # Clear dirs to stop os.walk from going deeper into this folder
+                dirs[:] = []
+                continue
             
             if depth == 1:
-                logging.info(f"Analyzing category: {os.path.basename(root)}")
+                logging.info(f"Analyzing: {lvl1_folder} (Type: {rule.get('type', 'None')})")
+                
             elif depth == 2:
+                # We are inside a Level 2 folder (e.g. Root/Games/FPS)
+                # The 'folder' variable here is the Game Folder (Level 3)
                 for folder in dirs:
                     stats['scanned'] += 1 # Fix: Count each game folder individually
                     found_folders.add(folder)
@@ -1256,12 +1309,40 @@ class LibraryManager:
                             self.games[folder] = Game(Folder_Name=folder, Path_Root=full_path)
                             stats['new'] += 1
                     else:
-                        logging.info(f"    [CHECK] Checking existing game: {folder}")
+                        # logging.info(f"    [CHECK] Checking existing game: {folder}")
                         # For existing games, update the path and re-check the video
                         game = self.games[folder]
                         if game.data.get('Path_Root') != full_path:
                             game.data['Path_Root'] = full_path
                         game._parse_folder_name()
+                        
+                        # --- APPLY FOLDER STRUCTURE METADATA ---
+                        # Apply the rule from Level 1 to the Level 2 folder name
+                        # path_parts[1] is the Level 2 folder name (e.g. "FPS" or "Tomb Raider")
+                        if len(path_parts) >= 2:
+                            content_type = rule.get("type", "None")
+                            content_value = path_parts[1]
+                            
+                            if content_type == "Genre":
+                                # Append to existing genres or replace? 
+                                # Usually folder structure implies the primary genre.
+                                # Let's be safe: if it's not in the list, add it.
+                                current_genres = [g.strip() for g in game.data.get('Genre', '').split(',') if g.strip()]
+                                if content_value not in current_genres:
+                                    current_genres.insert(0, content_value) # Priority
+                                    game.data['Genre'] = ", ".join(current_genres)
+                                    
+                            elif content_type == "Collection":
+                                game.data['Collection'] = content_value
+                                
+                            elif content_type == "Publisher":
+                                game.data['Publisher'] = content_value
+                                
+                            elif content_type == "Developer":
+                                game.data['Developer'] = content_value
+                                
+                            elif content_type == "Year":
+                                game.data['Year_Folder'] = content_value
                         
                         # Cleanup: If we have real platforms, remove 'Warez'
                         p_set = set(x.strip() for x in game.data.get('Platforms', '').split(',') if x.strip())
@@ -1442,6 +1523,17 @@ class LibraryManager:
         # --- BACKUP LOGIC ---
         if os.path.exists(self.db_file):
             os.makedirs(BACKUP_DIR, exist_ok=True)
+            
+            # Cleanup old backups
+            backups = [os.path.join(BACKUP_DIR, f) for f in os.listdir(BACKUP_DIR) if f.startswith("VGVDB_") and f.endswith(".csv.bak")]
+            backups.sort(key=os.path.getctime)
+            while len(backups) >= MAX_FILES:
+                oldest = backups.pop(0)
+                try:
+                    os.remove(oldest)
+                except Exception as e:
+                    logging.error(f"    [BACKUP CLEANUP ERROR] Failed to remove {oldest}: {e}")
+
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_file = os.path.join(BACKUP_DIR, f"VGVDB_{timestamp}.csv.bak")
             try:
@@ -1458,7 +1550,7 @@ class LibraryManager:
         expected_columns = [
             'Folder_Name', 'Clean_Title', 'Search_Title', 'Path_Root', 'Path_Video', 
             'Status_Flag', 'Image_Link', 'Year_Folder', 'Platforms', 'Developer', 
-            'Publisher', 'Original_Release_Date', 'Summary', 'Genre', 'Trailer_Link',
+            'Publisher', 'Original_Release_Date', 'Summary', 'Genre', 'Collection', 'Trailer_Link',
             'game_ID'
         ] + [f'platform_ID_{i:02d}' for i in range(1, 51)]
         
