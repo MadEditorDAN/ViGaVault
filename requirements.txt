@@ -1,3 +1,4 @@
 pandas
 pyside6
 requests
+yt-dlp

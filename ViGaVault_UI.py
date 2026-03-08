@@ -9,7 +9,7 @@ import subprocess
 import shutil
 from datetime import datetime
 import webbrowser
-from ViGaVault_Scan import LibraryManager, get_safe_filename
+from ViGaVault_Scan import LibraryManager, get_safe_filename, get_platform_config
 from PySide6.QtWidgets import (QApplication, QMainWindow, QListWidget, QListWidgetItem, 
                              QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QPushButton, QStackedLayout, QFileDialog, QScrollArea,
                              QLineEdit, QComboBox, QDialog, QTextEdit, QFormLayout, QMessageBox, QFrame, QAbstractItemView, QCheckBox, QSlider, QStyle, QGroupBox)
@@ -64,6 +64,20 @@ class LocalScanWorker(QThread):
             # Log any exceptions that happen inside the thread
             logging.error(f"Critical error in local scan thread: {e}")
 
+class FullScanWorker(QThread):
+    def __init__(self, retry_failures=False):
+        super().__init__()
+        self.retry_failures = retry_failures
+
+    def run(self):
+        """Runs the full scan process."""
+        try:
+            manager = LibraryManager(r"\\madhdd02\Software\GAMES", "VGVDB.csv")
+            manager.load_db()
+            manager.scan_full(retry_failures=self.retry_failures, worker_thread=self)
+        except Exception as e:
+            logging.error(f"Critical error in full scan thread: {e}")
+
 class FilterWorker(QThread):
     finished = Signal(object)
 
@@ -84,7 +98,7 @@ class FilterWorker(QThread):
         selected_platforms = self.params['selected_platforms']
         if selected_platforms:
             regex_pattern = '|'.join([re.escape(p) for p in selected_platforms])
-            df = df[df['Platforms'].str.contains(regex_pattern, case=False, na=False)]
+            df = df[df['Platforms'].astype(str).str.contains(regex_pattern, case=False, na=False)]
         else:
             df = df.iloc[0:0]
 
@@ -297,6 +311,47 @@ class ActionDialog(QDialog):
                 else:
                     new_data[field] = inp.text()
         new_data.update(self.updated_data)
+
+        # --- RENAME MEDIA FILES IF TITLE OR DATE CHANGED ---
+        old_title = self.original_data.get('Clean_Title', '')
+        new_title = new_data.get('Clean_Title', '')
+        old_date = self.original_data.get('Original_Release_Date', '')
+        new_date = new_data.get('Original_Release_Date', '')
+
+        if new_title != old_title or new_date != old_date:
+            # Calculate new base filename
+            base_filename = new_title
+            if new_date and len(new_date) >= 4:
+                base_filename += f" ({new_date[-4:]})"
+            
+            new_safe_name = get_safe_filename(base_filename)
+            
+            # Rename Image
+            old_img_path = new_data.get('Image_Link', '')
+            if old_img_path and os.path.exists(old_img_path):
+                dir_name = os.path.dirname(old_img_path)
+                ext = os.path.splitext(old_img_path)[1]
+                new_img_path = os.path.join(dir_name, f"{new_safe_name}{ext}")
+                if new_img_path != old_img_path:
+                    try:
+                        os.rename(old_img_path, new_img_path)
+                        new_data['Image_Link'] = new_img_path
+                    except Exception as e:
+                        logging.error(f"Failed to rename image: {e}")
+
+            # Rename Video
+            old_vid_path = new_data.get('Path_Video', '')
+            if old_vid_path and os.path.exists(old_vid_path) and "videos" in os.path.abspath(old_vid_path):
+                dir_name = os.path.dirname(old_vid_path)
+                ext = os.path.splitext(old_vid_path)[1]
+                new_vid_path = os.path.join(dir_name, f"{new_safe_name}{ext}")
+                if new_vid_path != old_vid_path:
+                    try:
+                        os.rename(old_vid_path, new_vid_path)
+                        new_data['Path_Video'] = new_vid_path
+                    except Exception as e:
+                        logging.error(f"Failed to rename video: {e}")
+
         return new_data
 
 class Sidebar(QWidget):
@@ -371,6 +426,10 @@ class Sidebar(QWidget):
         
         self.filter_layout.addLayout(scan_local_layout)
 
+        # --- FULL SCAN BUTTON ---
+        self.btn_full_scan = QPushButton("Full Scan (GOG + Local)")
+        self.filter_layout.addWidget(self.btn_full_scan)
+
         # --- PANNEAU SCAN ---
         self.scan_panel = QWidget()
         self.scan_layout = QVBoxLayout(self.scan_panel)
@@ -421,6 +480,7 @@ class Sidebar(QWidget):
         self.btn_toggle_sort.clicked.connect(self.parent.toggle_sort_order)
         self.btn_sync_gog.clicked.connect(self.parent.start_gog_sync)
         self.btn_scan_local.clicked.connect(self.parent.start_local_scan)
+        self.btn_full_scan.clicked.connect(self.parent.start_full_scan)
 
         # Scan Connections
         self.scan_btn.clicked.connect(self.parent.on_manual_search_trigger)
@@ -656,6 +716,7 @@ class MainWindow(QMainWindow):
         self.current_scan_game = None
         self.gog_sync_in_progress = False # Flag to prevent multiple syncs
         self.local_scan_in_progress = False
+        self.full_scan_in_progress = False
         
         # 1. Setup main layout (Horizontal)
         central_widget = QWidget()
@@ -681,84 +742,101 @@ class MainWindow(QMainWindow):
             # Pre-calculate columns for faster sorting
             self.master_df['temp_sort_date'] = pd.to_datetime(self.master_df['Original_Release_Date'], errors='coerce', dayfirst=True)
             self.master_df['temp_sort_title'] = self.master_df['Clean_Title'].str.lower()
-
+        else:
+            # Initialize empty DataFrame if DB doesn't exist
+            self.master_df = pd.DataFrame(columns=['Clean_Title', 'Platforms', 'Original_Release_Date', 'Status_Flag', 'Path_Root', 'Folder_Name'])
+            self.master_df['temp_sort_date'] = pd.to_datetime([])
+            self.master_df['temp_sort_title'] = []
             
-            # Populate platforms in the sidebar
-            all_platforms = set()
+        # Populate Filters section (Static)
+        self.sidebar.chk_new = QCheckBox("NEW")
+        self.sidebar.chk_a_tester = QCheckBox("TO TEST")
+        self.sidebar.chk_vr = QCheckBox("VR")
+
+        # Add main filters
+        self.sidebar.filters_layout.addWidget(self.sidebar.chk_new, 0, 0)
+        self.sidebar.filters_layout.addWidget(self.sidebar.chk_a_tester, 0, 1)
+        self.sidebar.filters_layout.addWidget(self.sidebar.chk_vr, 0, 2)
+
+        self.sidebar.chk_new.stateChanged.connect(self.request_filter_update)
+        self.sidebar.chk_a_tester.stateChanged.connect(self.request_filter_update)
+        self.sidebar.chk_vr.stateChanged.connect(self.request_filter_update)
+
+        # Populate platforms in the sidebar (Dynamic)
+        self.populate_platforms()
+            
+        # --- RESTORATION ---
+        if os.path.exists("settings.json"):
+            saved_scroll = self.load_settings()
+            if saved_scroll:
+                self.pending_scroll = saved_scroll
+        else:
+            # Default sort on "Release Date"
+            self.sidebar.combo_sort.setCurrentIndex(1)
+        
+        # Initial display
+        self.request_filter_update()
+
+    def populate_platforms(self):
+        """Rebuilds the platform checkboxes based on the current master_df."""
+        # Clear existing items in the layout
+        layout = self.sidebar.platforms_layout
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+        
+        self.sidebar.platform_checkboxes = []
+
+        # Get platforms
+        all_platforms = set()
+        if hasattr(self, 'master_df') and not self.master_df.empty and 'Platforms' in self.master_df.columns:
             for platform_list in self.master_df['Platforms'].dropna().unique():
-                for platform in platform_list.split(','):
+                for platform in str(platform_list).split(','):
                     p = platform.strip()
                     if p:
                         all_platforms.add(p)
-            
-            # Separate "Warez" to place it manually next to the "All/None" buttons
-            has_warez = "Warez" in all_platforms
-            if has_warez:
-                all_platforms.remove("Warez")
-            
-            # Populate Filters section
-            self.sidebar.chk_new = QCheckBox("NEW")
-            self.sidebar.chk_a_tester = QCheckBox("TO TEST")
-            self.sidebar.chk_vr = QCheckBox("VR")
+        
+        has_warez = "Warez" in all_platforms
+        if has_warez:
+            all_platforms.remove("Warez")
 
-            # Add main filters
-            self.sidebar.filters_layout.addWidget(self.sidebar.chk_new, 0, 0)
-            self.sidebar.filters_layout.addWidget(self.sidebar.chk_a_tester, 0, 1)
-            self.sidebar.filters_layout.addWidget(self.sidebar.chk_vr, 0, 2)
+        # Re-add buttons
+        btn_all_platforms = QPushButton("All")
+        btn_none_platforms = QPushButton("None")
+        
+        btn_all_platforms.clicked.connect(self.select_all_platforms)
+        btn_none_platforms.clicked.connect(self.select_none_platforms)
 
-            self.sidebar.chk_new.stateChanged.connect(self.request_filter_update)
-            self.sidebar.chk_a_tester.stateChanged.connect(self.request_filter_update)
-            self.sidebar.chk_vr.stateChanged.connect(self.request_filter_update)
+        layout.addWidget(btn_all_platforms, 0, 0)
+        layout.addWidget(btn_none_platforms, 0, 1)
+        
+        row, col = 0, 2 # Start after buttons
 
-            platforms_layout = self.sidebar.platforms_layout
-
-            # Start grid layout for all platform controls
-            row, col = 0, 0
-
-            # Add "All" / "None" buttons for platforms
-            btn_all_platforms = QPushButton("All")
-            btn_none_platforms = QPushButton("None")
-            platforms_layout.addWidget(btn_all_platforms, row, col)
+        if has_warez:
+            self.sidebar.chk_warez = QCheckBox("Warez")
+            self.sidebar.chk_warez.stateChanged.connect(self.request_filter_update)
+            layout.addWidget(self.sidebar.chk_warez, row, col)
+            self.sidebar.platform_checkboxes.append(self.sidebar.chk_warez)
             col += 1
-            platforms_layout.addWidget(btn_none_platforms, row, col)
+        
+        for platform in sorted(list(all_platforms)):
+            if col > 2:
+                col = 0
+                row += 1
+            chk = QCheckBox(platform)
+            chk.stateChanged.connect(self.request_filter_update)
+            layout.addWidget(chk, row, col)
+            self.sidebar.platform_checkboxes.append(chk)
             col += 1
-
-            if has_warez:
-                self.sidebar.chk_warez = QCheckBox("Warez")
-                self.sidebar.chk_warez.stateChanged.connect(self.request_filter_update)
-                platforms_layout.addWidget(self.sidebar.chk_warez, row, col)
-                col += 1
-                # Also add it to the main list for select all/none and settings to work
-                self.sidebar.platform_checkboxes.append(self.sidebar.chk_warez)
-
-            btn_all_platforms.clicked.connect(self.select_all_platforms)
-            btn_none_platforms.clicked.connect(self.select_none_platforms)
-
-            # Add platform filters
-            for platform in sorted(list(all_platforms)):
-                if col > 2:
-                    col = 0
-                    row += 1
-                chk = QCheckBox(platform)
-                chk.stateChanged.connect(self.request_filter_update)
-                platforms_layout.addWidget(chk, row, col)
-                self.sidebar.platform_checkboxes.append(chk)
-                col += 1
             
-            # --- RESTORATION ---
-            if os.path.exists("settings.json"):
-                saved_scroll = self.load_settings()
-                if saved_scroll:
-                    self.pending_scroll = saved_scroll
-            else:
-                # Default sort on "Release Date"
-                self.sidebar.combo_sort.setCurrentIndex(1)
-            
-            # Initial display
-            self.request_filter_update()
+        # Default to checked to ensure visibility of new data
+        for chk in self.sidebar.platform_checkboxes:
+            chk.setChecked(True)
 
     def start_gog_sync(self):
-        if self.gog_sync_in_progress or self.local_scan_in_progress:
+        if self.gog_sync_in_progress or self.local_scan_in_progress or self.full_scan_in_progress:
             QMessageBox.information(self, "Info", "Another task is already in progress.")
             return
 
@@ -775,6 +853,7 @@ class MainWindow(QMainWindow):
         self.gog_sync_in_progress = True
         self.sidebar.btn_sync_gog.setEnabled(False)
         self.sidebar.btn_sync_gog.setText("Syncing...")
+        self.sidebar.btn_full_scan.setEnabled(False)
         self.sidebar.btn_scan_local.setEnabled(False)
 
         # Show the scan panel as a log viewer
@@ -832,17 +911,19 @@ class MainWindow(QMainWindow):
         self.gog_sync_in_progress = False
         self.sidebar.btn_sync_gog.setEnabled(True)
         self.sidebar.btn_sync_gog.setText("Sync GOG")
+        self.sidebar.btn_full_scan.setEnabled(True)
         self.sidebar.btn_scan_local.setEnabled(True)
         self.refresh_data()
 
     def start_local_scan(self):
-        if self.gog_sync_in_progress or self.local_scan_in_progress:
+        if self.gog_sync_in_progress or self.local_scan_in_progress or self.full_scan_in_progress:
             QMessageBox.information(self, "Info", "Another task is already in progress.")
             return
 
         self.local_scan_in_progress = True
         self.sidebar.btn_scan_local.setEnabled(False)
         self.sidebar.btn_scan_local.setText("Scanning...")
+        self.sidebar.btn_full_scan.setEnabled(False)
         self.sidebar.btn_sync_gog.setEnabled(False)
 
         # Show the scan panel as a log viewer
@@ -887,11 +968,90 @@ class MainWindow(QMainWindow):
         self.local_scan_in_progress = False
         self.sidebar.btn_scan_local.setEnabled(True)
         self.sidebar.btn_scan_local.setText("Scan Local Folders")
+        self.sidebar.btn_full_scan.setEnabled(True)
         self.sidebar.btn_sync_gog.setEnabled(True)
 
         # If the panel is still visible, it means the scan completed without interruption.
         if self.sidebar.scan_panel.isVisible():
             self.sidebar.scan_results.addItem("--- Folder scan finished! ---")
+            self.sidebar.scan_results.scrollToBottom()
+            # Change button to "Close" and set its action to close the panel.
+            self.sidebar.btn_cancel.setText("Close")
+            try: self.sidebar.btn_cancel.clicked.disconnect()
+            except: pass
+            self.sidebar.btn_cancel.clicked.connect(self.cancel_inline_scan)
+
+        self.refresh_data()
+
+    def start_full_scan(self):
+        if self.gog_sync_in_progress or self.local_scan_in_progress or self.full_scan_in_progress:
+            QMessageBox.information(self, "Info", "Another task is already in progress.")
+            return
+
+        # Check if GOG Galaxy is running
+        try:
+            output = subprocess.check_output('tasklist', shell=True).decode(errors='ignore')
+            if "GalaxyClient.exe" in output:
+                reply = QMessageBox.question(self, "GOG Galaxy Detected",
+                                            "GOG Galaxy is running. It must be closed to access the database.\n\nPlease close it and click Yes.",
+                                            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                if reply == QMessageBox.No: return
+        except: pass
+
+        self.full_scan_in_progress = True
+        self.sidebar.btn_full_scan.setEnabled(False)
+        self.sidebar.btn_full_scan.setText("Scanning...")
+        self.sidebar.btn_sync_gog.setEnabled(False)
+        self.sidebar.btn_scan_local.setEnabled(False)
+
+        # Show the scan panel as a log viewer
+        self.sidebar.scan_panel.show()
+        self.sidebar.scan_title_label.setText("Full Intelligent Scan")
+        self.sidebar.scan_input.hide()
+        self.sidebar.scan_btn.hide()
+        self.sidebar.scan_limit_combo.hide()
+        self.sidebar.btn_confirm.hide()
+        self.sidebar.btn_cancel.setText("Stop")
+        self.sidebar.scan_results.clear()
+        self.sidebar.scan_results.addItem("Starting Full Scan (GOG Sync + Local)...")
+
+        # Disconnect previous signals and connect the stop function
+        try: self.sidebar.btn_cancel.clicked.disconnect()
+        except: pass
+        self.sidebar.btn_cancel.clicked.connect(self.stop_full_scan)
+
+        # Setup logging to UI
+        self.log_signal = QtLogSignal()
+        self.log_signal.message_written.connect(self.update_sync_log)
+        self.qt_log_handler = QtLogHandler(self.log_signal)
+        logging.getLogger().addHandler(self.qt_log_handler)
+
+        # Setup and start worker thread
+        retry = self.sidebar.chk_retry_failures.isChecked()
+        self.full_scan_worker = FullScanWorker(retry_failures=retry)
+        self.full_scan_worker.finished.connect(self.finish_full_scan)
+        self.full_scan_worker.start()
+
+    def stop_full_scan(self):
+        """Requests interruption of the full scan thread and closes the panel."""
+        if self.full_scan_in_progress and hasattr(self, 'full_scan_worker'):
+            logging.info("--- Full Scan interrupted by user. ---")
+            self.full_scan_worker.requestInterruption()
+            self.sidebar.scan_panel.hide()
+            self.restore_scan_panel()
+
+    def finish_full_scan(self):
+        logging.getLogger().removeHandler(self.qt_log_handler)
+        
+        self.full_scan_in_progress = False
+        self.sidebar.btn_full_scan.setEnabled(True)
+        self.sidebar.btn_full_scan.setText("Full Scan (GOG + Local)")
+        self.sidebar.btn_sync_gog.setEnabled(True)
+        self.sidebar.btn_scan_local.setEnabled(True)
+
+        # If the panel is still visible, it means the scan completed without interruption.
+        if self.sidebar.scan_panel.isVisible():
+            self.sidebar.scan_results.addItem("--- Full Scan finished! ---")
             self.sidebar.scan_results.scrollToBottom()
             # Change button to "Close" and set its action to close the panel.
             self.sidebar.btn_cancel.setText("Close")
@@ -1108,7 +1268,15 @@ class MainWindow(QMainWindow):
         event.accept()
 
     def save_settings(self):
-        settings = {
+        # Load existing settings first to preserve keys not managed by UI (like platform_map)
+        current_settings = {}
+        if os.path.exists("settings.json"):
+            try:
+                with open("settings.json", "r") as f:
+                    current_settings = json.load(f)
+            except: pass
+
+        current_settings.update({
             "geometry": self.saveGeometry().toBase64().data().decode(),
             "sort_desc": self.sort_desc,
             "sort_index": self.sidebar.combo_sort.currentIndex(),
@@ -1118,10 +1286,17 @@ class MainWindow(QMainWindow):
             "chk_new": self.sidebar.chk_new.isChecked() if hasattr(self.sidebar, 'chk_new') else False,
             "chk_a_tester": self.sidebar.chk_a_tester.isChecked() if hasattr(self.sidebar, 'chk_a_tester') else False,
             "chk_vr": self.sidebar.chk_vr.isChecked() if hasattr(self.sidebar, 'chk_vr') else False,
-        }
+        })
+
+        # Ensure platform config exists in file if it wasn't there
+        if "platform_map" not in current_settings:
+             pm, ip = get_platform_config()
+             current_settings["platform_map"] = pm
+             current_settings["ignored_prefixes"] = ip
+
         try:
             with open("settings.json", "w") as f:
-                json.dump(settings, f)
+                json.dump(current_settings, f, indent=4)
         except Exception as e:
             print(f"Error saving settings: {e}")
 
@@ -1178,6 +1353,7 @@ class MainWindow(QMainWindow):
             # Re-add temporary sorting columns after reloading
             self.master_df['temp_sort_date'] = pd.to_datetime(self.master_df['Original_Release_Date'], errors='coerce', dayfirst=True)
             self.master_df['temp_sort_title'] = self.master_df['Clean_Title'].str.lower()
+            self.populate_platforms()
             self.request_filter_update()
 
     def load_data(self):
