@@ -1,3 +1,7 @@
+Move all warez video to vgv video folder
+
 Steam integration recupérer le TAG VR
 
 dowload background image from gog sb and use it as gamecard backbround
+
+In the Gamecard remove [] under the title when there is not local path

@@ -100,7 +100,7 @@
         }
     },
     "gog_db_path": "C:\\ProgramData\\GOG.com\\Galaxy\\storage\\galaxy-2.0.db",
-    "download_videos": false,
+    "download_videos": true,
     "scan_new": false,
     "filter_states": {
         "Platforms": [
@@ -304,7 +304,11 @@
         ]
     },
     "db_path": "C:/Users/mad_e/OneDrive/Batch Collection/ViGaVault/VGVDB.csv",
-    "card_image_size": 180,
-    "card_button_size": 70,
-    "card_text_size": 20
+    "enable_gog_db": true,
+    "video_path": "d:\\VGV-Videos\\",
+    "filter_expansion": {
+        "Platforms": false,
+        "Genre": false,
+        "Collection": false
+    }
 }

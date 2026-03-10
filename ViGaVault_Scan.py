@@ -6,11 +6,11 @@ import shutil
 import ctypes
 import requests
 import sqlite3
-import json
 import argparse
 from datetime import datetime
 from urllib.parse import urlparse
 import difflib
+import json
 
 # --- Optional Dependency Import ---
 try:
@@ -21,12 +21,59 @@ except ImportError:
 
 
 # --- CONFIGURATION ---
-ROOT_PATH = r"\\madhdd02\Software\GAMES"
-DB_FILE = "VGVDB.csv"
+def get_db_path():
+    """Reads the db_path from settings.json, falling back to the default."""
+    settings_file = "settings.json"
+    default_db = "VGVDB.csv"
+    if os.path.exists(settings_file):
+        try:
+            with open(settings_file, "r", encoding='utf-8') as f:
+                settings = json.load(f)
+                return settings.get("db_path", default_db)
+        except Exception:
+            return default_db
+    return default_db
+
 LOG_DIR = "./logs"
 BACKUP_DIR = "./backups"
 VIDEO_EXTS = ('.mp4', '.mkv', '.avi', '.wmv', '.webm')
 MAX_FILES = 10 
+
+def get_library_settings_file():
+    """Returns the path to the JSON settings file for the current library."""
+    db_path = get_db_path() # This is fine, it's dynamic
+    return os.path.splitext(db_path)[0] + ".json"
+
+def get_video_path():
+    """Returns the configured video path or default 'videos' folder."""
+    settings_path = get_library_settings_file()
+    default_path = os.path.join(os.getcwd(), "videos")
+    if os.path.exists(settings_path):
+        try:
+            with open(settings_path, "r", encoding='utf-8') as f:
+                settings = json.load(f)
+                return settings.get("video_path", default_path)
+        except: pass
+    return default_path
+
+def get_root_path():
+    """Returns the configured root path from the library's settings."""
+    settings_path = get_library_settings_file()
+    default_path = r"\\madhdd02\Software\GAMES" # Keep a fallback
+    if os.path.exists(settings_path):
+        try:
+            with open(settings_path, "r", encoding='utf-8') as f:
+                settings = json.load(f)
+                return settings.get("root_path", default_path)
+        except: pass
+    # Fallback to global settings.json if library one fails or doesn't exist
+    if os.path.exists("settings.json"):
+         try:
+            with open("settings.json", "r", encoding='utf-8') as f:
+                settings = json.load(f)
+                return settings.get("root_path", default_path)
+         except: pass
+    return default_path
 
 # --- API CONFIGURATION ---
 IGDB_CLIENT_ID = "a6q5htw1uxkye5kta223vwjs2qlace"
@@ -106,7 +153,11 @@ def get_platform_config():
         'gamesessions', 'gameuk', 'playfire', 'weplay'
     ]
 
-    settings_path = "settings.json"
+    # Try library specific settings first, then fall back to global settings.json
+    settings_path = get_library_settings_file()
+    if not os.path.exists(settings_path):
+        settings_path = "settings.json"
+
     if os.path.exists(settings_path):
         try:
             with open(settings_path, "r", encoding='utf-8') as f:
@@ -125,7 +176,12 @@ def get_local_scan_config():
         "global_type": "Genre",
         "folder_rules": {}
     }
-    settings_path = "settings.json"
+    
+    # Try library specific settings first, then fall back to global settings.json
+    settings_path = get_library_settings_file()
+    if not os.path.exists(settings_path):
+        settings_path = "settings.json"
+        
     if os.path.exists(settings_path):
         try:
             with open(settings_path, "r", encoding='utf-8') as f:
@@ -189,10 +245,11 @@ class Game:
     def _find_video(self):
         # Only look for videos in the centralized 'videos' folder
         # We ignore any video files that might exist in the game's own folder
+        video_dir = get_video_path()
         safe_name = get_safe_filename(self.data.get('Clean_Title') or self.data.get('Folder_Name', ''))
         
         for ext in VIDEO_EXTS:
-            potential_path = os.path.join("videos", f"{safe_name}{ext}")
+            potential_path = os.path.join(video_dir, f"{safe_name}{ext}")
             if os.path.exists(potential_path):
                 self.data['Path_Video'] = potential_path
                 logging.info(f"    [VIDEO] Found locally in videos folder: {safe_name}{ext}")
@@ -536,7 +593,8 @@ class LibraryManager:
             return
 
         os.makedirs("images", exist_ok=True)
-        os.makedirs("videos", exist_ok=True)
+        video_dir = get_video_path()
+        os.makedirs(video_dir, exist_ok=True)
         
         # Stats for the report
         stats = {
@@ -940,7 +998,7 @@ class LibraryManager:
                 # Check if a video already exists physically but is not in the CSV
                 if not video_exists_on_disk:
                     for ext in VIDEO_EXTS:
-                        potential_path = os.path.join("videos", f"{safe_filename}{ext}")
+                        potential_path = os.path.join(video_dir, f"{safe_filename}{ext}")
                         if os.path.exists(potential_path):
                             game_obj.data['Path_Video'] = potential_path
                             video_exists_on_disk = True
@@ -966,7 +1024,7 @@ class LibraryManager:
                                     raise Exception("Download interrupted by user")
 
                             ydl_opts = {
-                                'outtmpl': os.path.join("videos", f"{safe_filename}.%(ext)s"),
+                                'outtmpl': os.path.join(video_dir, f"{safe_filename}.%(ext)s"),
                                 'quiet': True,
                                 'no_warnings': True,
                                 # 'best' can fail on some HLS streams if they are split audio/video.
@@ -1569,7 +1627,7 @@ class LibraryManager:
         logging.info(f"    [DB SAVE] Database saved to {self.db_file} ({len(df)} games).")
 
 if __name__ == "__main__":
-    manager = LibraryManager(ROOT_PATH, DB_FILE)
+    manager = LibraryManager(get_root_path(), get_db_path())
     manager.load_db()
     
     parser = argparse.ArgumentParser(description="ViGaVault Library Manager.")
