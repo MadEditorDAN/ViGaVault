@@ -1,7 +1,50 @@
-Move all warez video to vgv video folder
+Pretyped messages:
+@workspace, lis le fichier INSTRUCTIONS.md et utilise-le comme base de travail pour toutes tes futures réponses sur ce projet.
+It did not worked, I rolled back
 
+Ideas:
 Steam integration recupérer le TAG VR
-
 dowload background image from gog sb and use it as gamecard backbround
 
-In the Gamecard remove [] under the title when there is not local path
+
+
+
+TO DO MAYBE : 
+
+Let's discuss, no code. 
+I would like to Merge the ViGaVault_Scan.py script and the ViGaVault_UI.py script in one new ViGaVault.py script. Is that a good idea/practice or is it better to keep separate .py files for different functions
+
+
+
+
+
+Let's discuss, no code. 
+How do we proceed to create an executable file and an installation exe
+
+
+
+
+TO CHECK : 
+
+self.background_loader.setInterval(100) # Load a batch every 100ms
+Est ce que allonger légerement ce parametre rendra l'interface un peu plus réactive ?
+
+# Check lang/ subdirectory first (cleaner), then root
+        lang_file = os.path.join(self.base_path, "lang", f"{lang_code}.json")
+Les fichier json de langues SON dans le dossier LANG et pas ailleur. Il ne faut pas les chercher ailleur.
+
+
+
+TO DO :
+Rendons fonctionnel le menu tools
+ - Full Scan, lance le Full Scan
+ - media manager montrera les jeux pour lesquels il manque l'image ou la video ou les deux et permettra de tenter de les télécharger sur les différentes source disponible.
+ - Platforme manager :  Pour le moment crée un fenetre vide.
+ - Statistics, le plus de statistiques possible sur la librairie actuelle.
+
+
+
+
+
+Platforme manager :  Mon idée mais elle est loin d'être simple est d'utilisé les plug ins utilise par GOG Galaxy pour récupérer les liste de jeux possédé sur les différentes platformes. Idée a discuter sérieusement avant de se lancer. 
+

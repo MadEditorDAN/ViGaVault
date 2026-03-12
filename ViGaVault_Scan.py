@@ -198,6 +198,22 @@ def is_hidden(filepath):
     except:
         return False
 
+def normalize_genre(text):
+    """Normalizes a comma-separated genre string to Title Case."""
+    if not text: return ""
+    parts = str(text).split(',')
+    clean_parts = []
+    seen = set()
+    for p in parts:
+        p = p.strip()
+        if not p: continue
+        # Force title case to fix PLATFORM -> Platform
+        p_norm = p.title()
+        if p_norm.lower() not in seen:
+            clean_parts.append(p_norm)
+            seen.add(p_norm.lower())
+    return ", ".join(clean_parts)
+
 class Game:
     def __init__(self, **kwargs):
         self.data = kwargs
@@ -243,6 +259,11 @@ class Game:
         self.data['Search_Title'] = clean_name
 
     def _find_video(self):
+        # If a valid video path already exists, do nothing.
+        current_path = self.data.get('Path_Video', '')
+        if current_path and os.path.exists(current_path):
+            return
+
         # Only look for videos in the centralized 'videos' folder
         # We ignore any video files that might exist in the game's own folder
         video_dir = get_video_path()
@@ -391,7 +412,7 @@ class Game:
                     g = best_match
                     self.data['Clean_Title'] = g.get('name', self.data['Clean_Title'])
                     self.data['Summary'] = g.get('summary', '')
-                    self.data['Genre'] = ", ".join([ge['name'] for ge in g.get('genres', [])])
+                    self.data['Genre'] = normalize_genre(", ".join([ge['name'] for ge in g.get('genres', [])]))
                     
                     companies = g.get('involved_companies', [])
                     self.data['Developer'] = ", ".join([c['company']['name'] for c in companies if c.get('developer')])
@@ -487,7 +508,7 @@ class Game:
                     g = best_match
                     self.data['Clean_Title'] = g.get('name', self.data['Clean_Title'])
                     self.data['Summary'] = g.get('summary', '')
-                    self.data['Genre'] = ", ".join([ge['name'] for ge in g.get('genres', [])])
+                    self.data['Genre'] = normalize_genre(", ".join([ge['name'] for ge in g.get('genres', [])]))
                     
                     companies = g.get('involved_companies', [])
                     self.data['Developer'] = ", ".join([c['company']['name'] for c in companies if c.get('developer')])
@@ -514,7 +535,7 @@ class Game:
         logging.info(f"    [MANUAL APPLY] Application des données pour '{self.data.get('Clean_Title')}' -> '{g.get('name')}'")
         self.data['Clean_Title'] = g.get('name', self.data.get('Clean_Title'))
         self.data['Summary'] = g.get('summary', '')
-        self.data['Genre'] = ", ".join([ge['name'] for ge in g.get('genres', [])])
+        self.data['Genre'] = normalize_genre(", ".join([ge['name'] for ge in g.get('genres', [])]))
         
         companies = g.get('involved_companies', [])
         self.data['Developer'] = ", ".join([c['company']['name'] for c in companies if c.get('developer')])
@@ -539,7 +560,7 @@ class Game:
 
         # Forced image download
         self.data['Image_Link'] = self._ensure_cover(g, force_download=True)
-        self.data['Status_Flag'] = 'OK'
+        self.data['Status_Flag'] = 'LOCKED'
         return True
 
     def to_dict(self):
@@ -562,34 +583,32 @@ class LibraryManager:
 
         try:
             con = sqlite3.connect(f'file:{gog_db_path}?mode=ro', uri=True)
-            query = """
-                SELECT DISTINCT
-                    urp.releaseKey,
-                    (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'meta' LIMIT 1) as meta_json,
-                    (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'title' LIMIT 1) as title_json,
-                    (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'originalTitle' LIMIT 1) as orig_title_json,
-                    (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'summary' LIMIT 1) as summary_json,
-                    (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'developers' LIMIT 1) as developers_json,
-                    (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'publishers' LIMIT 1) as publishers_json,
-                    (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'originalImages' LIMIT 1) as original_images_json,
-                    (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'allGameReleases' LIMIT 1) as all_releases_json,
-                    (SELECT name FROM Products p JOIN ReleaseProperties rp ON p.id = rp.gameId WHERE rp.releaseKey = urp.releaseKey LIMIT 1) as product_name,
-                    (SELECT title FROM LimitedDetails WHERE productId = (SELECT gameId FROM ReleaseProperties WHERE releaseKey = urp.releaseKey LIMIT 1) LIMIT 1) as ld_title,
-                    (SELECT description FROM Details d JOIN LimitedDetails ld ON d.limitedDetailsId = ld.id WHERE ld.productId = (SELECT gameId FROM ReleaseProperties WHERE releaseKey = urp.releaseKey LIMIT 1) LIMIT 1) as ld_summary,
-                    (SELECT releaseDate FROM Details d JOIN LimitedDetails ld ON d.limitedDetailsId = ld.id WHERE ld.productId = (SELECT gameId FROM ReleaseProperties WHERE releaseKey = urp.releaseKey LIMIT 1) LIMIT 1) as ld_release_date,
-                    (SELECT images FROM LimitedDetails WHERE productId = (SELECT gameId FROM ReleaseProperties WHERE releaseKey = urp.releaseKey LIMIT 1) LIMIT 1) as ld_images
-                FROM
-                    UserReleaseProperties urp
-                LEFT JOIN
-                    ReleaseProperties rp ON urp.releaseKey = rp.releaseKey
-                WHERE
-                    (rp.isDlc IS NULL OR rp.isDlc = 0)
-            """
-            gog_games = con.execute(query).fetchall()
-            con.close()
-            logging.info(f"{len(gog_games)} games found in your GOG library.")
+            cursor = con.cursor()
+            query = """SELECT DISTINCT
+ urp.releaseKey,
+ (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'meta' LIMIT 1) as meta_json,
+ (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'title' LIMIT 1) as title_json,
+ (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'originalTitle' LIMIT 1) as orig_title_json,
+ (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'summary' LIMIT 1) as summary_json,
+ (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'developers' LIMIT 1) as developers_json,
+ (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'publishers' LIMIT 1) as publishers_json,
+ (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'originalImages' LIMIT 1) as original_images_json,
+ (SELECT value FROM GamePieces gp JOIN GamePieceTypes gpt ON gp.gamePieceTypeId = gpt.id WHERE gp.releaseKey = urp.releaseKey AND gpt.type = 'allGameReleases' LIMIT 1) as all_releases_json,
+ (SELECT name FROM Products p JOIN ReleaseProperties rp ON p.id = rp.gameId WHERE rp.releaseKey = urp.releaseKey LIMIT 1) as product_name,
+ (SELECT title FROM LimitedDetails WHERE productId = (SELECT gameId FROM ReleaseProperties WHERE releaseKey = urp.releaseKey LIMIT 1) LIMIT 1) as ld_title,
+ (SELECT description FROM Details d JOIN LimitedDetails ld ON d.limitedDetailsId = ld.id WHERE ld.productId = (SELECT gameId FROM ReleaseProperties WHERE releaseKey = urp.releaseKey LIMIT 1) LIMIT 1) as ld_summary,
+ (SELECT releaseDate FROM Details d JOIN LimitedDetails ld ON d.limitedDetailsId = ld.id WHERE ld.productId = (SELECT gameId FROM ReleaseProperties WHERE releaseKey = urp.releaseKey LIMIT 1) LIMIT 1) as ld_release_date,
+ (SELECT images FROM LimitedDetails WHERE productId = (SELECT gameId FROM ReleaseProperties WHERE releaseKey = urp.releaseKey LIMIT 1) LIMIT 1) as ld_images
+ FROM
+ UserReleaseProperties urp
+ LEFT JOIN
+ ReleaseProperties rp ON urp.releaseKey = rp.releaseKey
+ WHERE
+ (rp.isDlc IS NULL OR rp.isDlc = 0)"""
+            cursor.execute(query)
         except Exception as e:
             logging.error(f"Error reading GOG database: {e}")
+            if 'con' in locals() and con: con.close()
             return
 
         os.makedirs("images", exist_ok=True)
@@ -598,7 +617,7 @@ class LibraryManager:
         
         # Stats for the report
         stats = {
-            'total_found': len(gog_games),
+            'total_found': 0,
             'processed': 0,
             'new': 0,
             'matched_key': 0,
@@ -626,11 +645,23 @@ class LibraryManager:
         found_gog_keys = set()
         processed_games_session = set()
 
-        for releaseKey, meta_json, title_json, orig_title_json, summary_json, developers_json, publishers_json, original_images_json, all_releases_json, product_name, ld_title, ld_summary, ld_release_date, ld_images in gog_games:
+        while True:
             # Check for interruption request from the UI thread
             if worker_thread and worker_thread.isInterruptionRequested():
                 logging.warning("GOG Sync interrupted by user.")
                 break
+
+            row = cursor.fetchone()
+            if row is None:
+                break # End of results
+
+            stats['total_found'] += 1
+            if stats['total_found'] % 100 == 0:
+                logging.info(f"    ... processed {stats['total_found']} GOG entries ...")
+
+            (releaseKey, meta_json, title_json, orig_title_json, summary_json, 
+             developers_json, publishers_json, original_images_json, all_releases_json, 
+             product_name, ld_title, ld_summary, ld_release_date, ld_images) = row
 
             found_gog_keys.add(releaseKey)
 
@@ -710,7 +741,6 @@ class LibraryManager:
                 # This filters out DLCs/Editions that GOG Galaxy lists as separate entries but share the same name.
                 session_key = (re.sub(r'[^a-z0-9]', '', title.lower()), platform)
                 if session_key in processed_games_session:
-                    logging.info(f"    [GOG SKIP] Duplicate title/platform in session: '{title}' ({platform})")
                     continue
                 processed_games_session.add(session_key)
 
@@ -830,6 +860,11 @@ class LibraryManager:
                 if force_media_refresh:
                     logging.info(f"    [GOG REFRESH] 'NEW' status detected for '{title}'. Checking for missing media.")
 
+                # --- LOCKED STATUS CHECK ---
+                if game_obj.data.get('Status_Flag') == 'LOCKED':
+                    logging.info(f"    [LOCKED] Skipping metadata update for protected game: {title}")
+                    continue
+
                 # --- UPDATING DATA ---
                 current_ids = set(x.strip() for x in game_obj.data.get('game_ID', '').split(',') if x.strip())
                 current_ids.add(releaseKey)
@@ -897,11 +932,13 @@ class LibraryManager:
                 # Genre
                 genres = meta_data.get('genres')
                 if genres:
+                    raw_genre = ""
                     if isinstance(genres, list):
                         if len(genres) > 0 and isinstance(genres[0], dict):
-                             game_obj.data['Genre'] = ", ".join([g.get('name', '') for g in genres if g.get('name')])
+                             raw_genre = ", ".join([g.get('name', '') for g in genres if g.get('name')])
                         else:
-                             game_obj.data['Genre'] = ", ".join([str(g) for g in genres])
+                             raw_genre = ", ".join([str(g) for g in genres])
+                    game_obj.data['Genre'] = normalize_genre(raw_genre)
 
                 # Release Date
                 release_date = None
@@ -1011,12 +1048,13 @@ class LibraryManager:
                     break
 
                 # Check if video_url is a real downloadable URL
-                is_downloadable_url = video_url and video_url not in ['no_mp4', 'no_section']
+                is_youtube = video_url and ('youtube.com' in video_url or 'youtu.be' in video_url)
+                is_downloadable_url = video_url and video_url not in ['no_mp4', 'no_section'] and not is_youtube
 
                 if is_downloadable_url and not video_exists_on_disk:
                     if YT_DLP_AVAILABLE:
                         try:
-                            logging.info(f"    [VIDEO] Found video URL, downloading with yt-dlp: {safe_filename} ...")
+                            logging.info(f"    [VIDEO] Found video URL ({video_url}), downloading with yt-dlp: {safe_filename} ...")
                             
                             # Hook to stop download if interrupted
                             def progress_hook(d):
@@ -1123,6 +1161,8 @@ class LibraryManager:
             except Exception as e:
                 logging.error(f"    [GOG ERROR] Error processing game '{title}' (releaseKey: {releaseKey}): {e}")
                 stats['errors'] += 1
+
+        con.close()
 
         # --- CLEANUP: Remove Ghost entries no longer in GOG ---
         # Only perform cleanup if the sync wasn't interrupted
@@ -1382,13 +1422,10 @@ class LibraryManager:
                             content_value = path_parts[1]
                             
                             if content_type == "Genre":
-                                # Append to existing genres or replace? 
-                                # Usually folder structure implies the primary genre.
-                                # Let's be safe: if it's not in the list, add it.
-                                current_genres = [g.strip() for g in game.data.get('Genre', '').split(',') if g.strip()]
-                                if content_value not in current_genres:
-                                    current_genres.insert(0, content_value) # Priority
-                                    game.data['Genre'] = ", ".join(current_genres)
+                                # Prepend the folder genre to the existing genre string and normalize
+                                current = game.data.get('Genre', '')
+                                combined = f"{content_value}, {current}" if current else content_value
+                                game.data['Genre'] = normalize_genre(combined)
                                     
                             elif content_type == "Collection":
                                 game.data['Collection'] = content_value
@@ -1583,7 +1620,7 @@ class LibraryManager:
             os.makedirs(BACKUP_DIR, exist_ok=True)
             
             # Cleanup old backups
-            backups = [os.path.join(BACKUP_DIR, f) for f in os.listdir(BACKUP_DIR) if f.startswith("VGVDB_") and f.endswith(".csv.bak")]
+            backups = [os.path.join(BACKUP_DIR, f) for f in os.listdir(BACKUP_DIR) if f.startswith("VGVDB_") and f.endswith(".csv")]
             backups.sort(key=os.path.getctime)
             while len(backups) >= MAX_FILES:
                 oldest = backups.pop(0)
@@ -1593,7 +1630,7 @@ class LibraryManager:
                     logging.error(f"    [BACKUP CLEANUP ERROR] Failed to remove {oldest}: {e}")
 
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_file = os.path.join(BACKUP_DIR, f"VGVDB_{timestamp}.csv.bak")
+            backup_file = os.path.join(BACKUP_DIR, f"VGVDB_{timestamp}.csv")
             try:
                 shutil.copy2(self.db_file, backup_file)
                 logging.info(f"    [DB BACKUP] Backup created at {backup_file}")

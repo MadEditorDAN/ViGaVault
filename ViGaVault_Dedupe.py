@@ -27,7 +27,7 @@ def deduplicate_db():
     # Create a backup
     os.makedirs(BACKUP_DIR, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_file = os.path.join(BACKUP_DIR, f"VGVDB_DEDUPE_{timestamp}.csv.bak")
+    backup_file = os.path.join(BACKUP_DIR, f"VGVDB_DEDUPE_{timestamp}.csv")
     shutil.copy2(DB_FILE, backup_file)
     print(f"Backup created: {backup_file}")
 

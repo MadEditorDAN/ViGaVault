@@ -9,15 +9,59 @@ import subprocess
 import shutil
 from datetime import datetime
 import webbrowser
-from ViGaVault_Scan import LibraryManager, get_safe_filename, get_platform_config, get_library_settings_file, get_db_path, get_root_path
+from ViGaVault_Scan import LibraryManager, get_safe_filename, get_platform_config, get_library_settings_file, get_db_path, get_root_path, normalize_genre
 from PySide6.QtWidgets import (QApplication, QMainWindow, QListWidget, QListWidgetItem, 
                              QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QPushButton, QStackedLayout, QFileDialog, QScrollArea,
-                             QLineEdit, QComboBox, QDialog, QTextEdit, QFormLayout, QMessageBox, QFrame, QAbstractItemView, QCheckBox, QSlider, QStyle, QGroupBox,
-                             QTabWidget, QMenuBar, QMenu, QSizePolicy)
-from PySide6.QtCore import Qt, QSize, QTimer, QByteArray, QEvent, QUrl, QThread, Signal, QObject, Slot
-from PySide6.QtGui import QPixmap, QIcon, QAction
+                             QLineEdit, QComboBox, QDialog, QTextEdit, QFormLayout, QMessageBox, QFrame, QAbstractItemView, QCheckBox, QSlider, QStyle, QGroupBox, QProgressBar,
+                             QTabWidget, QMenuBar, QMenu, QSizePolicy, QStyleFactory)
+from PySide6.QtCore import Qt, QSize, QTimer, QByteArray, QEvent, QUrl, QThread, Signal, QObject, Slot, QThreadPool, QRunnable
+from PySide6.QtGui import QPixmap, QIcon, QAction, QPalette, QColor, QFont, QImage
 
+# --- TRANSLATION ---
+# Handles loading JSON translation files based on user preference.
+# It falls back to the key name if a translation is missing.
+class Translator:
+    def __init__(self):
+        self.translations = {}
+        self.language = "English"
+        self.base_path = os.path.dirname(os.path.abspath(__file__))
+
+    def load_language(self, language):
+        self.language = language
+        lang_code = "en"
+        if language == "French":
+            lang_code = "fr"
+        elif language == "German":
+            lang_code = "de"
+        elif language == "Spanish":
+            lang_code = "es"
+        elif language == "Italian":
+            lang_code = "it"
+        
+        # Check lang/ subdirectory first (cleaner), then root
+        lang_file = os.path.join(self.base_path, "lang", f"{lang_code}.json")
+        if not os.path.exists(lang_file):
+            lang_file = os.path.join(self.base_path, f"{lang_code}.json")
+            
+        if os.path.exists(lang_file):
+            try:
+                with open(lang_file, "r", encoding='utf-8') as f:
+                    self.translations = json.load(f)
+                logging.info(f"Loaded language file: {lang_file}")
+            except Exception as e:
+                logging.error(f"Failed to load language file {lang_file}: {e}")
+                self.translations = {}
+        else:
+            logging.warning(f"Language file not found: {lang_file}")
+            self.translations = {}
+
+    def tr(self, key, **kwargs):
+        return self.translations.get(key, key).format(**kwargs)
+
+translator = Translator()
 # --- Custom Logging Handler for UI ---
+# Allows redirecting Python's standard logging output to a PyQt Signal.
+# This is used to display scan logs in real-time within the Sidebar UI.
 class QtLogSignal(QObject):
     message_written = Signal(str)
 
@@ -32,41 +76,9 @@ class QtLogHandler(logging.Handler):
         msg = self.format(record)
         self.signal_emitter.message_written.emit(msg)
 
-# --- Worker Thread for GOG Sync ---
-class GogSyncWorker(QThread):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.root_path = get_root_path()
-        self.db_path = get_db_path()
-
-    def run(self):
-        """Runs the GOG sync process."""
-        try:
-            manager = LibraryManager(self.root_path, self.db_path)
-            manager.load_db()
-            manager.sync_gog(worker_thread=self)
-        except Exception as e:
-            # Log any exceptions that happen inside the thread
-            logging.error(f"Critical error in GOG sync thread: {e}")
-
-class LocalScanWorker(QThread):
-    def __init__(self, retry_failures=False, parent=None):
-        super().__init__(parent)
-        self.retry_failures = retry_failures
-        self.root_path = get_root_path()
-        self.db_path = get_db_path()
-
-    def run(self, ):
-        """Runs the local folder scan process."""
-        try:
-            manager = LibraryManager(self.root_path, self.db_path)
-            manager.load_db()
-            # Pass the thread itself to the manager so it can check for interruption
-            manager.scan(retry_failures=self.retry_failures, worker_thread=self)
-        except Exception as e:
-            # Log any exceptions that happen inside the thread
-            logging.error(f"Critical error in local scan thread: {e}")
-
+# --- WORKER THREADS ---
+# Operations like scanning or filtering can take time. We run them in separate threads
+# to prevent the GUI from freezing (becoming unresponsive) while they process.
 class FullScanWorker(QThread):
     def __init__(self, retry_failures=False, parent=None):
         super().__init__(parent)
@@ -84,6 +96,7 @@ class FullScanWorker(QThread):
             logging.error(f"Critical error in full scan thread: {e}")
 
 class FilterWorker(QThread):
+    # Emits the filtered DataFrame back to the main thread when done.
     finished = Signal(object)
 
     def __init__(self, master_df, params, parent=None):
@@ -94,37 +107,38 @@ class FilterWorker(QThread):
     def run(self):
         df = self.master_df.copy()
 
-        # Text Filter
+        # 1. Text Filter (Search Bar)
         search = self.params['search_text'].lower()
         if search:
             df = df[df['Clean_Title'].str.lower().str.contains(search)]
             
         is_scan_new = self.params.get('scan_new', False)
 
-        # Dynamic Filters
+        # 2. Dynamic Filters (Sidebar Checkboxes)
         # Only apply if NOT scanning new games, as new games often lack metadata
         if not is_scan_new:
             active_filters = self.params.get('active_filters', {})
             for col, selected_values in active_filters.items():
                 if not selected_values:
-                    df = df.iloc[0:0] # Empty result if nothing selected in a category
+                    # If a category is active but has NO items selected, the result is empty.
+                    df = df.iloc[0:0] 
                     break
                 
+                # Regex match for multi-value fields (e.g. "RPG, Action")
                 regex_pattern = '|'.join([re.escape(v) for v in selected_values])
                 df = df[df[col].astype(str).str.contains(regex_pattern, case=False, na=False)]
 
         # Status Filter (Exclusive)
         if is_scan_new:
-            df = df[df['Status_Flag'] != 'OK']
-            df = df[df['Status_Flag'].astype(str) != 'OK']
+            df = df[~df['Status_Flag'].isin(['OK', 'LOCKED'])]
         else:
-            df = df[df['Status_Flag'] == 'OK']
-            df = df[df['Status_Flag'].astype(str) == 'OK']
+            df = df[df['Status_Flag'].isin(['OK', 'LOCKED'])]
             
-        # Sorting
+        # 3. Sorting
         sort_col = self.params['sort_col']
         sort_desc = self.params['sort_desc']
         
+        # Use pre-calculated temporary columns for speed (dates, lowercase titles)
         if sort_col == "temp_sort_date" or sort_col == "temp_sort_title":
             df = df.sort_values(by=sort_col, ascending=not sort_desc, na_position='last' if sort_col == "temp_sort_date" else 'first')
         else:
@@ -132,24 +146,63 @@ class FilterWorker(QThread):
         
         self.finished.emit(df)
 
+class DbLoaderWorker(QThread):
+    finished = Signal(object)
+
+    def run(self):
+        db_path = get_db_path()
+        if os.path.exists(db_path):
+            try:
+                df = pd.read_csv(db_path, sep=';', encoding='utf-8').fillna('')
+                if 'Status_Flag' not in df.columns:
+                    df['Status_Flag'] = 'NEW'
+                # Pre-calculate columns for faster sorting
+                df['temp_sort_date'] = pd.to_datetime(df['Original_Release_Date'], errors='coerce', dayfirst=True)
+                df['temp_sort_title'] = df['Clean_Title'].str.lower()
+            except Exception as e:
+                logging.error(f"Error loading DB: {e}")
+                df = pd.DataFrame()
+        else:
+            df = pd.DataFrame(columns=['Clean_Title', 'Platforms', 'Original_Release_Date', 'Status_Flag', 'Path_Root', 'Folder_Name'])
+            df['temp_sort_date'] = pd.to_datetime([])
+            df['temp_sort_title'] = []
+        self.finished.emit(df)
+
+class ImageSignals(QObject):
+    loaded = Signal(QImage)
+
+class ImageLoader(QRunnable):
+    def __init__(self, path):
+        super().__init__()
+        self.path = path
+        self.signals = ImageSignals()
+
+    def run(self):
+        if self.path and os.path.exists(self.path):
+            image = QImage(self.path)
+            if not image.isNull():
+                self.signals.loaded.emit(image)
+
+# --- CUSTOM WIDGETS ---
+# A custom group box that can collapse its content to save space in the sidebar.
 class CollapsibleFilterGroup(QGroupBox):
     def __init__(self, title, parent_layout, parent=None):
         super().__init__("", parent)
         self.parent_layout = parent_layout
         self.title = title
-        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
 
-        # Header Button
+        # Header Button (acts as the toggle trigger)
         self.toggle_btn = QPushButton(f"▶ {title}")
         self.toggle_btn.setCheckable(True)
         self.toggle_btn.setChecked(False) # Default collapsed
         self.toggle_btn.setStyleSheet("""
-            QPushButton { text-align: left; font-weight: bold; padding: 5px; border: none; background-color: #333; }
-            QPushButton:hover { background-color: #444; }
-            QPushButton:checked { background-color: #333; }
+            QPushButton { text-align: left; font-weight: bold; padding: 5px; border: none; background-color: palette(button); color: palette(button-text); }
+            QPushButton:hover { background-color: palette(midlight); }
+            QPushButton:checked { background-color: palette(button); }
         """)
         self.toggle_btn.toggled.connect(self.toggle_content)
         self.layout.addWidget(self.toggle_btn)
@@ -172,6 +225,7 @@ class CollapsibleFilterGroup(QGroupBox):
         self.scroll.setFrameShape(QFrame.NoFrame)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         
+        # Grid layout for checkboxes (2 columns)
         self.checkbox_container = QWidget()
         self.checkbox_layout = QGridLayout(self.checkbox_container)
         self.checkbox_layout.setAlignment(Qt.AlignTop)
@@ -184,14 +238,39 @@ class CollapsibleFilterGroup(QGroupBox):
         self.content_area.setVisible(checked)
         arrow = "▼" if checked else "▶"
         self.toggle_btn.setText(f"{arrow} {self.title}")
-        if self.parent_layout:
-            self.parent_layout.setStretchFactor(self, 100 if checked else 0)
+        
+        if checked:
+            self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+            
+            # Calculate required height to prevent small groups from taking 50% of space
+            h_header = self.toggle_btn.sizeHint().height()
+            h_content = 0
+            if self.btns_layout.count() > 0:
+                h_content += self.btns_layout.sizeHint().height() + self.content_layout.spacing()
+            
+            self.checkbox_container.adjustSize()
+            h_list = self.checkbox_container.sizeHint().height()
+            h_chrome = 2 * self.scroll.frameWidth() + self.layout.contentsMargins().top() + self.layout.contentsMargins().bottom() + self.layout.spacing()
+            
+            total_h = h_header + h_content + h_list + h_chrome + 10
+            self.setMaximumHeight(total_h)
+
+            if self.parent_layout:
+                self.parent_layout.setStretchFactor(self, 1)
+        else:
+            self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+            self.setMaximumHeight(16777215) # Remove limit
+            if self.parent_layout:
+                self.parent_layout.setStretchFactor(self, 0)
+        
+        self.updateGeometry()
 
 # --- Dialog Windows for Editing and Scanning ---
+# Dialog for manual editing of game metadata.
 class ActionDialog(QDialog):
     def __init__(self, title, data, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(title)
+        self.setWindowTitle(translator.tr(title))
         self.setMinimumWidth(850)
         self.original_data = data.copy()
         self.updated_data = {}
@@ -202,19 +281,27 @@ class ActionDialog(QDialog):
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
  
-        metadata_group = QGroupBox("Metadata")
+        metadata_group = QGroupBox(translator.tr("dialog_edit_metadata_group"))
         self.form_layout = QFormLayout(metadata_group)
         self.inputs = {}
+        
+        # Locked Checkbox
+        self.chk_locked = QCheckBox(translator.tr("dialog_edit_locked"))
+        self.chk_locked.setChecked(self.original_data.get('Status_Flag') == 'LOCKED')
+        self.form_layout.addRow("", self.chk_locked)
+        
+        # Fields that should not be editable by the user to prevent breaking logic
         fields_to_disable = [
-            'Folder_Name', 'Path_Root', 'Path_Video', 'Status_Flag', 'Image_Link', 
-            'Year_Folder', 'Platforms'
+            'Folder_Name', 'Path_Video', 'Status_Flag', 'Image_Link', 
+            'Platforms'
         ]
         fields_to_exclude = [
-            'Trailer_Link', 'game_ID', 'Image_Link', 'temp_sort_date', 'temp_sort_title'
+            'Trailer_Link', 'game_ID', 'Image_Link', 'temp_sort_date', 'temp_sort_title',
+            'Path_Root', 'Year_Folder'
         ]
 
         for field, value in self.original_data.items():
-            if field in fields_to_exclude:
+            if field in fields_to_exclude or field.startswith('platform_ID_'):
                 continue
             label_text = field.replace('_', ' ').title()
             if field == "Summary":
@@ -223,6 +310,7 @@ class ActionDialog(QDialog):
                 inp = QLineEdit(str(value))
             if field in fields_to_disable:
                 inp.setEnabled(False)
+                inp.setStyleSheet("background-color: palette(window);")
             self.form_layout.addRow(label_text, inp)
             self.inputs[field] = inp
  
@@ -233,20 +321,20 @@ class ActionDialog(QDialog):
         right_layout = QVBoxLayout(right_widget)
 
         # Section 1: Cover Image
-        cover_group = QGroupBox("Cover Image")
+        cover_group = QGroupBox(translator.tr("dialog_edit_cover_group"))
         cover_layout = QVBoxLayout(cover_group)
-        self.cover_image_label = QLabel("No Cover")
+        self.cover_image_label = QLabel(translator.tr("dialog_edit_no_cover"))
         self.cover_image_label.setAlignment(Qt.AlignCenter)
         self.cover_image_label.setFixedSize(200, 266)
         self.update_cover_display()
-        btn_select_image = QPushButton("Select another Image From Disk")
+        btn_select_image = QPushButton(translator.tr("dialog_edit_select_image_btn"))
         btn_select_image.clicked.connect(self.select_new_image)
         cover_layout.addWidget(self.cover_image_label, 0, Qt.AlignHCenter)
         cover_layout.addWidget(btn_select_image)
         right_layout.addWidget(cover_group)
 
         # Section 2: Trailer
-        self.trailer_group = QGroupBox("Trailer")
+        self.trailer_group = QGroupBox(translator.tr("dialog_edit_trailer_group"))
         self.trailer_layout = QVBoxLayout(self.trailer_group)
         self.trailer_thumbnail_label = QLabel("No Trailer")
         self.trailer_thumbnail_label.setAlignment(Qt.AlignCenter)
@@ -255,16 +343,15 @@ class ActionDialog(QDialog):
 
         # URL display and copy button
         url_layout = QHBoxLayout()
-        url_layout.addWidget(QLabel("URL:"))
+        url_layout.addWidget(QLabel(translator.tr("dialog_edit_trailer_url_label")))
         self.url_line_edit = QLineEdit()
-        self.url_line_edit.setReadOnly(True)
-        url_layout.addWidget(self.url_line_edit)
-        copy_btn = QPushButton("📋")
+        url_layout.addWidget(self.url_line_edit, 1)
+        copy_btn = QPushButton(translator.tr("dialog_edit_trailer_copy_btn"))
         copy_btn.clicked.connect(self.copy_trailer_url)
         url_layout.addWidget(copy_btn)
         self.trailer_layout.addLayout(url_layout)
 
-        self.btn_play_trailer = QPushButton("Play in browser")
+        self.btn_play_trailer = QPushButton(translator.tr("dialog_edit_trailer_play_btn"))
         self.trailer_layout.addWidget(self.btn_play_trailer)
 
         self.setup_trailer_section()
@@ -279,8 +366,8 @@ class ActionDialog(QDialog):
 
         # --- Bottom Buttons ---
         button_box = QHBoxLayout()
-        btn_save = QPushButton("Save")
-        btn_cancel = QPushButton("Cancel")
+        btn_save = QPushButton(translator.tr("dialog_edit_save_btn"))
+        btn_cancel = QPushButton(translator.tr("dialog_edit_cancel_btn"))
         btn_save.clicked.connect(self.accept)
         btn_cancel.clicked.connect(self.reject)
         button_box.addWidget(btn_save)
@@ -323,11 +410,16 @@ class ActionDialog(QDialog):
 
     def setup_trailer_section(self):
         self.trailer_link = self.original_data.get('Trailer_Link', '')
-        if not self.trailer_link:
-            self.trailer_group.hide()
-            return
-        thumbnail_data = None
         self.url_line_edit.setText(self.trailer_link)
+
+        if not self.trailer_link:
+            self.trailer_thumbnail_label.setText("No Trailer URL")
+            self.trailer_thumbnail_label.setStyleSheet("border: 1px solid #555;")
+            self.btn_play_trailer.setEnabled(False)
+            return
+
+        thumbnail_data = None
+        self.btn_play_trailer.setEnabled(True)
 
         if 'youtube.com' in self.trailer_link or 'youtu.be' in self.trailer_link:
             match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", self.trailer_link)
@@ -345,7 +437,9 @@ class ActionDialog(QDialog):
             self.trailer_thumbnail_label.setText("MP4 Trailer")
             self.btn_play_trailer.clicked.connect(self.play_trailer)
         else:
-            self.trailer_group.hide()
+            self.trailer_thumbnail_label.setText("Link Available")
+            self.trailer_thumbnail_label.setStyleSheet("border: 1px solid #555;")
+            self.btn_play_trailer.clicked.connect(self.play_trailer)
             return
         if thumbnail_data:
             pixmap = QPixmap()
@@ -372,6 +466,9 @@ class ActionDialog(QDialog):
                 else:
                     new_data[field] = inp.text()
         new_data.update(self.updated_data)
+        
+        new_data['Status_Flag'] = 'LOCKED' if self.chk_locked.isChecked() else 'OK'
+        new_data['Trailer_Link'] = self.url_line_edit.text().strip()
 
         # --- RENAME MEDIA FILES IF TITLE OR DATE CHANGED ---
         old_title = self.original_data.get('Clean_Title', '')
@@ -415,11 +512,12 @@ class ActionDialog(QDialog):
 
         return new_data
 
+# Configuration dialog with tabs for Display, Folders, and Data Sources.
 class SettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent_window = parent
-        self.setWindowTitle("Settings")
+        self.setWindowTitle(translator.tr("settings_title"))
 
         # Define the 10 steps for each slider
         self.IMG_SIZES = [120, 140, 160, 180, 200, 225, 250, 275, 300, 325]
@@ -435,25 +533,28 @@ class SettingsDialog(QDialog):
         # Tab 1: Display
         self.tab_display = QWidget()
         self.setup_display_tab()
-        self.tabs.addTab(self.tab_display, "Display")
+        self.tabs.addTab(self.tab_display, translator.tr("settings_tab_display"))
         
         # Tab 2: Local Folders
         self.tab_folders = QWidget()
         self.setup_folders_tab()
-        self.tabs.addTab(self.tab_folders, "Local Folders")
+        self.tabs.addTab(self.tab_folders, translator.tr("settings_tab_folders"))
         
         # Tab 3: Data Sources
         self.tab_data = QWidget()
         self.setup_data_tab()
-        self.tabs.addTab(self.tab_data, "Data Sources")
+        self.tabs.addTab(self.tab_data, translator.tr("settings_tab_data"))
         
         # Buttons
         btn_layout = QHBoxLayout()
-        btn_save = QPushButton("Save")
-        btn_cancel = QPushButton("Cancel")
+        btn_apply = QPushButton(translator.tr("settings_btn_apply"))
+        btn_save = QPushButton(translator.tr("settings_btn_save"))
+        btn_cancel = QPushButton(translator.tr("settings_btn_cancel"))
+        btn_apply.clicked.connect(self.apply_settings)
         btn_save.clicked.connect(self.accept)
-        btn_cancel.clicked.connect(self.cancel_and_revert)
+        btn_cancel.clicked.connect(self.reject)
         btn_layout.addStretch()
+        btn_layout.addWidget(btn_apply)
         btn_layout.addWidget(btn_save)
         btn_layout.addWidget(btn_cancel)
         layout.addLayout(btn_layout)
@@ -465,59 +566,58 @@ class SettingsDialog(QDialog):
         
         # Theme
         self.combo_theme = QComboBox()
-        self.combo_theme.addItems(["System", "Dark", "Light"])
-        layout.addRow("Theme:", self.combo_theme)
+        self.combo_theme.addItems([translator.tr("theme_system"), translator.tr("theme_dark"), translator.tr("theme_light")])
+        layout.addRow(translator.tr("settings_display_theme"), self.combo_theme)
         
         # Language
         self.combo_lang = QComboBox()
-        self.combo_lang.addItems(["English", "French"])
-        layout.addRow("Language:", self.combo_lang)
+        self.combo_lang.addItems(["English", "French", "German", "Spanish", "Italian"]) # Keep these hardcoded as they map to file names
+        layout.addRow(translator.tr("settings_display_language"), self.combo_lang)
         
         # --- Image Size Slider ---
         img_layout = QHBoxLayout()
         self.slider_img_size = QSlider(Qt.Horizontal)
         self.slider_img_size.setRange(0, 9) # 10 steps
+        self.slider_img_size.setPageStep(1)
         self.slider_img_size.setTickInterval(1)
         self.slider_img_size.setTickPosition(QSlider.TicksBelow)
         self.lbl_img_size = QLabel("200 px")
         self.lbl_img_size.setFixedWidth(60)
         img_layout.addWidget(self.slider_img_size)
         img_layout.addWidget(self.lbl_img_size)
-        layout.addRow("Image Size:", img_layout)
+        layout.addRow(translator.tr("settings_display_img_size"), img_layout)
 
         # --- Button Size Slider ---
         btn_layout = QHBoxLayout()
         self.slider_btn_size = QSlider(Qt.Horizontal)
         self.slider_btn_size.setRange(0, 9) # 10 steps
+        self.slider_btn_size.setPageStep(1)
         self.slider_btn_size.setTickInterval(1)
         self.slider_btn_size.setTickPosition(QSlider.TicksBelow)
         self.lbl_btn_size = QLabel("45 px")
         self.lbl_btn_size.setFixedWidth(60)
         btn_layout.addWidget(self.slider_btn_size)
         btn_layout.addWidget(self.lbl_btn_size)
-        layout.addRow("Button Size:", btn_layout)
+        layout.addRow(translator.tr("settings_display_btn_size"), btn_layout)
 
         # --- Text Size Slider ---
         txt_layout = QHBoxLayout()
         self.slider_text_size = QSlider(Qt.Horizontal)
         self.slider_text_size.setRange(0, 9) # 10 steps
+        self.slider_text_size.setPageStep(1)
         self.slider_text_size.setTickInterval(1)
         self.slider_text_size.setTickPosition(QSlider.TicksBelow)
         self.lbl_text_size = QLabel("22 px")
         self.lbl_text_size.setFixedWidth(60)
         txt_layout.addWidget(self.slider_text_size)
         txt_layout.addWidget(self.lbl_text_size)
-        layout.addRow("Text Size:", txt_layout)
+        layout.addRow(translator.tr("settings_display_txt_size"), txt_layout)
 
         # --- Connections ---
         # Update labels in real-time while dragging
         self.slider_img_size.valueChanged.connect(self.update_preview_labels)
         self.slider_btn_size.valueChanged.connect(self.update_preview_labels)
         self.slider_text_size.valueChanged.connect(self.update_preview_labels)
-        # Update the main UI only when the slider is released (solves performance issue)
-        self.slider_img_size.sliderReleased.connect(self.on_display_setting_changed)
-        self.slider_btn_size.sliderReleased.connect(self.on_display_setting_changed)
-        self.slider_text_size.sliderReleased.connect(self.on_display_setting_changed)
 
     def update_preview_labels(self):
         """Updates the 'px' labels next to the sliders."""
@@ -529,60 +629,34 @@ class SettingsDialog(QDialog):
         self.lbl_btn_size.setText(f"{btn_val} px")
         self.lbl_text_size.setText(f"{txt_val} px")
 
-    def on_display_setting_changed(self):
-        """Triggers dynamic update in the main window."""
-        if self.parent_window and hasattr(self.parent_window, 'preview_display_settings'):
-            self.parent_window.preview_display_settings(
-                self.IMG_SIZES[self.slider_img_size.value()],
-                self.BTN_SIZES[self.slider_btn_size.value()],
-                self.TXT_SIZES[self.slider_text_size.value()]
-            )
-
-    def cancel_and_revert(self):
-        """Reverts any previewed changes by reloading from settings.json and closes."""
-        if self.parent_window and hasattr(self.parent_window, 'preview_display_settings'):
-            # Defaults
-            img_size = 200
-            btn_size = 45
-            text_size = 22
-            
-            # Display settings are Global, so we check settings.json
-            if os.path.exists("settings.json"):
-                try:
-                    with open("settings.json", "r", encoding='utf-8') as f:
-                        settings = json.load(f)
-                        img_size = settings.get("card_image_size", 200)
-                        btn_size = settings.get("card_button_size", 45)
-                        text_size = settings.get("card_text_size", 22)
-                except:
-                    pass
-            
-            self.parent_window.preview_display_settings(img_size, btn_size, text_size)
-            
-        self.reject()
-
     def setup_folders_tab(self):
+        # Configures local folder scanning rules (Simple vs Advanced mode)
         layout = QVBoxLayout(self.tab_folders)
         
-        grp_root = QGroupBox("Root")
+        # Scan Local Files Checkbox
+        self.chk_scan_local = QCheckBox(translator.tr("settings_folders_scan_local"))
+        self.chk_scan_local.setChecked(True)
+        self.chk_scan_local.toggled.connect(self.toggle_local_scan_options)
+        layout.addWidget(self.chk_scan_local)
+
+        grp_root = QGroupBox(translator.tr("settings_folders_root_group"))
         layout_root = QFormLayout(grp_root)
         self.root_path_input = QLineEdit(r"\\madhdd02\Software\GAMES")
-        
-        btn_browse = QPushButton("...")
-        btn_browse.setFixedWidth(40)
-        btn_browse.clicked.connect(self.browse_root_path)
+        self.btn_browse_root = QPushButton("...")
+        self.btn_browse_root.setFixedWidth(40)
+        self.btn_browse_root.clicked.connect(self.browse_root_path)
         
         path_layout = QHBoxLayout()
         path_layout.addWidget(self.root_path_input)
-        path_layout.addWidget(btn_browse)
+        path_layout.addWidget(self.btn_browse_root)
         
-        layout_root.addRow("Main Path:", path_layout)
+        layout_root.addRow(translator.tr("settings_folders_main_path"), path_layout)
         layout.addWidget(grp_root)
         
-        grp_structure = QGroupBox("Folder Structure")
+        grp_structure = QGroupBox(translator.tr("settings_folders_structure_group"))
         self.struct_layout = QVBoxLayout(grp_structure)
         
-        self.chk_ignore_hidden = QCheckBox("Ignore Hidden Folders (Global)")
+        self.chk_ignore_hidden = QCheckBox(translator.tr("settings_folders_ignore_hidden"))
         self.struct_layout.addWidget(self.chk_ignore_hidden)
 
         # --- MODE 1: SIMPLE / GLOBAL (Depth 1 or 2) ---
@@ -590,20 +664,20 @@ class SettingsDialog(QDialog):
         simple_layout = QVBoxLayout(self.mode_simple_widget)
         simple_layout.setContentsMargins(0, 10, 0, 0)
         
-        lbl_simple = QLabel("Mode: Global Structure")
+        lbl_simple = QLabel(translator.tr("settings_folders_simple_mode_label"))
         lbl_simple.setStyleSheet("font-weight: bold; color: #4CAF50;")
         simple_layout.addWidget(lbl_simple)
         
         form_simple = QFormLayout()
         self.combo_global_type = QComboBox()
         self.combo_global_type.addItems(["Direct (Root -> Games)", "Genre", "Collection", "Publisher", "Developer", "Year", "Other", "None"])
-        form_simple.addRow("Content of Root Folders:", self.combo_global_type)
+        form_simple.addRow(translator.tr("settings_folders_simple_mode_content"), self.combo_global_type)
         
-        self.chk_global_filter = QCheckBox("Add to Filters")
+        self.chk_global_filter = QCheckBox(translator.tr("settings_folders_simple_mode_add_filter"))
         form_simple.addRow("", self.chk_global_filter)
         simple_layout.addLayout(form_simple)
         
-        self.btn_switch_advanced = QPushButton("Add Folder Level (Advanced Mode)")
+        self.btn_switch_advanced = QPushButton(translator.tr("settings_folders_simple_mode_switch_btn"))
         self.btn_switch_advanced.clicked.connect(self.switch_to_advanced)
         simple_layout.addWidget(self.btn_switch_advanced)
         simple_layout.addStretch()
@@ -615,7 +689,7 @@ class SettingsDialog(QDialog):
         adv_layout = QVBoxLayout(self.mode_advanced_widget)
         adv_layout.setContentsMargins(0, 10, 0, 0)
         
-        lbl_adv = QLabel("Mode: Per-Folder Rules (Root -> Folders -> Categories -> Games)")
+        lbl_adv = QLabel(translator.tr("settings_folders_adv_mode_label"))
         lbl_adv.setStyleSheet("font-weight: bold; color: #2196F3;")
         adv_layout.addWidget(lbl_adv)
 
@@ -632,7 +706,7 @@ class SettingsDialog(QDialog):
         adv_layout.addWidget(scroll)
 
         btn_layout = QHBoxLayout()
-        self.btn_switch_simple = QPushButton("Remove Folder Level")
+        self.btn_switch_simple = QPushButton(translator.tr("settings_folders_adv_mode_switch_btn"))
         self.btn_switch_simple.clicked.connect(self.switch_to_simple)
         btn_layout.addWidget(self.btn_switch_simple)
         btn_layout.addStretch()
@@ -641,6 +715,16 @@ class SettingsDialog(QDialog):
         self.struct_layout.addWidget(self.mode_advanced_widget)
         
         layout.addWidget(grp_structure, 1)
+
+    def toggle_local_scan_options(self, checked):
+        """Enables or disables all local scan options based on the checkbox."""
+        self.root_path_input.setEnabled(checked)
+        self.btn_browse_root.setEnabled(checked)
+        # Disable the entire structure group content
+        for i in range(self.struct_layout.count()):
+            item = self.struct_layout.itemAt(i)
+            if item.widget():
+                item.widget().setEnabled(checked)
 
     def switch_to_simple(self):
         self.mode_advanced_widget.hide()
@@ -653,16 +737,17 @@ class SettingsDialog(QDialog):
         self.current_scan_mode = "advanced"
 
     def populate_folders_list(self, saved_rules):
+        # Populates the list of root folders found on disk for Advanced Mode configuration
         # Clear existing
         while self.folders_grid.count():
             item = self.folders_grid.takeAt(0)
             if item.widget(): item.widget().deleteLater()
 
         # Headers
-        self.folders_grid.addWidget(QLabel("Folder"), 0, 0)
-        self.folders_grid.addWidget(QLabel("Content Type"), 0, 1)
-        self.folders_grid.addWidget(QLabel("Filter"), 0, 2)
-        self.folders_grid.addWidget(QLabel("Scan"), 0, 3)
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_folder")), 0, 0)
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_content_type")), 0, 1)
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_filter")), 0, 2)
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_scan")), 0, 3)
 
         # Get folders from disk
         root = self.root_path_input.text().strip()
@@ -724,10 +809,10 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(self.tab_data)
 
         # --- GOG Galaxy Section ---
-        grp_gog = QGroupBox("GOG Galaxy")
+        grp_gog = QGroupBox(translator.tr("settings_data_gog_group"))
         layout_gog = QGridLayout(grp_gog)
         
-        self.chk_enable_gog = QCheckBox("GOG Galaxy DB")
+        self.chk_enable_gog = QCheckBox(translator.tr("settings_data_gog_checkbox"))
         self.chk_enable_gog.toggled.connect(self.toggle_gog_input)
 
         self.gog_db_input = QLineEdit()
@@ -745,22 +830,21 @@ class SettingsDialog(QDialog):
         layout.addWidget(grp_gog)
         
         # --- Media Download Section ---
-        grp_media = QGroupBox("Media Download")
+        grp_media = QGroupBox(translator.tr("settings_data_media_group"))
         layout_media = QGridLayout(grp_media)
         
-        self.chk_download_videos = QCheckBox("Download Videos")
+        self.chk_download_videos = QCheckBox(translator.tr("settings_data_media_download_videos"))
         
         self.video_path_input = QLineEdit()
         self.btn_browse_video = QPushButton("...")
         self.btn_browse_video.setFixedWidth(40)
         self.btn_browse_video.clicked.connect(self.browse_video_path)
         
-        # Layout: Checkbox on top, Path below
-        layout_media.addWidget(self.chk_download_videos, 0, 0, 1, 3)
-        
-        layout_media.addWidget(QLabel("Videos Path:"), 1, 0)
-        layout_media.addWidget(self.video_path_input, 1, 1)
-        layout_media.addWidget(self.btn_browse_video, 1, 2)
+        # Layout: All on one line
+        layout_media.addWidget(self.chk_download_videos, 0, 0)
+        layout_media.addWidget(QLabel(translator.tr("settings_data_media_videos_path")), 0, 1)
+        layout_media.addWidget(self.video_path_input, 0, 2)
+        layout_media.addWidget(self.btn_browse_video, 0, 3)
         
         layout.addWidget(grp_media)
         
@@ -807,7 +891,13 @@ class SettingsDialog(QDialog):
             lib_settings = global_settings
                 
         # --- Apply Global Settings ---
-        self.combo_theme.setCurrentText(global_settings.get("theme", "System"))
+        theme_map = {
+            "System": translator.tr("theme_system"),
+            "Dark": translator.tr("theme_dark"),
+            "Light": translator.tr("theme_light")
+        }
+        saved_theme_key = global_settings.get("theme", "System")
+        self.combo_theme.setCurrentText(theme_map.get(saved_theme_key, translator.tr("theme_system")))
         self.combo_lang.setCurrentText(global_settings.get("language", "English"))
 
         saved_img_size = global_settings.get("card_image_size", 200)
@@ -827,6 +917,8 @@ class SettingsDialog(QDialog):
         self.root_path_input.setText(lib_settings.get("root_path", r"\\madhdd02\Software\GAMES"))
         
         local_config = lib_settings.get("local_scan_config", {})
+        self.chk_scan_local.setChecked(local_config.get("enable_local_scan", True))
+        self.toggle_local_scan_options(self.chk_scan_local.isChecked())
         self.chk_ignore_hidden.setChecked(local_config.get("ignore_hidden", True))
         
         self.current_scan_mode = local_config.get("scan_mode", "advanced")
@@ -858,7 +950,12 @@ class SettingsDialog(QDialog):
                     global_settings = json.load(f)
             except: pass
             
-        global_settings["theme"] = self.combo_theme.currentText()
+        theme_map_rev = {
+            translator.tr("theme_system"): "System",
+            translator.tr("theme_dark"): "Dark",
+            translator.tr("theme_light"): "Light"
+        }
+        global_settings["theme"] = theme_map_rev.get(self.combo_theme.currentText(), "System")
         global_settings["language"] = self.combo_lang.currentText()
         global_settings["card_image_size"] = self.IMG_SIZES[self.slider_img_size.value()]
         global_settings["card_button_size"] = self.BTN_SIZES[self.slider_btn_size.value()]
@@ -893,6 +990,7 @@ class SettingsDialog(QDialog):
             }
         
         lib_settings["local_scan_config"] = {
+            "enable_local_scan": self.chk_scan_local.isChecked(),
             "ignore_hidden": self.chk_ignore_hidden.isChecked(),
             "scan_mode": self.current_scan_mode,
             "global_type": self.combo_global_type.currentText(),
@@ -931,6 +1029,12 @@ class SettingsDialog(QDialog):
         except Exception as e:
             print(f"Error saving library settings: {e}")
 
+        # Update parent window display settings immediately so refresh_data uses new values
+        if self.parent_window and hasattr(self.parent_window, 'display_settings'):
+            self.parent_window.display_settings['image'] = self.IMG_SIZES[self.slider_img_size.value()]
+            self.parent_window.display_settings['button'] = self.BTN_SIZES[self.slider_btn_size.value()]
+            self.parent_window.display_settings['text'] = self.TXT_SIZES[self.slider_text_size.value()]
+
     def move_video_files(self, old_path, new_path):
         try:
             os.makedirs(new_path, exist_ok=True)
@@ -967,14 +1071,19 @@ class SettingsDialog(QDialog):
                 self.parent_window.save_database()
                 logging.info(f"Updated {count} video paths in database.")
 
-    def accept(self):
+    def apply_settings(self):
         self.save_settings()
-        super().accept()
-        
-        # Refresh the main window data and filters if parent is MainWindow
-        if self.parent() and hasattr(self.parent(), 'refresh_data'):
-            self.parent().refresh_data()
+        if self.parent_window:
+            if hasattr(self.parent_window, 'reload_global_settings'):
+                self.parent_window.reload_global_settings()
+            if hasattr(self.parent_window, 'refresh_data'):
+                self.parent_window.refresh_data()
 
+    def accept(self):
+        self.apply_settings()
+        super().accept()
+
+# The right-hand sidebar containing Counters, Search, Sort, Filters, and the Scan Panel.
 class Sidebar(QWidget):
     def __init__(self, parent):
         super().__init__()
@@ -985,74 +1094,121 @@ class Sidebar(QWidget):
         
         # --- TOP CONTAINER (Search, Sort, Filters) ---
         self.top_layout = QVBoxLayout()
+        self.top_layout.setSpacing(10) # Aération entre les cadres
 
-        label_style = "font-weight: bold; font-size: 16px;"
+        font_lbl = QFont()
+        font_lbl.setBold(True)
+        font_lbl.setPixelSize(16)
         
-        # 1. Header (Search + Counter)
-        header_layout = QHBoxLayout()
-        lbl_search = QLabel("Search")
-        lbl_search.setStyleSheet(label_style)
-        header_layout.addWidget(lbl_search)
-        header_layout.addStretch()
+        # Style commun pour les cadres (bordure visible + fond légèrement différent)
+        self.frame_style = """
+            QFrame#sidebar_frame {
+                border: 1px solid palette(mid);
+                border-radius: 6px;
+                background-color: palette(alternate-base);
+            }
+        """
+
+        # 1. Cadre 1: Compteurs et Nom de la librairie
+        self.frame_counters = QFrame()
+        self.frame_counters.setObjectName("sidebar_frame")
+        self.frame_counters.setStyleSheet(self.frame_style)
+        counters_layout = QHBoxLayout(self.frame_counters)
+        counters_layout.setContentsMargins(8, 8, 8, 8)
+
         self.lbl_counter = QLabel("0/0")
-        self.lbl_counter.setStyleSheet("font-weight: bold; font-size: 20px; color: white;")
-        header_layout.addWidget(self.lbl_counter)
+        self.lbl_counter.setFont(QFont(font_lbl.family(), 20, QFont.Bold))
+        counters_layout.addWidget(self.lbl_counter)
         
+        counters_layout.addStretch()
+
         self.lbl_lib_name = QLabel("")
-        self.lbl_lib_name.setStyleSheet("font-size: 12px; color: #AAAAAA; margin-left: 5px; font-weight: bold;")
+        self.lbl_lib_name.setFont(QFont(font_lbl.family(), 20, QFont.Bold))
         self.lbl_lib_name.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        header_layout.addWidget(self.lbl_lib_name)
+        counters_layout.addWidget(self.lbl_lib_name)
         
-        self.top_layout.addLayout(header_layout)
+        self.top_layout.addWidget(self.frame_counters)
         
+        # 2. Cadre 2: Recherche
+        self.frame_search = QFrame()
+        self.frame_search.setObjectName("sidebar_frame")
+        self.frame_search.setStyleSheet(self.frame_style)
+        search_layout = QHBoxLayout(self.frame_search)
+        search_layout.setContentsMargins(8, 8, 8, 8)
+
+        lbl_search = QLabel(translator.tr("sidebar_search_label"))
+        lbl_search.setObjectName("sidebar_search_label")
+        lbl_search.setFont(font_lbl)
+        search_layout.addWidget(lbl_search)
+
         self.search_bar = QLineEdit()
-        self.search_bar.setPlaceholderText("Game name...")
+        self.search_bar.setPlaceholderText(translator.tr("sidebar_search_placeholder"))
         self.search_bar.setClearButtonEnabled(True)
-        self.top_layout.addWidget(self.search_bar)
+        search_layout.addWidget(self.search_bar, 1) # Stretch 1 pour prendre l'espace disponible
         
-        # 3. Sort
-        lbl_sort = QLabel("Sort by")
-        lbl_sort.setStyleSheet(label_style)
-        self.top_layout.addWidget(lbl_sort)
+        self.top_layout.addWidget(self.frame_search)
+        
+        # 3. Cadre 3: Tri
+        self.frame_sort = QFrame()
+        self.frame_sort.setObjectName("sidebar_frame")
+        self.frame_sort.setStyleSheet(self.frame_style)
+        sort_layout = QHBoxLayout(self.frame_sort)
+        sort_layout.setContentsMargins(8, 8, 8, 8)
 
-        sort_layout = QHBoxLayout()
+        lbl_sort = QLabel(translator.tr("sidebar_sort_label"))
+        lbl_sort.setObjectName("sidebar_sort_label")
+        lbl_sort.setFont(font_lbl)
+        sort_layout.addWidget(lbl_sort)
+
         self.combo_sort = QComboBox()
-        self.combo_sort.addItems(["Name", "Release Date", "Developer"])
-        sort_layout.addWidget(self.combo_sort, 4)
+        self.combo_sort.addItems([translator.tr("sidebar_sort_name"), translator.tr("sidebar_sort_release_date"), translator.tr("sidebar_sort_developer")])
+        sort_layout.addWidget(self.combo_sort, 1) # Stretch 1 pour prendre l'espace disponible
         
-        self.btn_toggle_sort = QPushButton("⇅ Order")
-        self.btn_toggle_sort.setStyleSheet("font-size: 16px;")
-        sort_layout.addWidget(self.btn_toggle_sort, 1)
-        self.top_layout.addLayout(sort_layout)
+        self.btn_toggle_sort = QPushButton()
+        self.btn_toggle_sort.setFixedWidth(50)
+        self.update_sort_button(self.parent.sort_desc)
+        sort_layout.addWidget(self.btn_toggle_sort)
+        
+        self.top_layout.addWidget(self.frame_sort)
 
-        # --- FILTERS ---
-        lbl_filters = QLabel("Filters")
-        lbl_filters.setStyleSheet(label_style)
-        self.top_layout.addWidget(lbl_filters)
+        # 4. Cadre 4: Filtres
+        self.frame_filters = QFrame()
+        self.frame_filters.setObjectName("sidebar_frame")
+        self.frame_filters.setStyleSheet(self.frame_style)
+        filters_frame_layout = QVBoxLayout(self.frame_filters)
+        filters_frame_layout.setContentsMargins(8, 8, 8, 8)
+
+        lbl_filters = QLabel(translator.tr("sidebar_filters_label"))
+        lbl_filters.setObjectName("sidebar_filters_label")
+        lbl_filters.setFont(font_lbl)
+        filters_frame_layout.addWidget(lbl_filters)
 
         # We remove the outer scroll area to let individual groups handle their scrolling/sizing
         self.filters_container = QWidget()
         self.filters_layout = QVBoxLayout(self.filters_container)
         self.filters_layout.setContentsMargins(0, 0, 0, 0)
         
-        self.top_layout.addWidget(self.filters_container, 1) # Give it stretch to take available space
+        filters_frame_layout.addWidget(self.filters_container, 1)
+        
+        self.top_layout.addWidget(self.frame_filters, 1) # Give it stretch to take available space
         self.layout.addLayout(self.top_layout, 1) # Give top part stretch priority
 
-        # --- SCAN PANEL ---
+        # --- SCAN PANEL (Manual Scan / Full Scan Logs) ---
+        # Hidden by default, shown when scanning starts
         self.scan_panel = QWidget()
         self.scan_layout = QVBoxLayout(self.scan_panel)
         
         # Separator line
         line = QFrame()
         line.setFrameShape(QFrame.HLine)
-        line.setFrameShadow(QFrame.Sunken)
+        line.setFrameShadow(QFrame.Sunken) # Uses QPalette.Shadow, customized for dark mode
         self.scan_layout.addWidget(line)
         
         self.scan_input = QLineEdit()
-        self.scan_input.setPlaceholderText("Game name to search...")
+        self.scan_input.setPlaceholderText(translator.tr("sidebar_manual_scan_placeholder"))
 
         scan_action_layout = QHBoxLayout()
-        self.scan_btn = QPushButton("Search")
+        self.scan_btn = QPushButton(translator.tr("sidebar_manual_scan_search_btn"))
         scan_action_layout.addWidget(self.scan_btn, 3)
 
         self.scan_limit_combo = QComboBox()
@@ -1064,12 +1220,12 @@ class Sidebar(QWidget):
         self.scan_results.setIconSize(QSize(50, 70))
 
         self.btns_layout = QHBoxLayout()
-        self.btn_confirm = QPushButton("Confirm Choice")
-        self.btn_cancel = QPushButton("Cancel")
+        self.btn_confirm = QPushButton(translator.tr("sidebar_manual_scan_confirm_btn"))
+        self.btn_cancel = QPushButton(translator.tr("sidebar_manual_scan_cancel_btn"))
         self.btns_layout.addWidget(self.btn_confirm)
         self.btns_layout.addWidget(self.btn_cancel)
         
-        self.scan_title_label = QLabel("Manual Scan")
+        self.scan_title_label = QLabel(translator.tr("sidebar_manual_scan_title"))
         self.scan_layout.addWidget(self.scan_title_label)
         self.scan_layout.addWidget(self.scan_input)
         self.scan_layout.addLayout(scan_action_layout)
@@ -1077,26 +1233,18 @@ class Sidebar(QWidget):
         self.scan_layout.addLayout(self.btns_layout)
 
         # --- BOTTOM CONTAINER (Scan Buttons) ---
-        self.bottom_layout = QVBoxLayout()
+        self.bottom_layout = QHBoxLayout()
         
-        # --- SCAN BUTTONS ---
-        scan_btns_layout = QHBoxLayout()
-        
-        self.btn_sync_gog = QPushButton("Sync GOG")
-        self.btn_scan_local = QPushButton("Scan Local")
-        self.btn_scan_new = QPushButton("Scan NEW")
-        self.btn_scan_new.setCheckable(True)
-        self.btn_scan_new.setStyleSheet("QPushButton:checked { background-color: #ff5555; color: white; }")
-        
-        scan_btns_layout.addWidget(self.btn_sync_gog)
-        scan_btns_layout.addWidget(self.btn_scan_local)
-        scan_btns_layout.addWidget(self.btn_scan_new)
-        
-        self.bottom_layout.addLayout(scan_btns_layout)
+        # --- SHOW NEW CHECKBOX ---
+        self.chk_show_new = QCheckBox(translator.tr("sidebar_chk_show_new"))
+        self.chk_show_new.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.chk_show_new.setLayoutDirection(Qt.RightToLeft)
 
         # --- FULL SCAN BUTTON ---
-        self.btn_full_scan = QPushButton("FULL Scan")
-        self.bottom_layout.addWidget(self.btn_full_scan)
+        self.btn_full_scan = QPushButton(translator.tr("sidebar_btn_full_scan"))
+        
+        self.bottom_layout.addWidget(self.btn_full_scan, 2) # 2/3 stretch
+        self.bottom_layout.addWidget(self.chk_show_new, 1)  # 1/3 stretch
 
         self.layout.addWidget(self.scan_panel)
         self.scan_panel.hide()
@@ -1106,10 +1254,8 @@ class Sidebar(QWidget):
         self.search_bar.textChanged.connect(self.parent.request_filter_update)
         self.combo_sort.currentIndexChanged.connect(self.parent.request_filter_update)
         self.btn_toggle_sort.clicked.connect(self.parent.toggle_sort_order)
-        self.btn_sync_gog.clicked.connect(self.parent.start_gog_sync)
-        self.btn_scan_local.clicked.connect(self.parent.start_local_scan)
         self.btn_full_scan.clicked.connect(self.parent.start_full_scan)
-        self.btn_scan_new.toggled.connect(self.parent.request_filter_update)
+        self.chk_show_new.toggled.connect(self.parent.request_filter_update)
 
         # Scan Connections
         self.scan_btn.clicked.connect(self.parent.on_manual_search_trigger)
@@ -1117,6 +1263,44 @@ class Sidebar(QWidget):
         self.btn_confirm.clicked.connect(self.parent.apply_inline_selection)
         self.btn_cancel.clicked.connect(self.parent.cancel_inline_scan)
         self.scan_results.itemDoubleClicked.connect(self.parent.apply_inline_selection)
+
+    def update_sort_button(self, is_desc):
+        # Updates label between UP (Ascending) and DOWN (Descending)
+        key = "sidebar_sort_descending" if is_desc else "sidebar_sort_ascending"
+        self.btn_toggle_sort.setText(translator.tr(key))
+
+    def refresh_styles(self):
+        # Only refresh elements that use stylesheets and might cache colors
+        for frame in [self.frame_counters, self.frame_search, self.frame_sort, self.frame_filters]:
+            frame.setStyleSheet(self.frame_style)
+
+        # Refresh Filter Groups to pick up new palette
+        for i in range(self.filters_layout.count()):
+            item = self.filters_layout.itemAt(i)
+            if item.widget() and isinstance(item.widget(), CollapsibleFilterGroup):
+                w = item.widget()
+                # Force re-eval of palette() keywords
+                sheet = w.toggle_btn.styleSheet()
+                w.toggle_btn.setStyleSheet("")
+                w.toggle_btn.setStyleSheet(sheet)
+
+    def retranslate_ui(self):
+        self.findChild(QLabel, "sidebar_search_label").setText(translator.tr("sidebar_search_label"))
+        self.search_bar.setPlaceholderText(translator.tr("sidebar_search_placeholder"))
+        self.findChild(QLabel, "sidebar_sort_label").setText(translator.tr("sidebar_sort_label"))
+        self.combo_sort.setItemText(0, translator.tr("sidebar_sort_name"))
+        self.combo_sort.setItemText(1, translator.tr("sidebar_sort_release_date"))
+        self.combo_sort.setItemText(2, translator.tr("sidebar_sort_developer"))
+        self.update_sort_button(self.parent.sort_desc)
+        self.findChild(QLabel, "sidebar_filters_label").setText(translator.tr("sidebar_filters_label"))
+        self.chk_show_new.setText(translator.tr("sidebar_chk_show_new"))
+        self.btn_full_scan.setText(translator.tr("sidebar_btn_full_scan"))
+        # Scan panel
+        self.scan_title_label.setText(translator.tr("sidebar_manual_scan_title"))
+        self.scan_input.setPlaceholderText(translator.tr("sidebar_manual_scan_placeholder"))
+        self.scan_btn.setText(translator.tr("sidebar_manual_scan_search_btn"))
+        self.btn_confirm.setText(translator.tr("sidebar_manual_scan_confirm_btn"))
+        self.btn_cancel.setText(translator.tr("sidebar_manual_scan_cancel_btn"))
 
 class SelectionDialog(QDialog):
     def __init__(self, candidates, parent=None):
@@ -1147,15 +1331,19 @@ class SelectionDialog(QDialog):
             return item.data(Qt.UserRole) # Retrieve the stored object
         return None
 
+# The core display widget for a single game in the list.
+# Handles image display, text wrapping, and buttons.
 class GameCard(QWidget):
     def __init__(self, game_data, parent_window, item):
         super().__init__()
         self.data = game_data
         self.parent_window = parent_window
         self.item = item
-        self.info_labels = [] # Store references for dynamic updates
+        self.info_labels = [] # Store references for dynamic style updates
+        self.cached_pixmap = None
         
         main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(5, 5, 5, 5)
         
         # Get display settings from parent
         settings = getattr(self.parent_window, 'display_settings', {'image': 200, 'button': 45, 'text': 22})
@@ -1167,41 +1355,50 @@ class GameCard(QWidget):
         self.img_label.setFixedSize(img_w, img_h)
         self.img_label.setAlignment(Qt.AlignCenter)
         img_path = game_data.get('Image_Link', '')
-        if img_path and os.path.exists(img_path):
-            pixmap = QPixmap(img_path).scaled(img_w, img_h, Qt.KeepAspectRatio, Qt.FastTransformation)
-            self.img_label.setPixmap(pixmap)
+        if img_path:
+            self.img_label.setText("Loading...")
+            self.start_image_load(img_path)
         else:
             self.img_label.setText("No Image")
             self.img_label.setStyleSheet("border: 1px solid #555;")
         self.img_label.installEventFilter(self)
-        main_layout.addWidget(self.img_label)
+        main_layout.addWidget(self.img_label, 0, Qt.AlignTop)
         
+        # --- RIGHT COLUMN (DETAILS) ---
         # Details
         details_layout = QVBoxLayout()
         details_layout.setContentsMargins(0, 0, 0, 0) 
-        details_layout.setSpacing(2)
+        details_layout.setSpacing(0)
+        details_layout.setAlignment(Qt.AlignTop)
         
         header_layout = QHBoxLayout()
-        
+        header_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Title Layout (Title + Path Label)
         title_layout = QVBoxLayout()
+        title_layout.setContentsMargins(0, 0, 0, 0)
         title_layout.setSpacing(0)
         
         self.title_lbl = QLabel(game_data.get('Clean_Title', 'Unknown'))
         self.title_lbl.setStyleSheet(f"font-weight: bold; font-size: {settings.get('text', 22)}px;")
+        self.title_lbl.setWordWrap(True)
         self.title_lbl.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.title_lbl.installEventFilter(self)
+        # SizePolicy ignored to allow text to shrink/wrap correctly in tight spaces
+        self.title_lbl.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        self.title_lbl.setMinimumWidth(0)
         title_layout.addWidget(self.title_lbl)
-        
+
         path_root = game_data.get('Path_Root', '')
         path_text = f"({path_root})" if path_root else ""
         self.path_lbl = QLabel(path_text)
         self.path_lbl.setStyleSheet("font-size: 11px; color: gray;")
         self.path_lbl.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.path_lbl.installEventFilter(self)
+        self.path_lbl.setWordWrap(True)
+        self.path_lbl.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        self.path_lbl.setMinimumWidth(0)
         title_layout.addWidget(self.path_lbl)
         
-        header_layout.addLayout(title_layout)
-        header_layout.addStretch()
+        header_layout.addLayout(title_layout, 1) # Give title stretch priority
         
         # Buttons
         self.video_path = str(game_data.get('Path_Video', '')).strip()
@@ -1230,6 +1427,7 @@ class GameCard(QWidget):
                 icon_to_load = f"{name}_disabled"
 
             icon_path = f"icons/{icon_to_load}.png"
+            icon_path = f"assets/{icon_to_load}.png"
 
             if os.path.exists(icon_path):
                 btn.setIcon(QIcon(icon_path))
@@ -1268,19 +1466,21 @@ class GameCard(QWidget):
         info_font_size = max(10, settings.get('text', 22) - 6)
         for field in ['Original_Release_Date', 'Platforms', 'Developer']:
             display_name = 'Developer' # Default
-            if field == 'Original_Release_Date':
-                display_name = 'Release Date'
-            elif field == 'Platforms':
-                display_name = 'Platform(s)'
+            if field == 'Original_Release_Date': display_name = translator.tr("gamecard_info_release_date")
+            elif field == 'Platforms': display_name = translator.tr("gamecard_info_platforms")
+            elif field == 'Developer': display_name = translator.tr("gamecard_info_developer")
 
-            label = QLabel(f"{display_name}: {game_data.get(field, '')}")
+            label = QLabel(f"<b>{display_name}:</b> {game_data.get(field, '')}")
             label.setStyleSheet(f"font-weight: bold; font-size: {info_font_size}px;")
+            label.setWordWrap(True)
             label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-            label.installEventFilter(self)
+            # Policy and MinimumWidth are crucial to prevent "disappearing buttons" bug
+            label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+            label.setMinimumWidth(0)
             details_layout.addWidget(label)
             self.info_labels.append(label)
         
-        self.summary_title = QLabel("Summary")
+        self.summary_title = QLabel(translator.tr("gamecard_summary_title"))
         self.summary_title.setStyleSheet(f"font-weight: bold; font-size: {info_font_size}px;")
         details_layout.addWidget(self.summary_title)
 
@@ -1289,9 +1489,28 @@ class GameCard(QWidget):
         self.summary_content.setWordWrap(True)
         self.summary_content.setStyleSheet(f"font-size: {summary_font_size}px;")
         self.summary_content.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.summary_content.installEventFilter(self)
+        # Vertical Policy Minimum prevents the summary from forcing the card to be too tall
+        self.summary_content.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
         details_layout.addWidget(self.summary_content)
         main_layout.addLayout(details_layout)
+
+    def start_image_load(self, path):
+        loader = ImageLoader(path)
+        loader.signals.loaded.connect(self.on_image_loaded)
+        self.parent_window.thread_pool.start(loader)
+
+    def on_image_loaded(self, image):
+        self.cached_pixmap = QPixmap.fromImage(image)
+        self.update_image_display()
+
+    def update_image_display(self):
+        settings = getattr(self.parent_window, 'display_settings', {'image': 200})
+        img_w = settings.get('image', 200)
+        img_h = int(img_w * 1.33)
+        
+        if self.cached_pixmap:
+            self.img_label.setPixmap(self.cached_pixmap.scaled(img_w, img_h, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.img_label.setText("") # Clear text
 
     def update_style(self, settings):
         """Updates the card style dynamically."""
@@ -1302,10 +1521,8 @@ class GameCard(QWidget):
         
         # Update Image
         self.img_label.setFixedSize(img_w, img_h)
-        img_path = self.data.get('Image_Link', '')
-        if img_path and os.path.exists(img_path):
-            pixmap = QPixmap(img_path).scaled(img_w, img_h, Qt.KeepAspectRatio, Qt.FastTransformation)
-            self.img_label.setPixmap(pixmap)
+        if self.cached_pixmap:
+            self.img_label.setPixmap(self.cached_pixmap.scaled(img_w, img_h, Qt.KeepAspectRatio, Qt.SmoothTransformation))
             
         # Update Buttons
         for btn in self.buttons.values():
@@ -1318,20 +1535,70 @@ class GameCard(QWidget):
 
         # Update Text
         self.title_lbl.setStyleSheet(f"font-weight: bold; font-size: {text_size}px;")
+        
         info_size = max(10, text_size - 6)
         for lbl in self.info_labels:
             lbl.setStyleSheet(f"font-weight: bold; font-size: {info_size}px;")
         self.summary_title.setStyleSheet(f"font-weight: bold; font-size: {info_size}px;")
         self.summary_content.setStyleSheet(f"font-size: {max(10, text_size - 8)}px;")
 
+    def calculate_size_hint(self, target_width):
+        """
+        Manually calculates the exact required height for the card at a specific width.
+        Why: The standard sizeHint() often fails during resize events or when text wraps,
+        leading to huge vertical gaps or cut-off text. We compute the math manually to guarantee precision.
+        """
+        m = self.layout().contentsMargins()
+        spacing_main = self.layout().spacing()
+        if spacing_main == -1: spacing_main = 6
+        
+        img_w = self.img_label.width()
+        img_h = self.img_label.height()
+        
+        # Width available for the Details Column
+        details_w = target_width - m.left() - m.right() - img_w - spacing_main
+        if details_w <= 50: return QSize(target_width, max(img_h + m.top() + m.bottom(), 100))
+        
+        # 1. Header Height
+        spacing_header = 6
+        btn_count = 5
+        btn_size = self.buttons['edit'].width()
+        # 5 buttons + spacing between title_layout and buttons
+        buttons_block_w = (btn_count * btn_size) + (btn_count * spacing_header)
+        
+        title_w = details_w - buttons_block_w
+        if title_w < 10: title_w = 10
+        
+        h_title = self.title_lbl.heightForWidth(title_w)
+        h_path = self.path_lbl.heightForWidth(title_w)
+        # Fallback if heightForWidth returns -1 (valid for non-wrapping, but safe to check)
+        if h_title <= 0: h_title = self.title_lbl.sizeHint().height()
+        if h_path <= 0: h_path = self.path_lbl.sizeHint().height()
+        
+        h_header = max(h_title + h_path, btn_size)
+        
+        # 2. Rest of the content (Info + Summary)
+        h_rest = 0
+        labels_to_measure = self.info_labels + [self.summary_title, self.summary_content]
+        for lbl in labels_to_measure:
+            h = lbl.heightForWidth(details_w)
+            if h <= 0: h = lbl.sizeHint().height()
+            h_rest += h
+            
+        final_h = max(img_h, h_header + h_rest) + m.top() + m.bottom() + 4 # +4 buffer
+        return QSize(target_width, final_h)
+
     def mousePressEvent(self, event):
         self.item.listWidget().setCurrentItem(self.item)
         super().mousePressEvent(event)
 
     def eventFilter(self, obj, event):
-        if event.type() == QEvent.MouseButtonPress:
-            self.item.listWidget().setCurrentItem(self.item)
-        return super().eventFilter(obj, event)
+        try:
+            if event.type() == QEvent.MouseButtonPress:
+                self.item.listWidget().setCurrentItem(self.item)
+            return super().eventFilter(obj, event)
+        except (KeyboardInterrupt, RuntimeError, AttributeError):
+            return False
 
     def start_trailer(self):
         if self.trailer_link:
@@ -1354,7 +1621,7 @@ class GameCard(QWidget):
             os.startfile(self.data.get('Path_Root', ''))
 
     def edit_game(self):
-        dlg = ActionDialog("Edit Game", self.data, self.parent_window)
+        dlg = ActionDialog("dialog_edit_title", self.data, self.parent_window)
         if dlg.exec():
             new_data = dlg.get_data()
             if new_data:
@@ -1363,15 +1630,17 @@ class GameCard(QWidget):
     def scan_game(self):
         if hasattr(self.parent_window, 'start_inline_scan'):
             self.parent_window.start_inline_scan(self.data)
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("ViGaVault Library")
+        self.setWindowTitle(translator.tr("app_title"))
         self.resize(1200, 800)
         self.is_startup = True
         self.create_menu_bar()
         self.sort_desc = True
         self.display_settings = {'image': 200, 'button': 45, 'text': 22}
+        self.thread_pool = QThreadPool()
         
         
         # Variables for Lazy Loading
@@ -1379,20 +1648,19 @@ class MainWindow(QMainWindow):
         self.current_df = pd.DataFrame()
         self.loaded_count = 0
         
-        # Timer for background loading
+        # Timer for background loading: adds items in chunks to keep UI responsive
+        self.last_viewport_width = 0
         self.background_loader = QTimer()
-        self.background_loader.setInterval(100) # Load a batch every 100ms
+        self.background_loader.setInterval(200) # Load a batch every 200ms
         self.background_loader.timeout.connect(self.load_more_items)
         
         # Timer to avoid reloading the list on every keystroke (Debounce)
         self.filter_timer = QTimer()
         self.filter_timer.setSingleShot(True)
-        self.filter_timer.setInterval(300) # Wait 300ms after the last change
+        self.filter_timer.setInterval(600) # Wait 600ms after the last change
         self.filter_timer.timeout.connect(self.start_filter_worker)
 
         self.current_scan_game = None
-        self.gog_sync_in_progress = False # Flag to prevent multiple syncs
-        self.local_scan_in_progress = False
         self.full_scan_in_progress = False
         
         # 1. Setup main layout (Horizontal)
@@ -1412,24 +1680,13 @@ class MainWindow(QMainWindow):
         self.sidebar = Sidebar(self)
         main_layout.addWidget(self.sidebar, stretch=1)
         
-        # 4. Data loading
-        if os.path.exists(get_db_path()):
-            self.master_df = pd.read_csv(get_db_path(), sep=';', encoding='utf-8').fillna('')
-            
-            if 'Status_Flag' not in self.master_df.columns:
-                self.master_df['Status_Flag'] = 'NEW'
-            
-            # Pre-calculate columns for faster sorting
-            self.master_df['temp_sort_date'] = pd.to_datetime(self.master_df['Original_Release_Date'], errors='coerce', dayfirst=True)
-            self.master_df['temp_sort_title'] = self.master_df['Clean_Title'].str.lower()
-        else:
-            # Initialize empty DataFrame if DB doesn't exist
-            self.master_df = pd.DataFrame(columns=['Clean_Title', 'Platforms', 'Original_Release_Date', 'Status_Flag', 'Path_Root', 'Folder_Name'])
-            self.master_df['temp_sort_date'] = pd.to_datetime([])
-            self.master_df['temp_sort_title'] = []
-            
-        # Populate dynamic filters
-        self.populate_dynamic_filters()
+        # Initialize empty DataFrame required for filters logic before DB loads
+        self.master_df = pd.DataFrame(columns=['Clean_Title', 'Platforms', 'Original_Release_Date', 'Status_Flag', 'Path_Root', 'Folder_Name'])
+        self.master_df['temp_sort_date'] = pd.to_datetime([])
+        self.master_df['temp_sort_title'] = []
+        
+        # 4. Data loading (Async)
+        self.load_database_async()
             
         # Load display settings early
         if os.path.exists("settings.json"):
@@ -1446,87 +1703,63 @@ class MainWindow(QMainWindow):
         else:
             # Default sort on "Release Date"
             self.sidebar.combo_sort.setCurrentIndex(1)
-        
-        # Initial display
-        self.request_filter_update()
 
     def create_menu_bar(self):
         menu_bar = self.menuBar()
-        menu_bar.setStyleSheet("""
-            QMenuBar {
-                font-size: 16px;
-            }
-            QMenu {
-                font-size: 16px;
-            }
-        """)
+        menu_bar.clear()
         
         # --- File ---
-        file_menu = menu_bar.addMenu("File")
+        file_menu = menu_bar.addMenu(translator.tr("menu_file"))
         
-        action_select_lib = QAction("Switch/New Library...", self)
+        action_select_lib = QAction(translator.tr("menu_file_switch_lib"), self)
         action_select_lib.triggered.connect(self.select_library)
         file_menu.addAction(action_select_lib)
         
-        action_save = QAction("Save", self)
+        action_save = QAction(translator.tr("menu_file_save"), self)
         action_save.setShortcut("Ctrl+S")
         action_save.triggered.connect(self.save_database)
         file_menu.addAction(action_save)
         
         file_menu.addSeparator()
         
-        action_settings = QAction("Settings", self)
+        action_settings = QAction(translator.tr("menu_file_settings"), self)
         action_settings.triggered.connect(self.open_settings)
         file_menu.addAction(action_settings)
 
         file_menu.addSeparator()
         
-        action_quit = QAction("Exit", self)
+        action_quit = QAction(translator.tr("menu_file_exit"), self)
         action_quit.triggered.connect(self.close)
         file_menu.addAction(action_quit)
         
-        # --- Library ---
-        lib_menu = menu_bar.addMenu("Library")
-        
-        action_full_scan = QAction("Full Scan", self)
-        lib_menu.addAction(action_full_scan)
-        
-        lib_menu.addSeparator()
-        
-        action_sync_gog = QAction("Sync GOG", self)
-        lib_menu.addAction(action_sync_gog)
-        
-        action_scan_local = QAction("Scan Local Folders", self)
-        lib_menu.addAction(action_scan_local)
-        
-        lib_menu.addSeparator()
-        
-        action_clean = QAction("Clean Library", self)
-        lib_menu.addAction(action_clean)
-        
         # --- Tools ---
-        tools_menu = menu_bar.addMenu("Tools")
+        tools_menu = menu_bar.addMenu(translator.tr("menu_tools"))
         
-        action_media = QAction("Media Manager", self)
+        action_media = QAction(translator.tr("menu_tools_media_manager"), self)
         tools_menu.addAction(action_media)
         
-        action_platforms = QAction("Platform Manager", self)
+        action_platforms = QAction(translator.tr("menu_tools_platform_manager"), self)
         tools_menu.addAction(action_platforms)
         
-        action_stats = QAction("Statistics / Report", self)
+        action_stats = QAction(translator.tr("menu_tools_stats"), self)
         tools_menu.addAction(action_stats)
         
         # --- Help ---
-        help_menu = menu_bar.addMenu("Help")
+        help_menu = menu_bar.addMenu(translator.tr("menu_help"))
         
-        action_about = QAction("About", self)
+        action_docs = QAction(translator.tr("menu_help_docs"), self)
+        action_docs.triggered.connect(self.show_documentation)
+        help_menu.addAction(action_docs)
+        
+        action_about = QAction(translator.tr("menu_help_about"), self)
+        action_about.triggered.connect(self.show_about)
         help_menu.addAction(action_about)
 
     def update_library_info(self):
         """Updates window title and sidebar label with current library name."""
         lib_name = os.path.basename(get_db_path()).replace('.csv', '')
         self.setWindowTitle(f"ViGaVault Library - [{lib_name}]")
-        self.sidebar.lbl_lib_name.setText(f"[{lib_name}]")
+        self.sidebar.lbl_lib_name.setText(f"{lib_name}")
 
     def select_library(self):
         """Opens a dialog to select an existing library or create a new one, then soft-reloads the UI."""
@@ -1590,18 +1823,25 @@ class MainWindow(QMainWindow):
         self.list_widget.clear()
         self.sidebar.search_bar.clear()
 
-        # 1. Load new master dataframe
-        db_path = get_db_path()
-        if os.path.exists(db_path):
-            self.master_df = pd.read_csv(db_path, sep=';', encoding='utf-8').fillna('')
-            if 'Status_Flag' not in self.master_df.columns: self.master_df['Status_Flag'] = 'NEW'
-            self.master_df['temp_sort_date'] = pd.to_datetime(self.master_df['Original_Release_Date'], errors='coerce', dayfirst=True)
-            self.master_df['temp_sort_title'] = self.master_df['Clean_Title'].str.lower()
-        else:
-            self.master_df = pd.DataFrame(columns=['Clean_Title', 'Platforms', 'Original_Release_Date', 'Status_Flag', 'Path_Root', 'Folder_Name'])
-            self.master_df['temp_sort_date'] = pd.to_datetime([])
-            self.master_df['temp_sort_title'] = []
+        # 1. Async Load
+        self.load_database_async()
 
+    def load_database_async(self):
+        self.list_widget.clear()
+        loading_item = QListWidgetItem("Loading Database...")
+        loading_item.setTextAlignment(Qt.AlignCenter)
+        self.list_widget.addItem(loading_item)
+        self.sidebar.setEnabled(False)
+        
+        self.db_worker = DbLoaderWorker()
+        self.db_worker.finished.connect(self.on_db_loaded)
+        self.db_worker.start()
+
+    def on_db_loaded(self, df):
+        self.master_df = df
+        self.list_widget.clear() # Remove Loading message
+        self.sidebar.setEnabled(True)
+        
         # 2. Load all settings for the new library
         lib_settings = {}
         lib_settings_file = get_library_settings_file()
@@ -1619,21 +1859,20 @@ class MainWindow(QMainWindow):
 
         # 4. Apply other UI settings from the loaded library settings
         self.sidebar.combo_sort.blockSignals(True)
-        self.sidebar.btn_scan_new.blockSignals(True)
+        self.sidebar.chk_show_new.blockSignals(True)
 
         self.sort_desc = lib_settings.get("sort_desc", True)
         self.sidebar.combo_sort.setCurrentIndex(lib_settings.get("sort_index", 1))
         self.sidebar.search_bar.setText(lib_settings.get("search_text", ""))
-        self.sidebar.btn_scan_new.setChecked(lib_settings.get("scan_new", False))
+        self.sidebar.chk_show_new.setChecked(lib_settings.get("scan_new", False))
+        self.sidebar.update_sort_button(self.sort_desc)
 
         self.sidebar.combo_sort.blockSignals(False)
-        self.sidebar.btn_scan_new.blockSignals(False)
+        self.sidebar.chk_show_new.blockSignals(False)
 
         # 5. Update window title and GOG button state
         self.update_library_info()
         enable_gog = lib_settings.get("enable_gog_db", True)
-        self.sidebar.btn_sync_gog.setEnabled(enable_gog)
-        self.sidebar.btn_sync_gog.setToolTip("GOG Sync is disabled in Settings" if not enable_gog else "")
 
         # 6. Trigger a filter and display update
         self.request_filter_update()
@@ -1647,14 +1886,14 @@ class MainWindow(QMainWindow):
             MAX_FILES = 10
             os.makedirs(BACKUP_DIR, exist_ok=True)
             
-            backups = [os.path.join(BACKUP_DIR, f) for f in os.listdir(BACKUP_DIR) if f.endswith(".csv.bak")]
+            backups = [os.path.join(BACKUP_DIR, f) for f in os.listdir(BACKUP_DIR) if f.endswith(".csv")]
             backups.sort(key=os.path.getctime)
             while len(backups) >= MAX_FILES:
                 os.remove(backups.pop(0))
 
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             db_filename = os.path.basename(db_path)
-            backup_file = os.path.join(BACKUP_DIR, f"{os.path.splitext(db_filename)[0]}_{timestamp}.csv.bak")
+            backup_file = os.path.join(BACKUP_DIR, f"{os.path.splitext(db_filename)[0]}_{timestamp}.csv")
             shutil.copy2(db_path, backup_file)
             logging.info(f"    [DB BACKUP] Backup created at {backup_file}")
         
@@ -1669,6 +1908,40 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logging.error(f"Failed to save database: {e}")
             QMessageBox.critical(self, "Error", f"Could not save the library: {e}")
+
+    def load_html_asset(self, filename):
+        """Helper to load HTML content from the assets folder."""
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        asset_path = os.path.join(base_path, "assets", filename)
+        if os.path.exists(asset_path):
+            try:
+                with open(asset_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    assets_dir = os.path.join(base_path, "assets").replace("\\", "/")
+                    
+                    # Detect current theme brightness to select correct logo
+                    bg_color = QApplication.palette().color(QPalette.Window)
+                    if bg_color.lightness() < 128:
+                        logo_file = "MadEditor_Logo_Dark.png"
+                    else:
+                        logo_file = "MadEditor_Logo_Light.png"
+
+                    content = content.replace("{assets_path}", assets_dir)
+                    return content.replace("{logo_filename}", logo_file)
+            except Exception as e:
+                logging.error(f"Error loading asset {filename}: {e}")
+                return f"<p>Error loading content: {e}</p>"
+        return f"<p>Content not found: {filename}</p>"
+
+    def show_documentation(self):
+        title = translator.tr("menu_help_docs")
+        text = self.load_html_asset("doc.html")
+        QMessageBox.information(self, title, text)
+
+    def show_about(self):
+        title = translator.tr("menu_help_about")
+        text = self.load_html_asset("about.html")
+        QMessageBox.about(self, title, text)
 
     def populate_dynamic_filters(self, saved_state=None, saved_expansion=None):
         """Rebuilds the sidebar filters based on settings and data."""
@@ -1738,7 +2011,7 @@ class MainWindow(QMainWindow):
                 self.add_filter_group(type_name, col_name, self.sidebar.filters_layout, is_expanded)
         
         # Add a stretch at the end to push groups up
-        self.sidebar.filters_layout.addStretch(1)
+        self.sidebar.filters_layout.addStretch(0)
 
         # Restore state if provided
         # If saved_state is None, the default (checked=True) will apply.
@@ -1817,164 +2090,13 @@ class MainWindow(QMainWindow):
         else:
             self.sidebar.layout.setStretchFactor(self.sidebar.top_layout, 1)
             self.sidebar.layout.setStretchFactor(self.sidebar.scan_panel, 0)
-
-    def start_gog_sync(self):
-        if self.gog_sync_in_progress or self.local_scan_in_progress or self.full_scan_in_progress:
-            QMessageBox.information(self, "Info", "Another task is already in progress.")
-            return
-
-        # Check if GOG Galaxy is running
-        try:
-            output = subprocess.check_output('tasklist', shell=True).decode(errors='ignore')
-            if "GalaxyClient.exe" in output:
-                reply = QMessageBox.question(self, "GOG Galaxy Detected",
-                                            "GOG Galaxy is running. It must be closed to access the database.\n\nPlease close it and click Yes.",
-                                            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-                if reply == QMessageBox.No: return
-        except: pass
-
-        self.gog_sync_in_progress = True
-        self.sidebar.btn_sync_gog.setEnabled(False)
-        self.sidebar.btn_sync_gog.setText("Syncing...")
-        self.sidebar.btn_full_scan.setEnabled(False)
-        self.sidebar.btn_scan_local.setEnabled(False)
-        self.sidebar.btn_scan_new.setEnabled(False)
-        self.set_filters_ui_state(False)
-
-        # Show the scan panel as a log viewer
-        self.sidebar.scan_panel.show()
-        self.sidebar.scan_title_label.setText("GOG Sync")
-        self.sidebar.scan_input.hide()
-        self.sidebar.scan_btn.hide()
-        self.sidebar.scan_limit_combo.hide()
-        self.sidebar.btn_confirm.hide()
-        self.sidebar.btn_cancel.setText("Stop")
-        self.sidebar.scan_results.clear()
-        self.sidebar.scan_results.addItem("Starting GOG sync...")
-
-        # Disconnect previous signals and connect the stop function
-        try: self.sidebar.btn_cancel.clicked.disconnect()
-        except: pass
-        self.sidebar.btn_cancel.clicked.connect(self.stop_gog_sync)
-
-        # Setup logging to UI
-        self.log_signal = QtLogSignal()
-        self.log_signal.message_written.connect(self.update_sync_log)
-        self.qt_log_handler = QtLogHandler(self.log_signal)
-        logging.getLogger().addHandler(self.qt_log_handler)
-
-        # Setup and start worker thread
-        self.gog_worker = GogSyncWorker()
-        self.gog_worker.finished.connect(self.finish_gog_sync)
-        self.gog_worker.start()
-
-    def stop_gog_sync(self):
-        """Requests interruption of the GOG sync thread and closes the panel."""
-        if self.gog_sync_in_progress and hasattr(self, 'gog_worker'):
-            logging.info("--- GOG Sync interrupted by user. ---")
-            self.gog_worker.requestInterruption()
-            self.sidebar.scan_panel.hide()
-            self.set_filters_ui_state(True)
-            self.restore_scan_panel()
-
+    
     def update_sync_log(self, message):
         self.sidebar.scan_results.addItem(message)
         self.sidebar.scan_results.scrollToBottom()
 
-    def finish_gog_sync(self):
-        logging.getLogger().removeHandler(self.qt_log_handler)
-
-        # If the panel is still visible, it means the sync completed without interruption.
-        if self.sidebar.scan_panel.isVisible():
-            self.sidebar.scan_results.addItem("--- Sync complete! ---")
-            self.sidebar.scan_results.scrollToBottom()
-            # Change button to "Close" and set its action to close the panel.
-            self.sidebar.btn_cancel.setText("Close")
-            try: self.sidebar.btn_cancel.clicked.disconnect()
-            except: pass
-            self.sidebar.btn_cancel.clicked.connect(self.cancel_inline_scan)
-
-        self.gog_sync_in_progress = False
-        self.sidebar.btn_sync_gog.setEnabled(True)
-        self.sidebar.btn_sync_gog.setText("Sync GOG")
-        self.sidebar.btn_full_scan.setEnabled(True)
-        self.sidebar.btn_scan_local.setEnabled(True)
-        self.sidebar.btn_scan_new.setEnabled(True)
-        self.refresh_data()
-
-    def start_local_scan(self):
-        if self.gog_sync_in_progress or self.local_scan_in_progress or self.full_scan_in_progress:
-            QMessageBox.information(self, "Info", "Another task is already in progress.")
-            return
-
-        self.local_scan_in_progress = True
-        self.sidebar.btn_scan_local.setEnabled(False)
-        self.sidebar.btn_scan_local.setText("Scanning")
-        self.sidebar.btn_full_scan.setEnabled(False)
-        self.sidebar.btn_sync_gog.setEnabled(False)
-        self.sidebar.btn_scan_new.setEnabled(False)
-        self.set_filters_ui_state(False)
-
-        # Show the scan panel as a log viewer
-        self.sidebar.scan_panel.show()
-        self.sidebar.scan_title_label.setText("Local Folders Scan")
-        self.sidebar.scan_input.hide()
-        self.sidebar.scan_btn.hide()
-        self.sidebar.scan_limit_combo.hide()
-        self.sidebar.btn_confirm.hide()
-        self.sidebar.btn_cancel.setText("Stop")
-        self.sidebar.scan_results.clear()
-        self.sidebar.scan_results.addItem("Starting local folders scan...")
-
-        # Disconnect previous signals and connect the stop function
-        try: self.sidebar.btn_cancel.clicked.disconnect()
-        except: pass
-        self.sidebar.btn_cancel.clicked.connect(self.stop_local_scan)
-
-        # Setup logging to UI
-        self.log_signal = QtLogSignal()
-        self.log_signal.message_written.connect(self.update_sync_log)
-        self.qt_log_handler = QtLogHandler(self.log_signal)
-        logging.getLogger().addHandler(self.qt_log_handler)
-
-        # Setup and start worker thread
-        self.local_scan_worker = LocalScanWorker(retry_failures=False)
-        self.local_scan_worker.finished.connect(self.finish_local_scan)
-        self.local_scan_worker.start()
-
-    def stop_local_scan(self):
-        """Requests interruption of the local scan thread and closes the panel."""
-        if self.local_scan_in_progress and hasattr(self, 'local_scan_worker'):
-            logging.info("--- Scan interrupted by user. ---")
-            self.local_scan_worker.requestInterruption()
-            self.sidebar.scan_panel.hide()
-            self.set_filters_ui_state(True)
-            self.restore_scan_panel()
-
-    def finish_local_scan(self):
-        logging.getLogger().removeHandler(self.qt_log_handler)
-        
-        self.local_scan_in_progress = False
-        self.sidebar.btn_scan_local.setEnabled(True)
-        self.sidebar.btn_scan_local.setText("Scan Local")
-        self.sidebar.btn_full_scan.setEnabled(True)
-        self.sidebar.btn_sync_gog.setEnabled(True)
-        self.sidebar.btn_scan_new.setEnabled(True)
-
-        # If the panel is still visible, it means the scan completed without interruption.
-        if self.sidebar.scan_panel.isVisible():
-            self.sidebar.scan_results.addItem("--- Folder scan finished! ---")
-            self.sidebar.scan_results.scrollToBottom()
-            # Change button to "Close" and set its action to close the panel.
-            self.sidebar.btn_cancel.setText("Close")
-            try: self.sidebar.btn_cancel.clicked.disconnect()
-            except: pass
-            self.sidebar.btn_cancel.clicked.connect(self.cancel_inline_scan)
-
-        self.refresh_data()
-
     def start_full_scan(self):
-        if self.gog_sync_in_progress or self.local_scan_in_progress or self.full_scan_in_progress:
+        if self.full_scan_in_progress:
             QMessageBox.information(self, "Info", "Another task is already in progress.")
             return
 
@@ -1991,9 +2113,7 @@ class MainWindow(QMainWindow):
         self.full_scan_in_progress = True
         self.sidebar.btn_full_scan.setEnabled(False)
         self.sidebar.btn_full_scan.setText("Scanning...")
-        self.sidebar.btn_sync_gog.setEnabled(False)
-        self.sidebar.btn_scan_local.setEnabled(False)
-        self.sidebar.btn_scan_new.setEnabled(False)
+        self.sidebar.chk_show_new.setEnabled(False)
         self.set_filters_ui_state(False)
 
         # Show the scan panel as a log viewer
@@ -2037,10 +2157,8 @@ class MainWindow(QMainWindow):
         
         self.full_scan_in_progress = False
         self.sidebar.btn_full_scan.setEnabled(True)
-        self.sidebar.btn_full_scan.setText("Full Scan (GOG + Local)")
-        self.sidebar.btn_sync_gog.setEnabled(True)
-        self.sidebar.btn_scan_local.setEnabled(True)
-        self.sidebar.btn_scan_new.setEnabled(True)
+        self.sidebar.btn_full_scan.setText(translator.tr("sidebar_btn_full_scan"))
+        self.sidebar.chk_show_new.setEnabled(True)
 
         # If the panel is still visible, it means the scan completed without interruption.
         if self.sidebar.scan_panel.isVisible():
@@ -2061,6 +2179,7 @@ class MainWindow(QMainWindow):
 
         self.restore_scan_panel()
         
+        # Pre-process name for search: remove Year and platform tags to get clean title
         # Clean up folder name for search
         raw_name = game_data.get('Folder_Name', '')
         # 1. Remove year at the beginning (e.g., "1992 - Dune" -> "Dune")
@@ -2300,7 +2419,7 @@ class MainWindow(QMainWindow):
             "sort_index": self.sidebar.combo_sort.currentIndex(),
             "search_text": self.sidebar.search_bar.text(),
             "scroll_value": self.list_widget.verticalScrollBar().value(),
-            "scan_new": self.sidebar.btn_scan_new.isChecked(),
+            "scan_new": self.sidebar.chk_show_new.isChecked(),
             "filter_states": filter_states,
             "filter_expansion": saved_expansion
         })
@@ -2357,6 +2476,7 @@ class MainWindow(QMainWindow):
                 self.restoreGeometry(QByteArray.fromBase64(global_settings["geometry"].encode()))
                 
             self.sort_desc = lib_settings.get("sort_desc", True)
+            self.sidebar.update_sort_button(self.sort_desc)
             
             # Load display settings
             self.display_settings['image'] = global_settings.get("card_image_size", 200)
@@ -2373,14 +2493,14 @@ class MainWindow(QMainWindow):
             self.sidebar.search_bar.setText(lib_settings.get("search_text", ""))
             
             # Block signals for filter checkboxes during setup
-            self.sidebar.btn_scan_new.blockSignals(True)
+            self.sidebar.chk_show_new.blockSignals(True)
             
             if hasattr(self, 'dynamic_filters'):
                 for checkboxes in self.dynamic_filters.values():
                     for chk in checkboxes:
                         chk.blockSignals(True)
 
-            self.sidebar.btn_scan_new.setChecked(lib_settings.get("scan_new", False))
+            self.sidebar.chk_show_new.setChecked(lib_settings.get("scan_new", False))
 
             # Restore filter selections
             filter_states = lib_settings.get("filter_states") # Can be None
@@ -2401,7 +2521,7 @@ class MainWindow(QMainWindow):
                     for chk in checkboxes:
                         chk.blockSignals(False)
             
-            self.sidebar.btn_scan_new.blockSignals(False)
+            self.sidebar.chk_show_new.blockSignals(False)
 
             return lib_settings.get("scroll_value", 0)
         except Exception as e:
@@ -2409,19 +2529,6 @@ class MainWindow(QMainWindow):
             return 0
 
     def refresh_data(self):
-        # Check GOG setting to enable/disable buttons
-        settings_path = get_library_settings_file()
-        enable_gog = True
-        if os.path.exists(settings_path):
-            with open(settings_path, "r", encoding='utf-8') as f:
-                enable_gog = json.load(f).get("enable_gog_db", True)
-        
-        self.sidebar.btn_sync_gog.setEnabled(enable_gog)
-        if not enable_gog:
-            self.sidebar.btn_sync_gog.setToolTip("GOG Sync is disabled in Settings")
-        else:
-            self.sidebar.btn_sync_gog.setToolTip("")
-
         """Reloads the CSV and updates the display"""
         # Capture current filter state before rebuilding UI
         saved_filters = {}
@@ -2438,21 +2545,8 @@ class MainWindow(QMainWindow):
                 group = item.widget()
                 saved_expansion[group.title] = group.toggle_btn.isChecked()
 
-        if os.path.exists(get_db_path()):
-            self.master_df = pd.read_csv(get_db_path(), sep=';', encoding='utf-8').fillna('')
-            
-            if 'Status_Flag' not in self.master_df.columns:
-                self.master_df['Status_Flag'] = 'NEW'
-            
-            # Re-add temporary sorting columns after reloading
-            self.master_df['temp_sort_date'] = pd.to_datetime(self.master_df['Original_Release_Date'], errors='coerce', dayfirst=True)
-            self.master_df['temp_sort_title'] = self.master_df['Clean_Title'].str.lower()
-            
-            # Rebuild filters based on new data, passing the saved state
-            self.populate_dynamic_filters(saved_filters, saved_expansion)
-            self.update_library_info()
-            
-            self.request_filter_update()
+        self.save_settings() # Save current UI state to file
+        self.load_database_async() # Reload using standard flow (which reads settings)
 
     def load_data(self):
         for _, row in df.iterrows():
@@ -2465,6 +2559,7 @@ class MainWindow(QMainWindow):
 
     def toggle_sort_order(self):
         self.sort_desc = not self.sort_desc
+        self.sidebar.update_sort_button(self.sort_desc)
         self.request_filter_update()
         
     def request_filter_update(self):
@@ -2479,7 +2574,7 @@ class MainWindow(QMainWindow):
         self.list_widget.setEnabled(False)
         QApplication.setOverrideCursor(Qt.WaitCursor)
 
-        sort_col_map = {"Name": "temp_sort_title", "Release Date": "temp_sort_date", "Developer": "Developer"}
+        sort_col_map = ["temp_sort_title", "temp_sort_date", "Developer"] # Index-based: 0=Name, 1=Date, 2=Dev
         
         # Gather active filters
         active_filters = {}
@@ -2495,9 +2590,9 @@ class MainWindow(QMainWindow):
         params = {
             'search_text': self.sidebar.search_bar.text(),
             'active_filters': active_filters,
-            'sort_col': sort_col_map[self.sidebar.combo_sort.currentText()],
+            'sort_col': sort_col_map[self.sidebar.combo_sort.currentIndex()],
             'sort_desc': self.sort_desc,
-            'scan_new': self.sidebar.btn_scan_new.isChecked(),
+            'scan_new': self.sidebar.chk_show_new.isChecked(),
         }
 
         self.filter_worker = FilterWorker(self.master_df, params)
@@ -2510,6 +2605,7 @@ class MainWindow(QMainWindow):
         QApplication.restoreOverrideCursor()
         self.sidebar.setEnabled(True)
         self.list_widget.setEnabled(True)
+        self.sidebar.search_bar.setFocus()
 
         if self.is_startup:
             self.is_startup = False
@@ -2524,6 +2620,7 @@ class MainWindow(QMainWindow):
             self.load_more_items()
 
     def load_more_items(self):
+        # Lazy loading logic: Adds items in chunks (batch_size) to prevent UI freeze
         if self.loaded_count >= len(self.current_df):
             self.background_loader.stop()
             return
@@ -2532,15 +2629,56 @@ class MainWindow(QMainWindow):
         end_index = min(self.loaded_count + self.batch_size, len(self.current_df))
         batch_df = self.current_df.iloc[self.loaded_count:end_index]
         
+        # Sanity check: If viewport width is tiny (startup/minimized), assume a safe default (e.g. 600)
+        # This prevents text from wrapping into infinite lines and creating huge vertical gaps.
+        vp_width = self.list_widget.viewport().width()
+        current_width = vp_width if vp_width > 100 else 600
+        
+        # Check if width changed (e.g. scrollbar appeared), update existing items if needed
+        if self.loaded_count > 0 and abs(current_width - self.last_viewport_width) > 2:
+            self.update_item_sizes()
+            current_width = self.list_widget.viewport().width()
+        
+        self.last_viewport_width = current_width
+        
         for _, row in batch_df.iterrows():
             item = QListWidgetItem(self.list_widget)
             card = GameCard(row.to_dict(), self, item)
+            
+            card.setFixedWidth(current_width)
+            card.adjustSize()
             item.setSizeHint(card.sizeHint())
+            
+            # Unlock width
+            card.setMinimumWidth(0)
+            card.setMaximumWidth(16777215)
+            
             item.setData(Qt.UserRole, row['Folder_Name'])
             self.list_widget.addItem(item)
             self.list_widget.setItemWidget(item, card)
             
         self.loaded_count = end_index
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # Triggers recalculation of all item heights when the window width changes
+        self.update_item_sizes()
+
+    def update_item_sizes(self):
+        vp_width = self.list_widget.viewport().width()
+        # Same sanity check for resize events
+        viewport_width = vp_width if vp_width > 100 else 600
+        
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            widget = self.list_widget.itemWidget(item)
+            if widget:
+                widget.setFixedWidth(viewport_width)
+                widget.adjustSize()
+                item.setSizeHint(widget.sizeHint())
+                widget.setMinimumWidth(0)
+                widget.setMaximumWidth(16777215)
+        self.last_viewport_width = viewport_width
 
     def update_display_with_results(self, df):
         # Stop the previous loading if it's in progress
@@ -2597,8 +2735,103 @@ class MainWindow(QMainWindow):
             sb.setValue(self.pending_scroll)
             del self.pending_scroll
 
+    def refresh_styles(self):
+        if hasattr(self, 'sidebar'):
+            self.sidebar.refresh_styles()
+
+    def reload_global_settings(self):
+        """Reloads global settings (theme, language) and applies them."""
+        global_settings = {}
+        try:
+            with open("settings.json", "r", encoding='utf-8') as f:
+                global_settings = json.load(f)
+        except: pass
+        
+        new_theme = global_settings.get("theme", "System")
+        new_lang = global_settings.get("language", "English")
+        
+        apply_theme(QApplication.instance(), new_theme)
+        
+        if translator.language != new_lang:
+            translator.load_language(new_lang)
+            self.retranslate_ui()
+            
+        self.refresh_styles()
+
+    def retranslate_ui(self):
+        """Update all user-facing strings after a language change."""
+        self.setWindowTitle(translator.tr("app_title"))
+        self.create_menu_bar() # Easiest way to re-translate menus
+        self.sidebar.retranslate_ui()
+
+def apply_theme(app, theme_name):
+    effective_theme = theme_name
+    if theme_name == "System":
+        try:
+            import winreg
+            registry = winreg.ConnectRegistry(None, winreg.HKEY_CURRENT_USER)
+            key = winreg.OpenKey(registry, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")
+            value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
+            if value == 0:
+                effective_theme = "Dark"
+            else:
+                effective_theme = "Light"
+        except:
+            pass
+
+    # Always use Fusion to ensure consistency and palette respect
+    app.setStyle(QStyleFactory.create("Fusion"))
+
+    if effective_theme == "Dark":
+        dark_palette = QPalette()
+        dark_palette.setColor(QPalette.Window, QColor(53, 53, 53))
+        dark_palette.setColor(QPalette.WindowText, Qt.white)
+        dark_palette.setColor(QPalette.Base, QColor(25, 25, 25))
+        dark_palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
+        dark_palette.setColor(QPalette.ToolTipBase, Qt.white)
+        dark_palette.setColor(QPalette.ToolTipText, Qt.white)
+        dark_palette.setColor(QPalette.Text, Qt.white)
+        dark_palette.setColor(QPalette.Button, QColor(53, 53, 53))
+        dark_palette.setColor(QPalette.ButtonText, Qt.white)
+        dark_palette.setColor(QPalette.BrightText, Qt.red)
+        dark_palette.setColor(QPalette.Link, QColor(42, 130, 218))
+        dark_palette.setColor(QPalette.Highlight, QColor(50, 50, 50))
+        dark_palette.setColor(QPalette.HighlightedText, Qt.white)
+        app.setPalette(dark_palette)
+    else: # Light or System
+        # Force a Light Palette to ensure it doesn't inherit Dark Mode from OS
+        light_palette = QPalette()
+        light_palette.setColor(QPalette.Window, QColor(240, 240, 240))
+        light_palette.setColor(QPalette.WindowText, Qt.black)
+        light_palette.setColor(QPalette.Base, Qt.white)
+        light_palette.setColor(QPalette.AlternateBase, QColor(233, 233, 233))
+        light_palette.setColor(QPalette.ToolTipBase, Qt.white)
+        light_palette.setColor(QPalette.ToolTipText, Qt.black)
+        light_palette.setColor(QPalette.Text, Qt.black)
+        light_palette.setColor(QPalette.Button, QColor(240, 240, 240))
+        light_palette.setColor(QPalette.ButtonText, Qt.black)
+        light_palette.setColor(QPalette.BrightText, Qt.red)
+        light_palette.setColor(QPalette.Link, QColor(0, 0, 255))
+        
+        # Custom Highlight (Grey instead of Blue)
+        light_palette.setColor(QPalette.Highlight, QColor(200, 200, 200))
+        light_palette.setColor(QPalette.HighlightedText, Qt.black)
+        
+        app.setPalette(light_palette)
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+
+    # Load and apply theme/language at startup
+    global_settings = {}
+    if os.path.exists("settings.json"):
+        try:
+            with open("settings.json", "r", encoding='utf-8') as f:
+                global_settings = json.load(f)
+        except: pass
+    
+    apply_theme(app, global_settings.get("theme", "System"))
+    translator.load_language(global_settings.get("language", "English"))
 
     window = MainWindow()
     window.show()
