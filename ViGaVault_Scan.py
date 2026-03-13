@@ -21,10 +21,17 @@ except ImportError:
 
 
 # --- CONFIGURATION ---
+# WHY: We define BASE_DIR relative to this script file location.
+# This ensures that whether the script is run from CMD, an IDE, or a shortcut,
+# Python always knows where to look for relative files (DB, settings, logs)
+# instead of relying on the unpredictable 'current working directory' (os.getcwd).
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 def get_db_path():
     """Reads the db_path from settings.json, falling back to the default."""
-    settings_file = "settings.json"
-    default_db = "VGVDB.csv"
+    # WHY: Construct absolute path using BASE_DIR to reliably find settings.json
+    settings_file = os.path.join(BASE_DIR, "settings.json")
+    default_db = os.path.join(BASE_DIR, "VGVDB.csv")
     if os.path.exists(settings_file):
         try:
             with open(settings_file, "r", encoding='utf-8') as f:
@@ -34,8 +41,8 @@ def get_db_path():
             return default_db
     return default_db
 
-LOG_DIR = "./logs"
-BACKUP_DIR = "./backups"
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+BACKUP_DIR = os.path.join(BASE_DIR, "backups")
 VIDEO_EXTS = ('.mp4', '.mkv', '.avi', '.wmv', '.webm')
 MAX_FILES = 10 
 
@@ -47,7 +54,7 @@ def get_library_settings_file():
 def get_video_path():
     """Returns the configured video path or default 'videos' folder."""
     settings_path = get_library_settings_file()
-    default_path = os.path.join(os.getcwd(), "videos")
+    default_path = os.path.join(BASE_DIR, "videos")
     if os.path.exists(settings_path):
         try:
             with open(settings_path, "r", encoding='utf-8') as f:
@@ -67,9 +74,10 @@ def get_root_path():
                 return settings.get("root_path", default_path)
         except: pass
     # Fallback to global settings.json if library one fails or doesn't exist
-    if os.path.exists("settings.json"):
+    global_settings_path = os.path.join(BASE_DIR, "settings.json")
+    if os.path.exists(global_settings_path):
          try:
-            with open("settings.json", "r", encoding='utf-8') as f:
+            with open(global_settings_path, "r", encoding='utf-8') as f:
                 settings = json.load(f)
                 return settings.get("root_path", default_path)
          except: pass
@@ -155,8 +163,9 @@ def get_platform_config():
 
     # Try library specific settings first, then fall back to global settings.json
     settings_path = get_library_settings_file()
+    global_settings_path = os.path.join(BASE_DIR, "settings.json")
     if not os.path.exists(settings_path):
-        settings_path = "settings.json"
+        settings_path = global_settings_path
 
     if os.path.exists(settings_path):
         try:
@@ -179,8 +188,9 @@ def get_local_scan_config():
     
     # Try library specific settings first, then fall back to global settings.json
     settings_path = get_library_settings_file()
+    global_settings_path = os.path.join(BASE_DIR, "settings.json")
     if not os.path.exists(settings_path):
-        settings_path = "settings.json"
+        settings_path = global_settings_path
         
     if os.path.exists(settings_path):
         try:
@@ -285,7 +295,7 @@ class Game:
         # Otherwise, check if an image already exists in the images folder
         safe_name = get_safe_filename(self.data.get('Folder_Name', ''))
         for ext in ['.jpg', '.png', '.jpeg', '.webp']:
-            potential_path = os.path.join("images", f"{safe_name}{ext}")
+            potential_path = os.path.join(BASE_DIR, "images", f"{safe_name}{ext}")
             if os.path.exists(potential_path):
                 self.data['Image_Link'] = potential_path
                 logging.info(f"    [IMAGE] Found locally: {safe_name}{ext}")
@@ -300,7 +310,8 @@ class Game:
 
         # If we get here, it means we must (re)download
         if 'cover' in game_info:
-            os.makedirs("images", exist_ok=True)
+            images_dir = os.path.join(BASE_DIR, "images")
+            os.makedirs(images_dir, exist_ok=True)
             # IGDB provides a relative URL starting with //, we add https:
             cover_url = "https:" + game_info['cover']['url'].replace('t_thumb', 't_cover_big')
             
@@ -315,7 +326,7 @@ class Game:
             except:
                 ext = '.jpg'
 
-            save_path = os.path.join("images", f"{safe_filename}{ext}")
+            save_path = os.path.join(images_dir, f"{safe_filename}{ext}")
             
             try:
                 response = requests.get(cover_url, stream=True)
@@ -611,7 +622,8 @@ class LibraryManager:
             if 'con' in locals() and con: con.close()
             return
 
-        os.makedirs("images", exist_ok=True)
+        images_dir = os.path.join(BASE_DIR, "images")
+        os.makedirs(images_dir, exist_ok=True)
         video_dir = get_video_path()
         os.makedirs(video_dir, exist_ok=True)
         
@@ -1122,7 +1134,7 @@ class LibraryManager:
                     # Check if the target file already exists (handling the Year suffix logic which Game() init might miss)
                     if not image_exists_on_disk:
                         for check_ext in ['.jpg', '.png', '.jpeg', '.webp']:
-                            check_path = os.path.join("images", f"{safe_filename}{check_ext}")
+                            check_path = os.path.join(images_dir, f"{safe_filename}{check_ext}")
                             if os.path.exists(check_path):
                                 game_obj.data['Image_Link'] = check_path
                                 image_exists_on_disk = True
@@ -1142,7 +1154,7 @@ class LibraryManager:
                                 ext = '.jpg' # Fallback for other cases
                         except:
                             ext = '.jpg' # Ultimate fallback in case of parsing error
-                        save_path = os.path.join("images", f"{safe_filename}{ext}")
+                        save_path = os.path.join(images_dir, f"{safe_filename}{ext}")
                         try:
                             response = requests.get(cover_url, timeout=5)
                             if response.status_code == 200:
@@ -1236,6 +1248,10 @@ class LibraryManager:
             return None
 
     def load_db(self):
+        """Loads data from storage into memory."""
+        # WHY: This is the centralized point for reading data.
+        # Currently: Reads a CSV file via Pandas.
+        # Future: Will verify if .db exists and execute "SELECT * FROM games".
         if os.path.exists(self.db_file):
             df = pd.read_csv(self.db_file, sep=';', encoding='utf-8').fillna('')
             for _, row in df.iterrows():
@@ -1614,15 +1630,18 @@ class LibraryManager:
             return success
         return False
 
-    def save_db(self):
-        # --- BACKUP LOGIC ---
+    def _create_backup(self):
+        """Creates a timestamped backup of the current database file."""
+        # WHY: Abstracting backup logic prepares for SQLite. 
+        # With SQLite, we might use the 'backup' API or simply copy the .db file,
+        # but the logic of 'when' and 'how' to manage old backups stays here.
         if os.path.exists(self.db_file):
             os.makedirs(BACKUP_DIR, exist_ok=True)
             
             # Cleanup old backups
             backups = [os.path.join(BACKUP_DIR, f) for f in os.listdir(BACKUP_DIR) if f.startswith("VGVDB_") and f.endswith(".csv")]
             backups.sort(key=os.path.getctime)
-            while len(backups) >= MAX_FILES:
+            while len(backups) >= MAX_FILES: # Uses global MAX_FILES
                 oldest = backups.pop(0)
                 try:
                     os.remove(oldest)
@@ -1636,30 +1655,45 @@ class LibraryManager:
                 logging.info(f"    [DB BACKUP] Backup created at {backup_file}")
             except Exception as e:
                 logging.error(f"    [DB BACKUP ERROR] Failed to create backup: {e}")
-        # --- END BACKUP LOGIC ---
 
-        # 1. Create DataFrame
-        df = pd.DataFrame([g.to_dict() for g in self.games.values()])
-        
-        # 2. List of all expected columns (to guarantee structure)
-        expected_columns = [
+    def _get_db_schema(self):
+        """Returns the list of columns that constitutes the database schema."""
+        # WHY: Defining the schema in one place.
+        # Future: This list will determine the fields for the SQLite 'CREATE TABLE' statement.
+        return [
             'Folder_Name', 'Clean_Title', 'Search_Title', 'Path_Root', 'Path_Video', 
             'Status_Flag', 'Image_Link', 'Year_Folder', 'Platforms', 'Developer', 
             'Publisher', 'Original_Release_Date', 'Summary', 'Genre', 'Collection', 'Trailer_Link',
             'game_ID'
         ] + [f'platform_ID_{i:02d}' for i in range(1, 51)]
+
+    def save_db(self):
+        """Persists the current in-memory game list to storage."""
+        # WHY: This function acts as the single 'commit' point. 
+        # Currently: Serializes objects to CSV.
+        # Future: Will manage the SQLite transaction and execute INSERT/UPDATE queries.
         
-        # 3. Force columns: add missing ones (filled with empty strings)
+        # 1. Create Backup before writing
+        self._create_backup()
+
+        # 2. Convert memory objects to DataFrame (Presentation Layer for CSV)
+        df = pd.DataFrame([g.to_dict() for g in self.games.values()])
+        
+        # 3. Enforce Schema
+        expected_columns = self._get_db_schema()
+        
+        # Force columns: add missing ones (filled with empty strings)
         for col in expected_columns:
             if col not in df.columns:
                 df[col] = ''
         
-        # 4. Cleanup and save
+        # 4. Cleanup and Write
         df = df[expected_columns] # Reorder cleanly
         for col in ['Year_Folder', 'Original_Release_Date']:
             if col in df.columns:
                 df[col] = df[col].astype(str).str.replace(r'\.0$', '', regex=True).replace('nan', '')
         
+        # The actual write operation
         df.fillna('').to_csv(self.db_file, sep=';', index=False, encoding='utf-8')
         logging.info(f"    [DB SAVE] Database saved to {self.db_file} ({len(df)} games).")
 

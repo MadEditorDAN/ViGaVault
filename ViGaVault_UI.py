@@ -240,9 +240,14 @@ class CollapsibleFilterGroup(QGroupBox):
         self.toggle_btn.setText(f"{arrow} {self.title}")
         
         if checked:
+            # Switch policy to Expanding so it can take available space...
             self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
             
-            # Calculate required height to prevent small groups from taking 50% of space
+            # ...BUT we manually calculate the exact required height.
+            # WHY: By default, Qt splits space equally (50/50) between 'Expanding' widgets.
+            # This looks bad if one group is small and another is huge. 
+            # By setting MaximumHeight to the content size, we force the layout to give this 
+            # group ONLY what it needs, leaving the remaining space for other large groups.
             h_header = self.toggle_btn.sizeHint().height()
             h_content = 0
             if self.btns_layout.count() > 0:
@@ -258,6 +263,7 @@ class CollapsibleFilterGroup(QGroupBox):
             if self.parent_layout:
                 self.parent_layout.setStretchFactor(self, 1)
         else:
+            # Revert to Maximum (Compact) when collapsed
             self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
             self.setMaximumHeight(16777215) # Remove limit
             if self.parent_layout:
@@ -1979,7 +1985,7 @@ class MainWindow(QMainWindow):
         rules = local_config.get("folder_rules", {})
 
         # 1. Always add Platform filter (it's core)
-        is_expanded = saved_expansion.get("Platforms", False) if saved_expansion is not None else False
+        is_expanded = saved_expansion.get("Platforms", False) if saved_expansion else False
         self.add_filter_group("Platforms", "Platforms", self.sidebar.filters_layout, is_expanded)
 
         # 2. Add dynamic filters based on rules
@@ -2007,7 +2013,7 @@ class MainWindow(QMainWindow):
         
         for type_name, col_name in type_map.items():
             if type_name in active_types:
-                is_expanded = saved_expansion.get(type_name, False) if saved_expansion is not None else False
+                is_expanded = saved_expansion.get(type_name, False) if saved_expansion else False
                 self.add_filter_group(type_name, col_name, self.sidebar.filters_layout, is_expanded)
         
         # Add a stretch at the end to push groups up
@@ -2023,7 +2029,6 @@ class MainWindow(QMainWindow):
 
     def add_filter_group(self, title, col_name, parent_layout, is_expanded=False):
         group = CollapsibleFilterGroup(title, parent_layout)
-        group.toggle_btn.setChecked(is_expanded)
         
         # Ensure columns take equal width (50% each)
         group.checkbox_layout.setColumnStretch(0, 1)
@@ -2062,6 +2067,13 @@ class MainWindow(QMainWindow):
         
         self.dynamic_filters[col_name] = checkboxes
         parent_layout.addWidget(group)
+        
+        # WHY: We must trigger expansion (setChecked) AFTER adding the widget and items.
+        # If done before, the group calculates its size based on empty content, 
+        # resulting in a visual glitch (group locked to a tiny height).
+        # Doing it here ensures toggle_content() sees the correct content size.
+        if is_expanded:
+            group.toggle_btn.setChecked(True)
 
     def set_filter_group_state(self, col_name, state):
         if col_name in self.dynamic_filters:
@@ -2530,21 +2542,6 @@ class MainWindow(QMainWindow):
 
     def refresh_data(self):
         """Reloads the CSV and updates the display"""
-        # Capture current filter state before rebuilding UI
-        saved_filters = {}
-        saved_expansion = {}
-        if hasattr(self, 'dynamic_filters'):
-            for col, checkboxes in self.dynamic_filters.items():
-                saved_filters[col] = {chk.text() for chk in checkboxes if chk.isChecked()}
-        
-        # Capture expansion state
-        layout = self.sidebar.filters_layout
-        for i in range(layout.count()):
-            item = layout.itemAt(i)
-            if item.widget() and isinstance(item.widget(), CollapsibleFilterGroup):
-                group = item.widget()
-                saved_expansion[group.title] = group.toggle_btn.isChecked()
-
         self.save_settings() # Save current UI state to file
         self.load_database_async() # Reload using standard flow (which reads settings)
 

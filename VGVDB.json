@@ -106,7 +106,6 @@
     "filter_states": {
         "Platforms": [
             "Amazon",
-            "Battle.net",
             "Epic Games Store",
             "GOG",
             "Origin",

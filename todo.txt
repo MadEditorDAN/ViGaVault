@@ -1,7 +1,7 @@
 Pretyped messages:
 @workspace, lis le fichier INSTRUCTIONS.md et utilise-le comme base de travail pour toutes tes futures réponses sur ce projet.
 It did not worked, I rolled back
-
+On discute, pas de code
 Ideas:
 Steam integration recupérer le TAG VR
 dowload background image from gog sb and use it as gamecard backbround
@@ -10,25 +10,22 @@ dowload background image from gog sb and use it as gamecard backbround
 
 
 TO DO MAYBE : 
-
 Let's discuss, no code. 
 I would like to Merge the ViGaVault_Scan.py script and the ViGaVault_UI.py script in one new ViGaVault.py script. Is that a good idea/practice or is it better to keep separate .py files for different functions
-
-
-
-
 
 Let's discuss, no code. 
 How do we proceed to create an executable file and an installation exe
 
 
+"Garde le code modulaire (plusieurs fichiers), mais assure-toi d'utiliser des chemins relatifs robustes (via os.path.dirname(os.path.abspath(__file__))) pour que l'application retrouve le CSV et les dossiers d'images, qu'elle soit lancée depuis Python ou depuis un .exe."
+
+Puisque tu sais que tu vas y passer, tu peux déjà "préparer le terrain" dans ton code actuel (ViGaVault_Scan.py) :
+- Isole les accès DB : Au lieu d'utiliser df.to_csv() partout dans ton code, essaie de centraliser toutes les lectures/écritures dans 2 ou 3 fonctions de ton LibraryManager.
+- Le jour J : Quand tu voudras passer à SQLite, tu n'auras qu'à modifier ces 2 ou 3 fonctions pour qu'elles parlent à la base SQL au lieu du CSV, sans toucher à ton UI ni à tes Scrappers.
+- Pour ne pas perdre l'avantage du CSV (la visibilité), tu pourras utiliser un outil gratuit comme "DB Browser for SQLite". C'est un logiciel qui te permet de voir ta base SQL exactement comme un tableau Excel, de modifier les cases à la main et de faire des recherches. Ça t'enlèvera la peur de "ne plus voir tes données".
 
 
 TO CHECK : 
-
-self.background_loader.setInterval(100) # Load a batch every 100ms
-Est ce que allonger légerement ce parametre rendra l'interface un peu plus réactive ?
-
 # Check lang/ subdirectory first (cleaner), then root
         lang_file = os.path.join(self.base_path, "lang", f"{lang_code}.json")
 Les fichier json de langues SON dans le dossier LANG et pas ailleur. Il ne faut pas les chercher ailleur.
@@ -38,13 +35,76 @@ Les fichier json de langues SON dans le dossier LANG et pas ailleur. Il ne faut 
 TO DO :
 Rendons fonctionnel le menu tools
  - Full Scan, lance le Full Scan
- - media manager montrera les jeux pour lesquels il manque l'image ou la video ou les deux et permettra de tenter de les télécharger sur les différentes source disponible.
- - Platforme manager :  Pour le moment crée un fenetre vide.
+ - Platforms Manager : pour le moment ouvre une fenetre vide
  - Statistics, le plus de statistiques possible sur la librairie actuelle.
 
 
 
 
+Platforms Manager !
 
-Platforme manager :  Mon idée mais elle est loin d'être simple est d'utilisé les plug ins utilise par GOG Galaxy pour récupérer les liste de jeux possédé sur les différentes platformes. Idée a discuter sérieusement avant de se lancer. 
+Future structure : 
+
+ViGaVault/
+├── ViGaVault_UI.py             # (Existant - Ton interface)
+├── ViGaVault_Scan.py           # (Existant - Ton LibraryManager et CSV)
+├── ViGaVault_SCRAPPERS.py      # L'orchestrateur (À créer)
+└── connectors/                 
+    └── steam_cloud.py          # Le spécialiste Steam (À créer)
+	
+Voici les informations techniques que tu dois donner à Gemini pour qu'il code le connecteur :
+Source de données : API Store Front de Steam.
+Endpoint : https://store.steampowered.com/api/appdetails?appids={APPID}&l=french
+
+Données à extraire (Metadata) :
+---------------------------------------------------------------------------------------------------------
+Type,		Champ Steam API,									Action ViGaVault
+---------------------------------------------------------------------------------------------------------
+Metadata,	"name, developers, publishers, release_date",		Injection CSV via LibraryManager
+Texte,		"about_the_game, short_description",				Récupéré dans la langue de l'UI
+Genres,		genres,												Passage par ta fonction normalize_genre
+Images,		"header_image (Cover), 								background",Téléchargement dans ./images/
+Vidéos,		movies -> mp4 -> max,								Téléchargement .mp4 si lien direct
+Vidéos,		YouTube URL,										Copie simple du lien dans le CSV
+---------------------------------------------------------------------------------------------------------
+Si un lien .mp4 ou .webm existe (ex: mp4['max']) -> Téléchargement direct dans ./videos/.
+Si seul un lien YouTube est présent -> Copie de l'URL dans le CSV uniquement.
+
+3. Protocole de Connexion (Le Flux)
+
+Récupération de la liste : On utilise l'URL userdata de Steam (nécessite les cookies de session de l'utilisateur) pour obtenir tous les AppIDs possédés. 
+Boucle d'enrichissement : Pour chaque AppID, on appelle l'API appdetails pour obtenir le "gros" JSON.
+Injection : On passe ce dictionnaire à LibraryManager.add_game_to_db pour qu'il s'occupe de l'écriture dans VGVDB.csv et du rangement des fichiers.
+
+4. Le Guide pour Gemini dans VS Code
+Copie ce bloc et colle-le dans ton chat VS Code une fois les fichiers ouverts :
+
+"@workspace, nous allons implémenter le connecteur Cloud pour Steam.
+Fichiers de référence : 
+1. backend_steam_network.py pour voir comment ils gèrent les requêtes Web.
+2. ViGaVault_Scan.py pour utiliser mon LibraryManager (méthode add_game_to_db).
+
+Travail à réaliser :
+Crée connectors/steam_cloud.py. Ce module doit contenir une classe capable de :
+Récupérer la liste des AppIDs possédés via l'URL Steam UserData.
+Pour chaque jeu, interroger l'API Store Front (appdetails).
+Extraire TOUTES les métadonnées (Dev, Éditeur, Date, Résumé, Genres).
+Médias : Télécharger les images (header) et les vidéos si un lien direct (.mp4/.webm) est disponible. Si c'est du YouTube, stocker l'URL sans télécharger.
+Faire en sorte que le résultat final soit injecté proprement dans mon CSV via LibraryManager."
+
+5. Pourquoi commencer par Steam ?
+Fiabilité : L'API appdetails de Steam est la plus documentée et la plus stable du marché.
+Qualité : C'est là que tu trouveras les plus belles descriptions et les trailers les plus faciles à télécharger (souvent en MP4 direct sans protection).
+Template : Une fois que Steam fonctionne, on pourra copier 80% du code pour GOG et Epic, car la logique de "Récupérer ID -> Chercher Infos -> Télécharger Médias" sera déjà en place.	
+
+
+Le Plan de Vol pour Gemini (VS Code)
+Initialisation : Créer connectors/steam_cloud.py.
+Authentification : Utiliser les cookies de session (référence : backend_steam_network.py) pour récupérer la liste des jeux possédés sur le compte.
+Boucle de Scrapping :
+Prendre la langue de l'utilisateur (via settings.json).
+Appeler l'API Steam Store pour chaque jeu.
+Télécharger les images et les vidéos MP4.
+
+Finalisation : Appeler LibraryManager.add_game_to_db pour chaque jeu pour garantir que le CSV est à jour et que les fichiers sont bien nommés (via get_safe_filename).
 
