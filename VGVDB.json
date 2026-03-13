@@ -7,7 +7,7 @@
         "Battle.net",
         "Epic Games Store"
     ],
-    "search_text": "",
+    "search_text": "veil",
     "scroll_value": 0,
     "chk_new": false,
     "chk_a_tester": false,
@@ -164,6 +164,6 @@
     "video_path": "d:\\VGV-Videos\\",
     "filter_expansion": {
         "Platforms": false,
-        "Genre": true
+        "Genre": false
     }
 }

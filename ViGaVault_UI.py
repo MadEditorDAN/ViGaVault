@@ -13,7 +13,7 @@ from ViGaVault_Scan import LibraryManager, get_safe_filename, get_platform_confi
 from PySide6.QtWidgets import (QApplication, QMainWindow, QListWidget, QListWidgetItem, 
                              QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QPushButton, QStackedLayout, QFileDialog, QScrollArea,
                              QLineEdit, QComboBox, QDialog, QTextEdit, QFormLayout, QMessageBox, QFrame, QAbstractItemView, QCheckBox, QSlider, QStyle, QGroupBox, QProgressBar,
-                             QTabWidget, QMenuBar, QMenu, QSizePolicy, QStyleFactory)
+                             QTabWidget, QMenuBar, QMenu, QSizePolicy, QStyleFactory, QTableWidget, QTableWidgetItem, QHeaderView)
 from PySide6.QtCore import Qt, QSize, QTimer, QByteArray, QEvent, QUrl, QThread, Signal, QObject, Slot, QThreadPool, QRunnable
 from PySide6.QtGui import QPixmap, QIcon, QAction, QPalette, QColor, QFont, QImage
 
@@ -1308,6 +1308,177 @@ class Sidebar(QWidget):
         self.btn_confirm.setText(translator.tr("sidebar_manual_scan_confirm_btn"))
         self.btn_cancel.setText(translator.tr("sidebar_manual_scan_cancel_btn"))
 
+class PlatformManagerDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(translator.tr("tools_platform_title"))
+        self.resize(400, 300)
+        layout = QVBoxLayout(self)
+        
+        lbl = QLabel(translator.tr("tools_platform_header"))
+        lbl.setAlignment(Qt.AlignCenter)
+        font = QFont()
+        font.setPointSize(16)
+        font.setBold(True)
+        lbl.setFont(font)
+        
+        layout.addStretch()
+        layout.addWidget(lbl)
+        layout.addWidget(QLabel(translator.tr("tools_platform_desc"), alignment=Qt.AlignCenter))
+        layout.addWidget(QLabel(translator.tr("tools_platform_soon"), alignment=Qt.AlignCenter))
+        layout.addStretch()
+        
+        btn_close = QPushButton(translator.tr("btn_close"))
+        btn_close.clicked.connect(self.accept)
+        layout.addWidget(btn_close)
+
+class StatisticsDialog(QDialog):
+    def __init__(self, df, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(translator.tr("tools_stats_title"))
+        self.resize(900, 650)
+        self.df = df
+        
+        layout = QVBoxLayout(self)
+        
+        self.tabs = QTabWidget()
+        layout.addWidget(self.tabs)
+        
+        self.tabs.addTab(self.create_overview_tab(), translator.tr("tools_stats_overview"))
+        self.tabs.addTab(self.create_distribution_tab("Platforms", translator.tr("tools_stats_platforms")), translator.tr("tools_stats_platforms"))
+        self.tabs.addTab(self.create_distribution_tab("Genre", translator.tr("tools_stats_genres")), translator.tr("tools_stats_genres"))
+        self.tabs.addTab(self.create_timeline_tab(), translator.tr("tools_stats_timeline"))
+        
+        btn_close = QPushButton(translator.tr("btn_close"))
+        btn_close.clicked.connect(self.accept)
+        layout.addWidget(btn_close, 0, Qt.AlignRight)
+
+    def create_overview_tab(self):
+        widget = QWidget()
+        layout = QGridLayout(widget)
+        
+        # Calculate Stats
+        total_games = len(self.df)
+        scrapped = len(self.df[self.df['Status_Flag'].isin(['OK', 'LOCKED'])])
+        incomplete = total_games - scrapped
+        
+        # Helper for Cards
+        def add_stat_card(row, col, title, value, color):
+            frame = QFrame()
+            frame.setFrameShape(QFrame.StyledPanel)
+            frame.setStyleSheet(f"background-color: {color}; border-radius: 10px; color: white;")
+            fl = QVBoxLayout(frame)
+            lbl_val = QLabel(str(value))
+            lbl_val.setStyleSheet("font-size: 36px; font-weight: bold;")
+            lbl_val.setAlignment(Qt.AlignCenter)
+            lbl_title = QLabel(title)
+            lbl_title.setStyleSheet("font-size: 14px;")
+            lbl_title.setAlignment(Qt.AlignCenter)
+            fl.addWidget(lbl_val)
+            fl.addWidget(lbl_title)
+            layout.addWidget(frame, row, col)
+
+        add_stat_card(0, 0, translator.tr("tools_stats_total"), total_games, "#2196F3")
+        add_stat_card(0, 1, translator.tr("tools_stats_scrapped"), scrapped, "#4CAF50")
+        add_stat_card(0, 2, translator.tr("tools_stats_incomplete"), incomplete, "#FF9800")
+
+        # Textual Stats
+        stats_list = QListWidget()
+
+        # Helper to get top count from comma-separated columns
+        def get_top_count(col):
+            all_vals = []
+            for x in self.df[col].dropna():
+                all_vals.extend([v.strip() for v in str(x).split(',') if v.strip()])
+            if not all_vals: return "N/A"
+            c = pd.Series(all_vals).value_counts()
+            return f"{c.idxmax()} ({c.max()})"
+
+        stats_list.addItem(translator.tr("tools_stats_top_plat", value=get_top_count('Platforms')))
+        stats_list.addItem(translator.tr("tools_stats_top_genre", value=get_top_count('Genre')))
+
+        dev_counts = self.df['Developer'].value_counts()
+        top_dev = f"{dev_counts.idxmax()} ({dev_counts.max()})" if not dev_counts.empty else "N/A"
+        stats_list.addItem(translator.tr("tools_stats_top_dev", value=top_dev))
+        
+        # Oldest/Newest
+        years = pd.to_datetime(self.df['Original_Release_Date'], errors='coerce', dayfirst=True).dt.year
+        if not years.dropna().empty:
+            yc = years.value_counts()
+            top_year = f"{int(yc.idxmax())} ({yc.max()})"
+            stats_list.addItem(translator.tr("tools_stats_best_year", value=top_year))
+            stats_list.addItem(translator.tr("tools_stats_oldest", value=int(years.min())))
+            stats_list.addItem(translator.tr("tools_stats_newest", value=int(years.max())))
+        
+        layout.addWidget(stats_list, 1, 0, 1, 3)
+        return widget
+
+    def create_distribution_tab(self, col_name, title):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        
+        # Process Data (Split comma separated values)
+        all_values = []
+        for item in self.df[col_name].dropna():
+            parts = [x.strip() for x in str(item).split(',') if x.strip()]
+            all_values.extend(parts)
+            
+        counts = pd.Series(all_values).value_counts()
+        
+        table = QTableWidget()
+        table.setColumnCount(3)
+        table.setHorizontalHeaderLabels([title, translator.tr("tools_stats_col_count"), translator.tr("tools_stats_col_dist")])
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        table.setRowCount(len(counts))
+        
+        max_val = counts.max() if not counts.empty else 1
+        
+        for i, (name, count) in enumerate(counts.items()):
+            table.setItem(i, 0, QTableWidgetItem(name))
+            table.setItem(i, 1, QTableWidgetItem(str(count)))
+            
+            # Progress Bar for visual
+            pbar = QProgressBar()
+            pbar.setRange(0, max_val)
+            pbar.setValue(count)
+            pbar.setTextVisible(False)
+            pbar.setStyleSheet("QProgressBar::chunk { background-color: #00BCD4; }")
+            table.setCellWidget(i, 2, pbar)
+            
+        layout.addWidget(table)
+        return widget
+
+    def create_timeline_tab(self):
+        # Simplified histogram using QTableWidget
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        
+        years = pd.to_datetime(self.df['Original_Release_Date'], errors='coerce', dayfirst=True).dt.year
+        year_counts = years.dropna().astype(int).value_counts().sort_index()
+        
+        table = QTableWidget()
+        table.setColumnCount(2)
+        table.setHorizontalHeaderLabels([translator.tr("tools_stats_col_year"), translator.tr("tools_stats_col_released")])
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        table.setRowCount(len(year_counts))
+        
+        max_val = year_counts.max() if not year_counts.empty else 1
+        
+        for i, (year, count) in enumerate(year_counts.items()):
+            table.setItem(i, 0, QTableWidgetItem(str(year)))
+            
+            pbar = QProgressBar()
+            pbar.setRange(0, max_val)
+            pbar.setValue(count)
+            pbar.setFormat(f"{count}")
+            pbar.setTextVisible(True)
+            pbar.setAlignment(Qt.AlignCenter)
+            table.setCellWidget(i, 1, pbar)
+            
+        layout.addWidget(table)
+        return widget
+
 class SelectionDialog(QDialog):
     def __init__(self, candidates, parent=None):
         super().__init__(parent)
@@ -1741,13 +1912,16 @@ class MainWindow(QMainWindow):
         # --- Tools ---
         tools_menu = menu_bar.addMenu(translator.tr("menu_tools"))
         
-        action_media = QAction(translator.tr("menu_tools_media_manager"), self)
-        tools_menu.addAction(action_media)
+        action_full_scan = QAction(translator.tr("sidebar_btn_full_scan"), self) # Reusing "Full Scan" translation
+        action_full_scan.triggered.connect(self.start_full_scan)
+        tools_menu.addAction(action_full_scan)
         
         action_platforms = QAction(translator.tr("menu_tools_platform_manager"), self)
+        action_platforms.triggered.connect(self.show_platform_manager)
         tools_menu.addAction(action_platforms)
         
         action_stats = QAction(translator.tr("menu_tools_stats"), self)
+        action_stats.triggered.connect(self.show_statistics)
         tools_menu.addAction(action_stats)
         
         # --- Help ---
@@ -1831,6 +2005,14 @@ class MainWindow(QMainWindow):
 
         # 1. Async Load
         self.load_database_async()
+
+    def show_platform_manager(self):
+        dlg = PlatformManagerDialog(self)
+        dlg.exec()
+
+    def show_statistics(self):
+        dlg = StatisticsDialog(self.master_df, self)
+        dlg.exec()
 
     def load_database_async(self):
         self.list_widget.clear()
@@ -1942,7 +2124,7 @@ class MainWindow(QMainWindow):
     def show_documentation(self):
         title = translator.tr("menu_help_docs")
         text = self.load_html_asset("doc.html")
-        QMessageBox.information(self, title, text)
+        QMessageBox(QMessageBox.NoIcon, title, text, QMessageBox.Ok, self).exec()
 
     def show_about(self):
         title = translator.tr("menu_help_about")

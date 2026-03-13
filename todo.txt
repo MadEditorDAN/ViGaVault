@@ -1,7 +1,12 @@
 Pretyped messages:
 @workspace, lis le fichier INSTRUCTIONS.md et utilise-le comme base de travail pour toutes tes futures réponses sur ce projet.
+
 It did not worked, I rolled back
+
 On discute, pas de code
+
+Commente ton code, explique chaque changements et le POURQUOI de ce s chagements.
+
 Ideas:
 Steam integration recupérer le TAG VR
 dowload background image from gog sb and use it as gamecard backbround
@@ -10,36 +15,17 @@ dowload background image from gog sb and use it as gamecard backbround
 
 
 TO DO MAYBE : 
-Let's discuss, no code. 
-I would like to Merge the ViGaVault_Scan.py script and the ViGaVault_UI.py script in one new ViGaVault.py script. Is that a good idea/practice or is it better to keep separate .py files for different functions
 
 Let's discuss, no code. 
 How do we proceed to create an executable file and an installation exe
 
-
-"Garde le code modulaire (plusieurs fichiers), mais assure-toi d'utiliser des chemins relatifs robustes (via os.path.dirname(os.path.abspath(__file__))) pour que l'application retrouve le CSV et les dossiers d'images, qu'elle soit lancée depuis Python ou depuis un .exe."
-
-Puisque tu sais que tu vas y passer, tu peux déjà "préparer le terrain" dans ton code actuel (ViGaVault_Scan.py) :
-- Isole les accès DB : Au lieu d'utiliser df.to_csv() partout dans ton code, essaie de centraliser toutes les lectures/écritures dans 2 ou 3 fonctions de ton LibraryManager.
-- Le jour J : Quand tu voudras passer à SQLite, tu n'auras qu'à modifier ces 2 ou 3 fonctions pour qu'elles parlent à la base SQL au lieu du CSV, sans toucher à ton UI ni à tes Scrappers.
+SQL LITE
 - Pour ne pas perdre l'avantage du CSV (la visibilité), tu pourras utiliser un outil gratuit comme "DB Browser for SQLite". C'est un logiciel qui te permet de voir ta base SQL exactement comme un tableau Excel, de modifier les cases à la main et de faire des recherches. Ça t'enlèvera la peur de "ne plus voir tes données".
 
 
 TO CHECK : 
-# Check lang/ subdirectory first (cleaner), then root
-        lang_file = os.path.join(self.base_path, "lang", f"{lang_code}.json")
-Les fichier json de langues SON dans le dossier LANG et pas ailleur. Il ne faut pas les chercher ailleur.
-
-
 
 TO DO :
-Rendons fonctionnel le menu tools
- - Full Scan, lance le Full Scan
- - Platforms Manager : pour le moment ouvre une fenetre vide
- - Statistics, le plus de statistiques possible sur la librairie actuelle.
-
-
-
 
 Platforms Manager !
 
@@ -108,3 +94,4 @@ Télécharger les images et les vidéos MP4.
 
 Finalisation : Appeler LibraryManager.add_game_to_db pour chaque jeu pour garantir que le CSV est à jour et que les fichiers sont bien nommés (via get_safe_filename).
 
+274.84
