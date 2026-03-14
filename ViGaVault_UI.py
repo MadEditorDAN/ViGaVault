@@ -2145,6 +2145,7 @@ class MainWindow(QMainWindow):
                 pass
         
         self.dynamic_filters = {}
+        self.filter_buttons = {} # WHY: Keep track of All/None buttons to change their enabled state
 
         # Load rules
         local_config = {}
@@ -2224,6 +2225,7 @@ class MainWindow(QMainWindow):
             btn_none.clicked.connect(lambda: self.set_filter_group_state(col_name, False))
             group.btns_layout.addWidget(btn_all)
             group.btns_layout.addWidget(btn_none)
+            self.filter_buttons[col_name] = (btn_all, btn_none) # WHY: Store references to toggle their greyed-out state later
         
         # Get unique values
         values = set()
@@ -2239,6 +2241,7 @@ class MainWindow(QMainWindow):
             chk = QCheckBox(val)
             chk.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
             chk.setChecked(True) # Default all checked
+            chk.stateChanged.connect(lambda state, c=col_name: self.update_filter_buttons(c)) # WHY: Live update button states when a single checkbox is manually toggled
             chk.stateChanged.connect(self.request_filter_update)
             group.checkbox_layout.addWidget(chk, row, col)
             checkboxes.append(chk)
@@ -2248,6 +2251,7 @@ class MainWindow(QMainWindow):
                 row += 1
         
         self.dynamic_filters[col_name] = checkboxes
+        self.update_filter_buttons(col_name) # WHY: Set initial greyed-out states correctly (e.g. 'All' will start greyed out)
         parent_layout.addWidget(group)
         
         # WHY: We must trigger expansion (setChecked) AFTER adding the widget and items.
@@ -2263,7 +2267,22 @@ class MainWindow(QMainWindow):
                 chk.blockSignals(True)
                 chk.setChecked(state)
                 chk.blockSignals(False)
+                self.update_filter_buttons(col_name) # WHY: Ensure buttons grey out appropriately since signals were blocked above
             self.request_filter_update()
+
+    def update_filter_buttons(self, col_name):
+        """Updates the enabled state of the All/None buttons based on checkbox states."""
+        # WHY: Greys out 'All' when all are selected, and 'None' when none are selected
+        if hasattr(self, 'filter_buttons') and col_name in self.filter_buttons:
+            btn_all, btn_none = self.filter_buttons[col_name]
+            checkboxes = self.dynamic_filters.get(col_name, [])
+            if not checkboxes: return
+            
+            all_checked = all(chk.isChecked() for chk in checkboxes)
+            none_checked = not any(chk.isChecked() for chk in checkboxes)
+            
+            btn_all.setEnabled(not all_checked)
+            btn_none.setEnabled(not none_checked)
 
     def set_filters_ui_state(self, enabled):
         """Enables/Disables filter groups and collapses them when disabled."""
@@ -2705,9 +2724,13 @@ class MainWindow(QMainWindow):
                             saved_checked = filter_states.get(col, [])
                             for chk in checkboxes:
                                 chk.setChecked(chk.text() in saved_checked)
+                        if hasattr(self, 'update_filter_buttons'): # WHY: Update greyed-out button states after restoring user filters
+                            self.update_filter_buttons(col)
                 elif "checked_platforms" in lib_settings: # Legacy fallback
                     for chk in self.dynamic_filters.get("Platforms", []):
                         chk.setChecked(chk.text() in lib_settings["checked_platforms"])
+                    if hasattr(self, 'update_filter_buttons'): # WHY: Refresh button states for legacy fallback too
+                        self.update_filter_buttons("Platforms")
             
             self.sidebar.combo_sort.blockSignals(False)
             if hasattr(self, 'dynamic_filters'):
@@ -2976,6 +2999,12 @@ def apply_theme(app, theme_name):
         dark_palette.setColor(QPalette.Link, QColor(42, 130, 218))
         dark_palette.setColor(QPalette.Highlight, QColor(50, 50, 50))
         dark_palette.setColor(QPalette.HighlightedText, Qt.white)
+        
+        # WHY: Explicitly set disabled colors so disabled widgets (like All/None buttons) actually look greyed out.
+        dark_palette.setColor(QPalette.Disabled, QPalette.ButtonText, Qt.gray)
+        dark_palette.setColor(QPalette.Disabled, QPalette.Text, Qt.gray)
+        dark_palette.setColor(QPalette.Disabled, QPalette.WindowText, Qt.gray)
+        
         app.setPalette(dark_palette)
     else: # Light or System
         # Force a Light Palette to ensure it doesn't inherit Dark Mode from OS
@@ -2995,6 +3024,11 @@ def apply_theme(app, theme_name):
         # Custom Highlight (Grey instead of Blue)
         light_palette.setColor(QPalette.Highlight, QColor(200, 200, 200))
         light_palette.setColor(QPalette.HighlightedText, Qt.black)
+        
+        # WHY: Explicitly set disabled colors so disabled widgets (like All/None buttons) actually look greyed out.
+        light_palette.setColor(QPalette.Disabled, QPalette.ButtonText, Qt.gray)
+        light_palette.setColor(QPalette.Disabled, QPalette.Text, Qt.gray)
+        light_palette.setColor(QPalette.Disabled, QPalette.WindowText, Qt.gray)
         
         app.setPalette(light_palette)
 
