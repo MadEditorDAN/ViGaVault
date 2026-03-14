@@ -224,6 +224,36 @@ def normalize_genre(text):
             seen.add(p_norm.lower())
     return ", ".join(clean_parts)
 
+def _query_igdb_api(token, search_term=None, limit=5, by_id=False, custom_query=None):
+    """
+    WHY: Centralized helper to avoid duplicating the IGDB API network logic across multiple methods.
+    """
+    api_url = "https://api.igdb.com/v4/games"
+    headers = {"Client-ID": IGDB_CLIENT_ID, "Authorization": f"Bearer {token}"}
+    
+    if custom_query:
+        query = custom_query
+    else:
+        fields = ('id, name, summary, genres.name, involved_companies.company.name, '
+                  'involved_companies.developer, involved_companies.publisher, '
+                  'videos.video_id, release_dates.date, cover.url')
+        if by_id:
+            query = f'fields {fields}; where id = {search_term};'
+        else:
+            # Platforms filter (6=PC, 13=DOS, 14=Mac, 3=Linux)
+            query = f'search "{search_term}"; fields {fields}; where platforms = (6, 13, 14, 3); limit {limit};'
+            
+    try:
+        response = requests.post(api_url, headers=headers, data=query, timeout=10)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logging.error(f"    [IGDB API ERROR] {response.status_code} for query: {query}")
+            return None
+    except Exception as e:
+        logging.error(f"    [IGDB NETWORK ERROR] {e}")
+        return None
+
 class Game:
     def __init__(self, **kwargs):
         self.data = kwargs
