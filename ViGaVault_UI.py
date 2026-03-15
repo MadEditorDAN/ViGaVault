@@ -9,13 +9,150 @@ import subprocess
 import shutil
 from datetime import datetime
 import webbrowser
-from ViGaVault_Scan import LibraryManager, get_safe_filename, get_platform_config, get_library_settings_file, get_db_path, get_root_path, normalize_genre
+from ViGaVault_Scan import LibraryManager, get_safe_filename, normalize_genre
 from PySide6.QtWidgets import (QApplication, QMainWindow, QListWidget, QListWidgetItem, 
                              QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QPushButton, QStackedLayout, QFileDialog, QScrollArea,
-                             QLineEdit, QComboBox, QDialog, QTextEdit, QFormLayout, QMessageBox, QFrame, QAbstractItemView, QCheckBox, QSlider, QStyle, QGroupBox, QProgressBar,
-                             QTabWidget, QMenuBar, QMenu, QSizePolicy, QStyleFactory, QTableWidget, QTableWidgetItem, QHeaderView)
+                             QLineEdit, QComboBox, QDialog, QTextEdit, QFormLayout, QMessageBox, QFrame, QAbstractItemView, QCheckBox, QSlider, QStyle, QGroupBox, QProgressBar, QButtonGroup, QRadioButton,
+                             QTabWidget, QMenuBar, QMenu, QSizePolicy, QStyleFactory, QTableWidget, QTableWidgetItem, QHeaderView, QStyledItemDelegate, QStyleOptionProgressBar)
 from PySide6.QtCore import Qt, QSize, QTimer, QByteArray, QEvent, QUrl, QThread, Signal, QObject, Slot, QThreadPool, QRunnable
 from PySide6.QtGui import QPixmap, QIcon, QAction, QPalette, QColor, QFont, QImage
+
+# --- CONFIGURATION & UTILS ---
+# WHY: Migrated from ViGaVault_Scan.py to centralize file I/O operations and 
+# remove dependency of the worker script on the global UI context.
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+
+def get_db_path():
+    """Reads the db_path from settings.json, falling back to the default."""
+    settings_file = os.path.join(BASE_DIR, "settings.json")
+    default_db = os.path.join(BASE_DIR, "VGVDB.csv")
+    if os.path.exists(settings_file):
+        try:
+            with open(settings_file, "r", encoding='utf-8') as f:
+                settings = json.load(f)
+                return settings.get("db_path", default_db)
+        except Exception:
+            pass
+    return default_db
+
+def get_library_settings_file():
+    """Returns the path to the JSON settings file for the current library."""
+    db_path = get_db_path()
+    return os.path.splitext(db_path)[0] + ".json"
+
+def get_video_path():
+    """Returns the configured video path or default 'videos' folder."""
+    settings_path = get_library_settings_file()
+    default_path = os.path.join(BASE_DIR, "videos")
+    if os.path.exists(settings_path):
+        try:
+            with open(settings_path, "r", encoding='utf-8') as f:
+                settings = json.load(f)
+                return settings.get("video_path", default_path)
+        except: pass
+    return default_path
+
+def get_root_path():
+    """Returns the configured root path from the library's settings."""
+    settings_path = get_library_settings_file()
+    default_path = r"\\madhdd02\Software\GAMES"
+    if os.path.exists(settings_path):
+        try:
+            with open(settings_path, "r", encoding='utf-8') as f:
+                settings = json.load(f)
+                return settings.get("root_path", default_path)
+        except: pass
+    global_settings_path = os.path.join(BASE_DIR, "settings.json")
+    if os.path.exists(global_settings_path):
+         try:
+            with open(global_settings_path, "r", encoding='utf-8') as f:
+                settings = json.load(f)
+                return settings.get("root_path", default_path)
+         except: pass
+    return default_path
+
+def get_platform_config():
+    """Loads platform mapping and ignore list from settings.json or returns defaults."""
+    default_map = {
+        'gog': 'GOG', 'steam': 'Steam', 'epic': 'Epic Games Store', 'epic games store': 'Epic Games Store',
+        'uplay': 'Uplay', 'ubisoft': 'Uplay', 'ubisoft connect': 'Uplay', 'origin': 'Origin', 
+        'ea': 'EA', 'ea app': 'EA', 'amazon': 'Amazon', 'amazon prime': 'Amazon',
+        'battlenet': 'Battle.net', 'battle.net': 'Battle.net', 'rockstar': 'Rockstar', 
+        'bethesda': 'Bethesda', 'itch': 'itch.io', 'itch.io': 'itch.io', 'discord': 'Discord',
+        'ffxiv': 'Final Fantasy XIV', 'kartridge': 'Kartridge', 'minecraft': 'Minecraft',
+        'oculus': 'Oculus', 'paradox': 'Paradox', 'riot': 'Riot Games', 'stadia': 'Stadia',
+        'totalwar': 'Total War', 'twitch': 'Twitch', 'wargaming': 'Wargaming.net',
+        'winstore': 'Windows Store', 'windows store': 'Windows Store', 'beamdog': 'Beamdog',
+    }
+    default_ignore = [
+        'humble', 'gmg', 'fanatical', 'nuuvem', 'indiegala', 
+        'd2d', 'direct2drive', 'dotemu', 'fxstore', 'gamehouse', 
+        'gamesessions', 'gameuk', 'playfire', 'weplay'
+    ]
+    settings_path = get_library_settings_file()
+    global_settings_path = os.path.join(BASE_DIR, "settings.json")
+    if not os.path.exists(settings_path):
+        settings_path = global_settings_path
+    if os.path.exists(settings_path):
+        try:
+            with open(settings_path, "r", encoding='utf-8') as f:
+                settings = json.load(f)
+                return settings.get("platform_map", default_map), settings.get("ignored_prefixes", default_ignore)
+        except Exception as e:
+            logging.error(f"Error loading settings.json: {e}")
+    return default_map, default_ignore
+
+def get_local_scan_config():
+    """Loads local scan configuration from settings.json."""
+    default_config = {
+        "ignore_hidden": True,
+        "scan_mode": "advanced",
+        "global_type": "Genre",
+        "folder_rules": {}
+    }
+    settings_path = get_library_settings_file()
+    global_settings_path = os.path.join(BASE_DIR, "settings.json")
+    if not os.path.exists(settings_path):
+        settings_path = global_settings_path
+    if os.path.exists(settings_path):
+        try:
+            with open(settings_path, "r", encoding='utf-8') as f:
+                settings = json.load(f)
+                return settings.get("local_scan_config", default_config)
+        except:
+            pass
+    return default_config
+
+def build_scanner_config():
+    """Builds the comprehensive configuration dict required by LibraryManager."""
+    p_map, p_ignore = get_platform_config()
+    return {
+        'db_file': get_db_path(),
+        'root_path': get_root_path(),
+        'video_path': get_video_path(),
+        'platform_map': p_map,
+        'ignored_prefixes': p_ignore,
+        'local_scan_config': get_local_scan_config()
+    }
+
+def setup_logging():
+    """Sets up file logging for the application."""
+    os.makedirs(LOG_DIR, exist_ok=True)
+    logs = [os.path.join(LOG_DIR, f) for f in os.listdir(LOG_DIR) if f.startswith("scan_")]
+    logs.sort(key=os.path.getctime)
+    while len(logs) >= 10:
+        os.remove(logs.pop(0))
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = os.path.join(LOG_DIR, f"scan_{timestamp}.log")
+    logging.basicConfig(
+        level=logging.INFO, 
+        format='%(asctime)s [%(levelname)s] %(message)s', 
+        handlers=[
+            logging.FileHandler(log_file, encoding='utf-8'), 
+            logging.StreamHandler()
+        ]
+    )
 
 # --- TRANSLATION ---
 # Handles loading JSON translation files based on user preference.
@@ -83,13 +220,12 @@ class FullScanWorker(QThread):
     def __init__(self, retry_failures=False, parent=None):
         super().__init__(parent)
         self.retry_failures = retry_failures
-        self.root_path = get_root_path()
-        self.db_path = get_db_path()
+        self.config = build_scanner_config()
 
     def run(self):
         """Runs the full scan process."""
         try:
-            manager = LibraryManager(self.root_path, self.db_path)
+            manager = LibraryManager(self.config)
             manager.load_db()
             manager.scan_full(retry_failures=self.retry_failures, worker_thread=self)
         except Exception as e:
@@ -276,6 +412,7 @@ class CollapsibleFilterGroup(QGroupBox):
 class ActionDialog(QDialog):
     def __init__(self, title, data, parent=None):
         super().__init__(parent)
+        self.parent_window = parent # WHY: Store reference to main window to access master_df for merging
         self.setWindowTitle(translator.tr(title))
         self.setMinimumWidth(850)
         self.original_data = data.copy()
@@ -372,14 +509,31 @@ class ActionDialog(QDialog):
 
         # --- Bottom Buttons ---
         button_box = QHBoxLayout()
+        
+        # WHY: Add the Merge button here, separated from the Save/Cancel cluster.
+        btn_merge = QPushButton(translator.tr("dialog_edit_btn_merge"))
+        btn_merge.clicked.connect(self.start_merge)
+        button_box.addWidget(btn_merge)
+        
+        button_box.addStretch()
+        
         btn_save = QPushButton(translator.tr("dialog_edit_save_btn"))
         btn_cancel = QPushButton(translator.tr("dialog_edit_cancel_btn"))
         btn_save.clicked.connect(self.accept)
         btn_cancel.clicked.connect(self.reject)
         button_box.addWidget(btn_save)
-        button_box.addStretch()
         button_box.addWidget(btn_cancel)
         super_main_layout.addLayout(button_box)
+
+    def start_merge(self):
+        """Opens the Merge Selection window to pick a game to fuse with."""
+        dlg = MergeSelectionDialog(self.original_data, self.parent_window.master_df, self)
+        if dlg.exec():
+            selected_game = dlg.get_selected()
+            if selected_game:
+                # If the merge was successful, we close the edit window because the library was reloaded.
+                if self.parent_window.execute_merge(self.original_data['Folder_Name'], selected_game['Folder_Name']):
+                    self.accept()
 
     def update_cover_display(self):
         img_path = self.updated_data.get('Image_Link') or self.original_data.get('Image_Link', '')
@@ -475,48 +629,213 @@ class ActionDialog(QDialog):
         
         new_data['Status_Flag'] = 'LOCKED' if self.chk_locked.isChecked() else 'OK'
         new_data['Trailer_Link'] = self.url_line_edit.text().strip()
-
-        # --- RENAME MEDIA FILES IF TITLE OR DATE CHANGED ---
-        old_title = self.original_data.get('Clean_Title', '')
-        new_title = new_data.get('Clean_Title', '')
-        old_date = self.original_data.get('Original_Release_Date', '')
-        new_date = new_data.get('Original_Release_Date', '')
-
-        if new_title != old_title or new_date != old_date:
-            # Calculate new base filename
-            base_filename = new_title
-            if new_date and len(new_date) >= 4:
-                base_filename += f" ({new_date[-4:]})"
-            
-            new_safe_name = get_safe_filename(base_filename)
-            
-            # Rename Image
-            old_img_path = new_data.get('Image_Link', '')
-            if old_img_path and os.path.exists(old_img_path):
-                dir_name = os.path.dirname(old_img_path)
-                ext = os.path.splitext(old_img_path)[1]
-                new_img_path = os.path.join(dir_name, f"{new_safe_name}{ext}")
-                if new_img_path != old_img_path:
-                    try:
-                        os.rename(old_img_path, new_img_path)
-                        new_data['Image_Link'] = new_img_path
-                    except Exception as e:
-                        logging.error(f"Failed to rename image: {e}")
-
-            # Rename Video
-            old_vid_path = new_data.get('Path_Video', '')
-            if old_vid_path and os.path.exists(old_vid_path):
-                dir_name = os.path.dirname(old_vid_path)
-                ext = os.path.splitext(old_vid_path)[1]
-                new_vid_path = os.path.join(dir_name, f"{new_safe_name}{ext}")
-                if new_vid_path != old_vid_path:
-                    try:
-                        os.rename(old_vid_path, new_vid_path)
-                        new_data['Path_Video'] = new_vid_path
-                    except Exception as e:
-                        logging.error(f"Failed to rename video: {e}")
-
+        
+        # WHY: Media renaming has been moved to the Game class to be DRY.
+        
         return new_data
+
+class MergeSelectionDialog(QDialog):
+    def __init__(self, current_data, master_df, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(translator.tr("dialog_merge_title"))
+        self.resize(850, 500) # WHY: Make it larger to accommodate the table layout
+        self.current_title = current_data.get('Clean_Title', '')
+        self.current_folder = current_data.get('Folder_Name', '')
+        self.master_df = master_df
+        
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel(translator.tr("dialog_merge_desc")))
+        
+        self.chk_show_all = QCheckBox(translator.tr("dialog_merge_show_all"))
+        self.chk_show_all.toggled.connect(self.populate_list)
+        layout.addWidget(self.chk_show_all)
+        
+        # WHY: Replace QListWidget with a QTableWidget to separate columns.
+        self.table_widget = QTableWidget()
+        self.table_widget.setColumnCount(3)
+        self.table_widget.setHorizontalHeaderLabels([
+            translator.tr("dialog_merge_col_date"), 
+            translator.tr("dialog_merge_col_name"), 
+            translator.tr("dialog_merge_col_path")
+        ])
+        self.table_widget.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.table_widget.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table_widget.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.table_widget.verticalHeader().setVisible(False)
+        self.table_widget.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        layout.addWidget(self.table_widget)
+        
+        # Pre-calculate textual resemblance for the default filtered view
+        import difflib
+        games = master_df.to_dict('records')
+        self.resembling = []
+        for g in games:
+            if g['Folder_Name'] == self.current_folder: continue
+            ratio = difflib.SequenceMatcher(None, self.current_title.lower(), str(g.get('Clean_Title', '')).lower()).ratio()
+            if ratio > 0.4:
+                self.resembling.append((ratio, g))
+        self.resembling.sort(key=lambda x: x[0], reverse=True)
+        
+        self.populate_list()
+        
+        btn_box = QHBoxLayout()
+        btn_confirm = QPushButton(translator.tr("dialog_merge_confirm"))
+        btn_cancel = QPushButton(translator.tr("dialog_merge_cancel"))
+        btn_confirm.clicked.connect(self.accept)
+        btn_cancel.clicked.connect(self.reject)
+        btn_box.addStretch()
+        btn_box.addWidget(btn_confirm)
+        btn_box.addWidget(btn_cancel)
+        layout.addLayout(btn_box)
+
+    def populate_list(self):
+        self.table_widget.setRowCount(0)
+        items_to_show = []
+        
+        if self.chk_show_all.isChecked():
+            # Show all alphabetically
+            games = self.master_df.sort_values(by='Clean_Title').to_dict('records')
+            for g in games:
+                items_to_show.append((None, g))
+        else:
+            # Show resembling
+            for ratio, g in self.resembling:
+                items_to_show.append((ratio, g))
+
+        target_row = -1
+        for i, (ratio, g) in enumerate(items_to_show):
+            row = self.table_widget.rowCount()
+            self.table_widget.insertRow(row)
+            
+            date_val = str(g.get('Original_Release_Date') or g.get('Year_Folder', ''))
+            name_val = f"{g.get('Clean_Title')} ({g.get('Platforms')})"
+            path_val = str(g.get('Path_Root', ''))
+            
+            if ratio is not None:
+                name_val += f" [Match: {int(ratio*100)}%]"
+                
+            if g.get('Folder_Name') == self.current_folder:
+                name_val = f">>> {name_val} <<<"
+                target_row = row
+                
+            item_date = QTableWidgetItem(date_val)
+            item_date.setData(Qt.UserRole, g)
+            
+            self.table_widget.setItem(row, 0, item_date)
+            self.table_widget.setItem(row, 1, QTableWidgetItem(name_val))
+            self.table_widget.setItem(row, 2, QTableWidgetItem(path_val))
+            
+        if target_row >= 0:
+            self.table_widget.selectRow(target_row)
+            item = self.table_widget.item(target_row, 0)
+            if item:
+                self.table_widget.scrollToItem(item, QAbstractItemView.PositionAtCenter)
+
+    def get_selected(self):
+        row = self.table_widget.currentRow()
+        if row >= 0:
+            item = self.table_widget.item(row, 0)
+            return item.data(Qt.UserRole) if item else None
+        return None
+
+class ConflictDialog(QDialog):
+    def __init__(self, data_a, data_b, conflicts, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(translator.tr("dialog_conflict_title"))
+        self.resize(750, 500)
+        self.conflicts = conflicts
+        self.resolutions = {}
+        
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel(translator.tr("dialog_conflict_desc")))
+        
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        container = QWidget()
+        
+        # WHY: Utilizing a grid allows perfect side-by-side alignment of conflicting elements.
+        self.grid = QGridLayout(container)
+        
+        # Add vertical line for separation
+        vline = QFrame()
+        vline.setFrameShape(QFrame.VLine)
+        vline.setFrameShadow(QFrame.Sunken)
+        self.grid.addWidget(vline, 0, 3, len(conflicts) + 1, 1) # Span all rows
+
+        # Headers
+        self.grid.addWidget(QLabel(""), 0, 0)
+        lbl_a = QLabel(translator.tr("dialog_conflict_game_a"))
+        lbl_a.setStyleSheet("font-weight: bold; font-size: 16px;")
+        lbl_a.setAlignment(Qt.AlignCenter)
+        self.grid.addWidget(lbl_a, 0, 1, 1, 2)
+        
+        lbl_b = QLabel(translator.tr("dialog_conflict_game_b"))
+        lbl_b.setStyleSheet("font-weight: bold; font-size: 16px;")
+        lbl_b.setAlignment(Qt.AlignCenter)
+        self.grid.addWidget(lbl_b, 0, 4, 1, 2)
+        
+        self.bgs = {}
+        row = 1
+        for field, vals in conflicts.items():
+            lbl_field = QLabel(field.replace('_', ' ').title())
+            lbl_field.setStyleSheet("font-weight: bold;")
+            self.grid.addWidget(lbl_field, row, 0)
+            
+            bg = QButtonGroup(self)
+            self.bgs[field] = bg
+            
+            rb_a = QRadioButton()
+            rb_a.setChecked(True) # Default to Game A
+            rb_b = QRadioButton()
+            bg.addButton(rb_a, 0)
+            bg.addButton(rb_b, 1)
+            
+            self.grid.addWidget(rb_a, row, 1)
+            self.grid.addWidget(self.create_widget(field, vals['A']), row, 2)
+            
+            self.grid.addWidget(rb_b, row, 4)
+            self.grid.addWidget(self.create_widget(field, vals['B']), row, 5)
+            
+            row += 1
+            
+        scroll.setWidget(container)
+        layout.addWidget(scroll)
+        
+        btn_box = QHBoxLayout()
+        btn_confirm = QPushButton(translator.tr("dialog_merge_confirm"))
+        btn_confirm.clicked.connect(self.accept)
+        btn_box.addStretch()
+        btn_box.addWidget(btn_confirm)
+        layout.addLayout(btn_box)
+
+    def create_widget(self, field, val):
+        """Creates the appropriate display widget based on the field type."""
+        if field == 'Image_Link' and os.path.exists(val):
+            lbl = QLabel()
+            lbl.setPixmap(QPixmap(val).scaled(150, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            lbl.setAlignment(Qt.AlignCenter)
+            return lbl
+        elif field == 'Path_Video' and os.path.exists(val):
+            btn = QPushButton(translator.tr("dialog_conflict_btn_play"))
+            btn.clicked.connect(lambda _, v=val: os.startfile(v))
+            return btn
+        elif field == 'Summary':
+            txt = QTextEdit(val)
+            txt.setReadOnly(True)
+            txt.setMaximumHeight(80)
+            return txt
+        else:
+            txt = QLineEdit(val)
+            txt.setReadOnly(True)
+            # Force cursor to start of text so the start is always visible
+            txt.setCursorPosition(0) 
+            return txt
+
+    def get_resolutions(self):
+        for field, bg in self.bgs.items():
+            winner_idx = bg.checkedId()
+            self.resolutions[field] = self.conflicts[field]['A'] if winner_idx == 0 else self.conflicts[field]['B']
+        return self.resolutions
 
 # Configuration dialog with tabs for Display, Folders, and Data Sources.
 class SettingsDialog(QDialog):
@@ -1184,10 +1503,22 @@ class Sidebar(QWidget):
         filters_frame_layout = QVBoxLayout(self.frame_filters)
         filters_frame_layout.setContentsMargins(8, 8, 8, 8)
 
+        # WHY: Grouping Filters label and Show NEW checkbox in the same horizontal line.
+        filters_header_layout = QHBoxLayout()
         lbl_filters = QLabel(translator.tr("sidebar_filters_label"))
         lbl_filters.setObjectName("sidebar_filters_label")
         lbl_filters.setFont(font_lbl)
-        filters_frame_layout.addWidget(lbl_filters)
+        filters_header_layout.addWidget(lbl_filters)
+
+        # WHY: Add a stretch spacer to push the "Show NEW" checkbox to the far right edge of the layout.
+        filters_header_layout.addStretch()
+
+        # --- SHOW NEW CHECKBOX (Moved here) ---
+        self.chk_show_new = QCheckBox(translator.tr("sidebar_chk_show_new"))
+        self.chk_show_new.setLayoutDirection(Qt.RightToLeft)
+        filters_header_layout.addWidget(self.chk_show_new, 0, Qt.AlignRight)
+
+        filters_frame_layout.addLayout(filters_header_layout)
 
         # We remove the outer scroll area to let individual groups handle their scrolling/sizing
         self.filters_container = QWidget()
@@ -1241,16 +1572,17 @@ class Sidebar(QWidget):
         # --- BOTTOM CONTAINER (Scan Buttons) ---
         self.bottom_layout = QHBoxLayout()
         
-        # --- SHOW NEW CHECKBOX ---
-        self.chk_show_new = QCheckBox(translator.tr("sidebar_chk_show_new"))
-        self.chk_show_new.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.chk_show_new.setLayoutDirection(Qt.RightToLeft)
-
         # --- FULL SCAN BUTTON ---
         self.btn_full_scan = QPushButton(translator.tr("sidebar_btn_full_scan"))
         
+        # --- RETRY FAILURES CHECKBOX (Replaces Show NEW) ---
+        # WHY: Adding the Retry Failures option where Show NEW used to be.
+        self.chk_retry_failures = QCheckBox(translator.tr("sidebar_chk_retry_failures"))
+        self.chk_retry_failures.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.chk_retry_failures.setLayoutDirection(Qt.RightToLeft)
+
         self.bottom_layout.addWidget(self.btn_full_scan, 2) # 2/3 stretch
-        self.bottom_layout.addWidget(self.chk_show_new, 1)  # 1/3 stretch
+        self.bottom_layout.addWidget(self.chk_retry_failures, 1)  # 1/3 stretch
 
         self.layout.addWidget(self.scan_panel)
         self.scan_panel.hide()
@@ -1301,6 +1633,7 @@ class Sidebar(QWidget):
         self.findChild(QLabel, "sidebar_filters_label").setText(translator.tr("sidebar_filters_label"))
         self.chk_show_new.setText(translator.tr("sidebar_chk_show_new"))
         self.btn_full_scan.setText(translator.tr("sidebar_btn_full_scan"))
+        self.chk_retry_failures.setText(translator.tr("sidebar_chk_retry_failures"))
         # Scan panel
         self.scan_title_label.setText(translator.tr("sidebar_manual_scan_title"))
         self.scan_input.setPlaceholderText(translator.tr("sidebar_manual_scan_placeholder"))
@@ -1332,38 +1665,88 @@ class PlatformManagerDialog(QDialog):
         btn_close.clicked.connect(self.accept)
         layout.addWidget(btn_close)
 
+class ProgressBarDelegate(QStyledItemDelegate):
+    """
+    WHY: Draws a progress bar natively inside the cell. 
+    Using setCellWidget() breaks table sorting (widgets don't move when sorted).
+    This delegate guarantees the progress bar follows the data when headers are clicked.
+    """
+    def paint(self, painter, option, index):
+        val = index.data(Qt.EditRole)
+        max_val = index.data(Qt.UserRole)
+        show_text = index.data(Qt.UserRole + 1)
+        
+        if val is not None and max_val:
+            opts = QStyleOptionProgressBar()
+            opts.rect = option.rect
+            opts.minimum = 0
+            opts.maximum = int(max_val)
+            opts.progress = int(val)
+            if show_text:
+                opts.textVisible = True
+                opts.text = str(val)
+                opts.textAlignment = Qt.AlignCenter
+            else:
+                opts.textVisible = False
+            QApplication.style().drawControl(QStyle.CE_ProgressBar, opts, painter)
+        else:
+            super().paint(painter, option, index)
+
 class StatisticsDialog(QDialog):
     def __init__(self, df, parent=None):
         super().__init__(parent)
         self.setWindowTitle(translator.tr("tools_stats_title"))
-        self.resize(900, 650)
+        self.resize(1300, 800) # WHY: Increase width to comfortably fit the 3 side-by-side graphs
         self.df = df
         
         layout = QVBoxLayout(self)
         
-        self.tabs = QTabWidget()
-        layout.addWidget(self.tabs)
+        # WHY: Replace tabs with a single scrollable dashboard page for a better at-a-glance view
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
         
-        self.tabs.addTab(self.create_overview_tab(), translator.tr("tools_stats_overview"))
-        self.tabs.addTab(self.create_distribution_tab("Platforms", translator.tr("tools_stats_platforms")), translator.tr("tools_stats_platforms"))
-        self.tabs.addTab(self.create_distribution_tab("Genre", translator.tr("tools_stats_genres")), translator.tr("tools_stats_genres"))
-        self.tabs.addTab(self.create_timeline_tab(), translator.tr("tools_stats_timeline"))
+        container = QWidget()
+        dashboard_layout = QVBoxLayout(container)
         
+        lbl_overview = QLabel(translator.tr("tools_stats_overview"))
+        lbl_overview.setStyleSheet("font-size: 18px; font-weight: bold;")
+        dashboard_layout.addWidget(lbl_overview)
+        
+        # Top Section: Overview Cards & Text Stats
+        dashboard_layout.addWidget(self.create_overview_section())
+        
+        # Bottom Section: 3 Graphs Side-by-Side
+        graphs_layout = QHBoxLayout()
+        graphs_layout.addWidget(self.create_distribution_section("Platforms", translator.tr("tools_stats_platforms")))
+        graphs_layout.addWidget(self.create_distribution_section("Genre", translator.tr("tools_stats_genres")))
+        graphs_layout.addWidget(self.create_timeline_section())
+        
+        dashboard_layout.addLayout(graphs_layout)
+        scroll.setWidget(container)
+        layout.addWidget(scroll)
+
         btn_close = QPushButton(translator.tr("btn_close"))
         btn_close.clicked.connect(self.accept)
         layout.addWidget(btn_close, 0, Qt.AlignRight)
 
-    def create_overview_tab(self):
+    def create_overview_section(self):
         widget = QWidget()
-        layout = QGridLayout(widget)
+        # WHY: Use a vertical layout to separate the colored boxes row from the text columns row.
+        # A grid layout caused the text_container (added without span) to constrain itself 
+        # into column 0, forcing the first colored box to stretch enormously.
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 15) # Add some spacing at the bottom
         
         # Calculate Stats
         total_games = len(self.df)
         scrapped = len(self.df[self.df['Status_Flag'].isin(['OK', 'LOCKED'])])
         incomplete = total_games - scrapped
         
+        boxes_layout = QHBoxLayout()
+
         # Helper for Cards
-        def add_stat_card(row, col, title, value, color):
+        def add_stat_card(title, value, color):
             frame = QFrame()
             frame.setFrameShape(QFrame.StyledPanel)
             frame.setStyleSheet(f"background-color: {color}; border-radius: 10px; color: white;")
@@ -1376,46 +1759,143 @@ class StatisticsDialog(QDialog):
             lbl_title.setAlignment(Qt.AlignCenter)
             fl.addWidget(lbl_val)
             fl.addWidget(lbl_title)
-            layout.addWidget(frame, row, col)
+            # Stretch=1 guarantees perfectly equal horizontal widths
+            boxes_layout.addWidget(frame, 1)
 
-        add_stat_card(0, 0, translator.tr("tools_stats_total"), total_games, "#2196F3")
-        add_stat_card(0, 1, translator.tr("tools_stats_scrapped"), scrapped, "#4CAF50")
-        add_stat_card(0, 2, translator.tr("tools_stats_incomplete"), incomplete, "#FF9800")
+        add_stat_card(translator.tr("tools_stats_total"), total_games, "#2196F3")
+        add_stat_card(translator.tr("tools_stats_scrapped"), scrapped, "#4CAF50")
+        add_stat_card(translator.tr("tools_stats_incomplete"), incomplete, "#FF9800")
 
-        # Textual Stats
-        stats_list = QListWidget()
+        layout.addLayout(boxes_layout)
+
+        stats_data = []
 
         # Helper to get top count from comma-separated columns
         def get_top_count(col):
+            if col not in self.df.columns: return "N/A"
             all_vals = []
             for x in self.df[col].dropna():
                 all_vals.extend([v.strip() for v in str(x).split(',') if v.strip()])
             if not all_vals: return "N/A"
             c = pd.Series(all_vals).value_counts()
             return f"{c.idxmax()} ({c.max()})"
+            
+        def get_unique_count(col):
+            if col not in self.df.columns: return 0
+            all_vals = {v.strip() for x in self.df[col].dropna() for v in str(x).split(',') if v.strip()}
+            return len(all_vals)
 
-        stats_list.addItem(translator.tr("tools_stats_top_plat", value=get_top_count('Platforms')))
-        stats_list.addItem(translator.tr("tools_stats_top_genre", value=get_top_count('Genre')))
-
-        dev_counts = self.df['Developer'].value_counts()
-        top_dev = f"{dev_counts.idxmax()} ({dev_counts.max()})" if not dev_counts.empty else "N/A"
-        stats_list.addItem(translator.tr("tools_stats_top_dev", value=top_dev))
+        # 1. Standard & Useful Stats
+        stats_data.append(("tools_stats_top_plat", get_top_count('Platforms')))
+        stats_data.append(("tools_stats_top_genre", get_top_count('Genre')))
+        stats_data.append(("tools_stats_top_dev", get_top_count('Developer')))
+        stats_data.append(("tools_stats_top_pub", get_top_count('Publisher')))
+        stats_data.append(("tools_stats_total_col", get_unique_count('Collection')))
+        stats_data.append(("tools_stats_top_col", get_top_count('Collection')))
+        stats_data.append(("tools_stats_unique_devs", get_unique_count('Developer')))
         
-        # Oldest/Newest
-        years = pd.to_datetime(self.df['Original_Release_Date'], errors='coerce', dayfirst=True).dt.year
+        years = pd.to_datetime(self.df['Original_Release_Date'], errors='coerce', dayfirst=True).dt.year if 'Original_Release_Date' in self.df.columns else pd.Series(dtype=int)
         if not years.dropna().empty:
             yc = years.value_counts()
-            top_year = f"{int(yc.idxmax())} ({yc.max()})"
-            stats_list.addItem(translator.tr("tools_stats_best_year", value=top_year))
-            stats_list.addItem(translator.tr("tools_stats_oldest", value=int(years.min())))
-            stats_list.addItem(translator.tr("tools_stats_newest", value=int(years.max())))
+            stats_data.append(("tools_stats_best_year", f"{int(yc.idxmax())} ({yc.max()})"))
+        else:
+            stats_data.append(("tools_stats_best_year", "N/A"))
+
+        has_img = len(self.df[self.df['Image_Link'].astype(str).str.strip() != '']) if 'Image_Link' in self.df.columns else 0
+        media_pct = round((has_img / total_games * 100) if total_games else 0, 1)
+        stats_data.append(("tools_stats_media_comp", f"{media_pct}% ({has_img})"))
+
+        has_trailer = len(self.df[(self.df['Trailer_Link'].astype(str).str.strip() != '') | (self.df['Path_Video'].astype(str).str.strip() != '')]) if 'Trailer_Link' in self.df.columns else 0
+        stats_data.append(("tools_stats_trailer_hoarder", has_trailer))
+
+        indie_count = self.df['Genre'].astype(str).str.contains('Indie', case=False, na=False).sum() if 'Genre' in self.df.columns else 0
+        stats_data.append(("tools_stats_indie_games", indie_count))
         
-        layout.addWidget(stats_list, 1, 0, 1, 3)
+        # Oldest/Newest
+        if 'Original_Release_Date' in self.df.columns:
+            valid_dates = self.df[pd.to_datetime(self.df['Original_Release_Date'], errors='coerce', dayfirst=True).notna()].copy()
+            if not valid_dates.empty:
+                valid_dates['DateObj'] = pd.to_datetime(valid_dates['Original_Release_Date'], errors='coerce', dayfirst=True)
+                sorted_dates = valid_dates.sort_values('DateObj')
+                oldest = sorted_dates.iloc[0]
+                newest = sorted_dates.iloc[-1]
+                stats_data.append(("tools_stats_oldest_relic", f"{oldest['Clean_Title']} ({oldest['DateObj'].year})"))
+                stats_data.append(("tools_stats_newest_edge", f"{newest['Clean_Title']} ({newest['DateObj'].year})"))
+            else:
+                stats_data.extend([("tools_stats_oldest_relic", "N/A"), ("tools_stats_newest_edge", "N/A")])
+
+        # Fun/Quirky Stats
+        if 'Clean_Title' in self.df.columns:
+            valid_titles = self.df['Clean_Title'].dropna().astype(str)
+            if not valid_titles.empty:
+                lengths = valid_titles.str.len()
+                stats_data.append(("tools_stats_longest_title", valid_titles.loc[lengths.idxmax()]))
+                stats_data.append(("tools_stats_shortest_title", valid_titles.loc[lengths.idxmin()]))
+                
+                import re
+                words = []
+                stopwords = {'the', 'of', 'and', 'in', 'to', 'a', 'for', 'on', 'with', 'edition', 'game', 'hd', 'remastered', 'collection', 'director', 'cut'}
+                for title in valid_titles:
+                    w_list = re.findall(r'\b[^\d\W_]{3,}\b', title.lower()) # 3+ letters, ignoring digits
+                    words.extend([w for w in w_list if w not in stopwords])
+                if words:
+                    stats_data.append(("tools_stats_common_word", pd.Series(words).value_counts().idxmax().title()))
+                else:
+                    stats_data.append(("tools_stats_common_word", "N/A"))
+            else:
+                stats_data.extend([("tools_stats_longest_title", "N/A"), ("tools_stats_shortest_title", "N/A"), ("tools_stats_common_word", "N/A")])
+
+        if 'Summary' in self.df.columns:
+            valid_sums = self.df['Summary'].fillna('').astype(str)
+            sum_lengths = valid_sums.str.len()
+            if not sum_lengths.empty and sum_lengths.max() > 0:
+                stats_data.append(("tools_stats_longest_sum", self.df.loc[sum_lengths.idxmax(), 'Clean_Title']))
+            else:
+                stats_data.append(("tools_stats_longest_sum", "N/A"))
+            stats_data.append(("tools_stats_no_sum", len(valid_sums[valid_sums.str.strip() == ''])))
+            
+        if 'Platforms' in self.df.columns:
+            warez_count = len(self.df[self.df['Platforms'].astype(str).str.lower() == 'warez'])
+            warez_pct = round((warez_count / total_games * 100) if total_games else 0, 1)
+            stats_data.append(("tools_stats_warez_ratio", f"{warez_pct}% ({warez_count})"))
+
+        # WHY: Using QHBoxLayout with 3 QFormLayouts guarantees equal spacing horizontally 
+        # and automatically aligns labels so the colons perfectly form a straight vertical line.
+        text_container = QWidget()
+        text_container.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        h_layout = QHBoxLayout(text_container)
+        h_layout.setContentsMargins(0, 10, 0, 0)
+        h_layout.setSpacing(20)
+
+        forms = [QFormLayout(), QFormLayout(), QFormLayout()]
+        for f in forms:
+            f.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            h_layout.addLayout(f, 1) # stretch=1 to ensure 3 perfectly equal columns
+
+        num_items = len(stats_data)
+        items_per_col = (num_items + 2) // 3 # Ceiling division
+
+        for i, (key, val) in enumerate(stats_data):
+            form_idx = i // items_per_col
+            
+            # Add single quotes for common word since we removed them from the json strings
+            if key == "tools_stats_common_word" and val != "N/A":
+                val = f"'{val}'"
+                
+            lbl_title = QLabel(translator.tr(key) + " :")
+            lbl_val = QLabel(str(val))
+            lbl_val.setWordWrap(True)
+            lbl_val.setStyleSheet("font-weight: bold;")
+            
+            forms[form_idx].addRow(lbl_title, lbl_val)
+            
+        layout.addWidget(text_container)
         return widget
 
-    def create_distribution_tab(self, col_name, title):
+    def create_distribution_section(self, col_name, title):
         widget = QWidget()
         layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
         
         # Process Data (Split comma separated values)
         all_values = []
@@ -1432,27 +1912,43 @@ class StatisticsDialog(QDialog):
         table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         table.setRowCount(len(counts))
         
+        # WHY: Disable edits and selection so the table behaves purely as a visual chart
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        table.setSelectionMode(QAbstractItemView.NoSelection)
+        
+        # WHY: Attach custom delegate so progress bar draws based on data correctly during sorting
+        delegate = ProgressBarDelegate(table)
+        table.setItemDelegateForColumn(2, delegate)
+
         max_val = counts.max() if not counts.empty else 1
         
         for i, (name, count) in enumerate(counts.items()):
-            table.setItem(i, 0, QTableWidgetItem(name))
-            table.setItem(i, 1, QTableWidgetItem(str(count)))
+            item_name = QTableWidgetItem()
+            item_name.setData(Qt.EditRole, name)
+            table.setItem(i, 0, item_name)
             
-            # Progress Bar for visual
-            pbar = QProgressBar()
-            pbar.setRange(0, max_val)
-            pbar.setValue(count)
-            pbar.setTextVisible(False)
-            pbar.setStyleSheet("QProgressBar::chunk { background-color: #00BCD4; }")
-            table.setCellWidget(i, 2, pbar)
+            # EditRole enforces native numeric sorting
+            item_count = QTableWidgetItem()
+            item_count.setData(Qt.EditRole, int(count))
+            table.setItem(i, 1, item_count)
+            
+            item_pbar = QTableWidgetItem()
+            item_pbar.setData(Qt.EditRole, int(count)) # Native sorting
+            item_pbar.setData(Qt.UserRole, int(max_val))
+            item_pbar.setData(Qt.UserRole + 1, False) # Show text = False
+            table.setItem(i, 2, item_pbar)
+            
+        table.setSortingEnabled(True)
+        table.sortItems(1, Qt.DescendingOrder)
             
         layout.addWidget(table)
         return widget
 
-    def create_timeline_tab(self):
+    def create_timeline_section(self):
         # Simplified histogram using QTableWidget
         widget = QWidget()
         layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
         
         years = pd.to_datetime(self.df['Original_Release_Date'], errors='coerce', dayfirst=True).dt.year
         year_counts = years.dropna().astype(int).value_counts().sort_index()
@@ -1463,18 +1959,28 @@ class StatisticsDialog(QDialog):
         table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         table.setRowCount(len(year_counts))
         
+        # WHY: Disable edits and selection so the table behaves purely as a visual chart
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        table.setSelectionMode(QAbstractItemView.NoSelection)
+        
+        delegate = ProgressBarDelegate(table)
+        table.setItemDelegateForColumn(1, delegate)
+        
         max_val = year_counts.max() if not year_counts.empty else 1
         
         for i, (year, count) in enumerate(year_counts.items()):
-            table.setItem(i, 0, QTableWidgetItem(str(year)))
+            item_year = QTableWidgetItem()
+            item_year.setData(Qt.EditRole, int(year))
+            table.setItem(i, 0, item_year)
             
-            pbar = QProgressBar()
-            pbar.setRange(0, max_val)
-            pbar.setValue(count)
-            pbar.setFormat(f"{count}")
-            pbar.setTextVisible(True)
-            pbar.setAlignment(Qt.AlignCenter)
-            table.setCellWidget(i, 1, pbar)
+            item_pbar = QTableWidgetItem()
+            item_pbar.setData(Qt.EditRole, int(count))
+            item_pbar.setData(Qt.UserRole, int(max_val))
+            item_pbar.setData(Qt.UserRole + 1, True) # Show text = True
+            table.setItem(i, 1, item_pbar)
+            
+        table.setSortingEnabled(True)
+        table.sortItems(0, Qt.AscendingOrder)
             
         layout.addWidget(table)
         return widget
@@ -1641,12 +2147,15 @@ class GameCard(QWidget):
         
         # Info
         info_font_size = max(10, settings.get('text', 22) - 6)
-        for field in ['Original_Release_Date', 'Platforms', 'Developer']:
+        # WHY: Reordered fields to group Platforms/Genre, Dev/Pub, and Collection. Added spacing between these groups.
+        for field in ['Original_Release_Date', 'Platforms', 'Genre', 'Developer', 'Publisher', 'Collection']:
             display_name = 'Developer' # Default
             if field == 'Original_Release_Date': display_name = translator.tr("gamecard_info_release_date")
             elif field == 'Platforms': display_name = translator.tr("gamecard_info_platforms")
+            elif field == 'Genre': display_name = translator.tr("gamecard_info_genre")            
             elif field == 'Developer': display_name = translator.tr("gamecard_info_developer")
-
+            elif field == 'Publisher': display_name = translator.tr("gamecard_info_publisher")
+            elif field == 'Collection': display_name = translator.tr("gamecard_info_collection")
             label = QLabel(f"<b>{display_name}:</b> {game_data.get(field, '')}")
             label.setStyleSheet(f"font-weight: bold; font-size: {info_font_size}px;")
             label.setWordWrap(True)
@@ -1656,6 +2165,9 @@ class GameCard(QWidget):
             label.setMinimumWidth(0)
             details_layout.addWidget(label)
             self.info_labels.append(label)
+            
+            if field in ['Genre', 'Publisher']:
+                details_layout.addSpacing(10)
         
         self.summary_title = QLabel(translator.tr("gamecard_summary_title"))
         self.summary_title.setStyleSheet(f"font-weight: bold; font-size: {info_font_size}px;")
@@ -1761,6 +2273,8 @@ class GameCard(QWidget):
             h = lbl.heightForWidth(details_w)
             if h <= 0: h = lbl.sizeHint().height()
             h_rest += h
+            
+        h_rest += 20 # WHY: Account for the 2x10px spacing added between info groups
             
         final_h = max(img_h, h_header + h_rest) + m.top() + m.bottom() + 4 # +4 buffer
         return QSize(target_width, final_h)
@@ -2327,6 +2841,7 @@ class MainWindow(QMainWindow):
         self.sidebar.btn_full_scan.setEnabled(False)
         self.sidebar.btn_full_scan.setText("Scanning...")
         self.sidebar.chk_show_new.setEnabled(False)
+        self.sidebar.chk_retry_failures.setEnabled(False)
         self.set_filters_ui_state(False)
 
         # Show the scan panel as a log viewer
@@ -2352,7 +2867,8 @@ class MainWindow(QMainWindow):
         logging.getLogger().addHandler(self.qt_log_handler)
 
         # Setup and start worker thread
-        self.full_scan_worker = FullScanWorker(retry_failures=False)
+        do_retry = self.sidebar.chk_retry_failures.isChecked()
+        self.full_scan_worker = FullScanWorker(retry_failures=do_retry)
         self.full_scan_worker.finished.connect(self.finish_full_scan)
         self.full_scan_worker.start()
 
@@ -2372,6 +2888,7 @@ class MainWindow(QMainWindow):
         self.sidebar.btn_full_scan.setEnabled(True)
         self.sidebar.btn_full_scan.setText(translator.tr("sidebar_btn_full_scan"))
         self.sidebar.chk_show_new.setEnabled(True)
+        self.sidebar.chk_retry_failures.setEnabled(True)
 
         # If the panel is still visible, it means the scan completed without interruption.
         if self.sidebar.scan_panel.isVisible():
@@ -2415,7 +2932,7 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(50, self.run_inline_search)
 
     def update_game_data(self, folder_name, new_data):
-        manager = LibraryManager(r"\\madhdd02\Software\GAMES", "VGVDB.csv")
+        manager = LibraryManager(build_scanner_config())
         manager.load_db()
         
         game_obj = manager.games.get(folder_name)
@@ -2423,9 +2940,15 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", f"Game '{folder_name}' not found in the database for this library.")
             return
 
+        old_title = game_obj.data.get('Clean_Title', '')
+        old_date = game_obj.data.get('Original_Release_Date', '')
+
         # Updates game data
         for key, value in new_data.items():
             game_obj.data[key] = value
+            
+        # Rename media properly via the Game class methods
+        game_obj.update_media_filenames(old_title, old_date)
         
         # Save to CSV
         while True:
@@ -2440,11 +2963,56 @@ class MainWindow(QMainWindow):
                 if reply == QMessageBox.Cancel:
                     return
         
-        QMessageBox.information(self, "Success", "Changes have been saved.")
-        
-        # Refresh the interface to show changes
-        # The existing anchoring system will handle repositioning the view
+        # WHY: Set a pending anchor before refreshing so the async loader focuses the updated game.
+        self.pending_anchor_folder = folder_name
         self.refresh_data()
+
+    def execute_merge(self, folder_a, folder_b):
+        """Runs the entire merge sequence from data combination to conflict UI."""
+        manager = LibraryManager(build_scanner_config())
+        manager.load_db()
+        game_a = manager.games.get(folder_a)
+        game_b = manager.games.get(folder_b)
+        
+        if not game_a or not game_b: return False
+        
+        old_title = game_a.data.get('Clean_Title', '')
+        old_year = game_a.data.get('Original_Release_Date', '')
+
+        conflicts = game_a.merge_with(game_b)
+        rejected_media = []
+
+        if conflicts:
+            dlg = ConflictDialog(game_a.data, game_b.data, conflicts, self)
+            if dlg.exec():
+                resolutions = dlg.get_resolutions()
+                for field, val in resolutions.items():
+                    game_a.data[field] = val
+                    
+                # WHY: Collect rejected media paths to safely delete orphaned files
+                if 'Image_Link' in conflicts:
+                    rejected = conflicts['Image_Link']['B'] if resolutions['Image_Link'] == conflicts['Image_Link']['A'] else conflicts['Image_Link']['A']
+                    if rejected and os.path.exists(rejected): rejected_media.append(rejected)
+                if 'Path_Video' in conflicts:
+                    rejected = conflicts['Path_Video']['B'] if resolutions['Path_Video'] == conflicts['Path_Video']['A'] else conflicts['Path_Video']['A']
+                    if rejected and os.path.exists(rejected): rejected_media.append(rejected)
+            else:
+                return False # User cancelled
+
+        # Combine and apply. Cleanup trailing data.
+        del manager.games[folder_b]
+
+        game_a.update_media_filenames(old_title, old_year)
+        
+        for f in rejected_media:
+            try: os.remove(f)
+            except Exception as e: logging.error(f"Could not delete orphaned media {f}: {e}")
+                
+        manager.save_db()
+        # WHY: Set a pending anchor to focus on the merged game.
+        self.pending_anchor_folder = folder_a
+        self.refresh_data()
+        return True
 
     def on_manual_search_trigger(self):
         self.sidebar.scan_results.clear()
@@ -2462,7 +3030,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Error", "No game selected for scanning. Please click the scan icon on a game.")
             return
         
-        manager = LibraryManager(r"\\madhdd02\Software\GAMES", "VGVDB.csv")
+        manager = LibraryManager(build_scanner_config())
         manager.load_db()
         token = manager.get_access_token()
 
@@ -2507,7 +3075,8 @@ class MainWindow(QMainWindow):
 
     def restore_scan_panel(self):
         """Resets the scan panel to its default state for manual scanning."""
-        self.sidebar.scan_title_label.setText("Manual Scan")
+        # WHY: Use the translator instead of a hardcoded string so the updated title is correctly displayed.
+        self.sidebar.scan_title_label.setText(translator.tr("sidebar_manual_scan_title"))
         self.sidebar.scan_input.show()
         self.sidebar.scan_btn.show()
         self.sidebar.scan_limit_combo.show()
@@ -2526,7 +3095,7 @@ class MainWindow(QMainWindow):
         if not item: return
         
         chosen_game = item.data(Qt.UserRole)
-        manager = LibraryManager(r"\\madhdd02\Software\GAMES", "VGVDB.csv")
+        manager = LibraryManager(build_scanner_config())
         manager.load_db()
         game_obj = manager.games.get(self.current_scan_game.get('Folder_Name'))
         
@@ -2543,25 +3112,10 @@ class MainWindow(QMainWindow):
                     if reply == QMessageBox.Cancel:
                         return
 
+            # WHY: Remove the synchronous scrolling logic that fails due to async background loading.
+            # Instead, we pass the folder to the pending anchor system.
+            self.pending_anchor_folder = self.current_scan_game.get('Folder_Name')
             self.refresh_data()
-            
-            # Position the list on the modified game
-            target_folder = self.current_scan_game.get('Folder_Name')
-            
-            # Find the position of the game in the full data list
-            folders_list = self.current_df['Folder_Name'].tolist()
-            if target_folder in folders_list:
-                row_index = folders_list.index(target_folder)
-                
-                # Force loading items until this row is reached
-                while self.loaded_count <= row_index:
-                    self.load_more_items()
-                
-                # Now that the item is created, we can select it
-                list_item = self.list_widget.item(row_index)
-                if list_item:
-                    self.list_widget.scrollToItem(list_item)
-                    self.list_widget.setCurrentItem(list_item)
             
             self.sidebar.scan_results.clear()
             item = QListWidgetItem("Update complete!")
@@ -2616,7 +3170,12 @@ class MainWindow(QMainWindow):
         filter_states = {}
         if hasattr(self, 'dynamic_filters'):
             for col, checkboxes in self.dynamic_filters.items():
-                filter_states[col] = [chk.text() for chk in checkboxes if chk.isChecked()]
+                # WHY: "Implicit All" logic. If all boxes are checked, we don't save the explicit list.
+                # This ensures that when a scan discovers a NEW category (e.g., a new genre),
+                # it will default to checked upon reload, instead of being unchecked because it 
+                # was missing from the old explicitly saved list.
+                if checkboxes and not all(chk.isChecked() for chk in checkboxes):
+                    filter_states[col] = [chk.text() for chk in checkboxes if chk.isChecked()]
 
         # Save expansion state
         saved_expansion = {}
@@ -2888,7 +3447,13 @@ class MainWindow(QMainWindow):
 
         # --- ANCHORING: Save selection ---
         current_item = self.list_widget.currentItem()
-        anchor_folder = current_item.data(Qt.UserRole) if current_item else None
+        
+        # WHY: Prioritize explicit anchors requested from actions like Manual Scan/Edit over current UI selection.
+        if hasattr(self, 'pending_anchor_folder') and self.pending_anchor_folder:
+            anchor_folder = self.pending_anchor_folder
+            self.pending_anchor_folder = None
+        else:
+            anchor_folder = current_item.data(Qt.UserRole) if current_item else None
 
         # Update UI
         self.current_df = df
@@ -2920,7 +3485,7 @@ class MainWindow(QMainWindow):
         # Start loading the rest in the background
         self.background_loader.start()
 
-    def restore_scroll_position(self):
+    def restore_scroll_position(self, retries=10):
         if not hasattr(self, 'pending_scroll'): return
         
         sb = self.list_widget.verticalScrollBar()
@@ -2930,8 +3495,13 @@ class MainWindow(QMainWindow):
             self.load_more_items()
             # Force layout update to recalculate the maximum immediately
             self.list_widget.doItemsLayout() 
-            # Immediate recall to continue loading if necessary
-            QTimer.singleShot(0, self.restore_scroll_position)
+            # WHY: Give the GUI layout engine actual time (10ms) to recalculate the scrollbar maximum.
+            # A 0ms timer often triggers before the layout finishes rendering the complex cards.
+            QTimer.singleShot(10, lambda: self.restore_scroll_position(10))
+        elif sb.maximum() < self.pending_scroll and self.loaded_count >= len(self.current_df) and retries > 0:
+            # WHY: All items are loaded into the data model, but the graphical layout is still 
+            # calculating heights. Wait a bit and retry before forcing the final scroll value.
+            QTimer.singleShot(50, lambda: self.restore_scroll_position(retries - 1))
         else:
             # Target reached or everything loaded: apply final position
             sb.setValue(self.pending_scroll)
@@ -3033,6 +3603,7 @@ def apply_theme(app, theme_name):
         app.setPalette(light_palette)
 
 if __name__ == "__main__":
+    setup_logging()
     app = QApplication(sys.argv)
 
     # Load and apply theme/language at startup

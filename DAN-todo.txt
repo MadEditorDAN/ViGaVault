@@ -1,0 +1,17 @@
+Pretyped messages:
+@workspace, lis le fichier INSTRUCTIONS.md et utilise-le comme base de travail pour toutes tes futures réponses sur ce projet.
+
+It did not worked, I rolled back
+
+On discute, pas de code
+Discuss no code
+
+n'oublie poas les fichier json de languages
+Commente ton code, explique chaque changements et le POURQUOI de ces chagements.
+Utilise le principe DRY quand c'est applicable
+
+Remember the language json files.
+Comment the code and explain why each modification is done.
+Use DRY principle when applicable
+
+

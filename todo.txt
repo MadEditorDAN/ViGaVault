@@ -1,47 +1,46 @@
-Pretyped messages:
-@workspace, lis le fichier INSTRUCTIONS.md et utilise-le comme base de travail pour toutes tes futures réponses sur ce projet.
-
-It did not worked, I rolled back
-
-On discute, pas de code
-
-Commente ton code, explique chaque changements et le POURQUOI de ce s chagements.
-
-Ideas:
-Steam integration recupérer le TAG VR
-dowload background image from gog sb and use it as gamecard backbround
-
-
-
+IDEAS:
+-Download background image from gog sb and use it as gamecard backbround
 
 TO DO MAYBE : 
-
-Let's discuss, no code. 
-How do we proceed to create an executable file and an installation exe
-
-SQL LITE
+- SQL LITE
 - Pour ne pas perdre l'avantage du CSV (la visibilité), tu pourras utiliser un outil gratuit comme "DB Browser for SQLite". C'est un logiciel qui te permet de voir ta base SQL exactement comme un tableau Excel, de modifier les cases à la main et de faire des recherches. Ça t'enlèvera la peur de "ne plus voir tes données".
 
-
-TO CHECK : 
-
 TO DO :
+ - Fix the "Unknown" platform issue.
 
-Platforms Manager !
+ - Use folder structure from the /local folder to add a tag 
 
+ - make the folder icon in the gamecard grey if there are no local folder
+
+ - make the text selectable in the statistic windows
+
+ - Clean up genre, we have duplicates in genre because of the different way the same genre is named, example, we currently have RPG, Role Playing Game and Role playing game (RPG). We need to normalize this and we need to do it at the scan level, when that metadata is acquired. But the normalization should not be limited ti punctation or capital letters, there are a lot of acronyms to consider, like the example.
+ Could you ceate a normalisation scheme for the genres.
+
+ - when searching on igdb, isn't there a way to choose between the igdb candidates, the original game instaed of the dlc, or a collector version. i know that on the igdb site, I can see some tags, like "main game" or "standalone expansion" or "port"... can we use these to identify the main game ? Is it relevant for our case. Because I noticed that in many ces it took the most recent updated version of the game instead of the game itself.
+
+ - In Settings/data source, Add a personnalized images folder exactly like we havbe for the videos folder
+
+ - Decoupe du ViGaVault_UI.py : 
+@workspace, mon fichier ViGaVault_UI.py est devenu trop lourd (+3500 lignes). Je veux le rendre modulaire pour améliorer la maintenance et la rapidité de l'IA.
+Plan d'action :
+Crée un fichier vgv_utils.py et déplace-y la classe Translator, les fonctions de configuration (get_db_path, etc.) et les fonctions de thèmes (apply_dark_theme, apply_light_theme).
+Crée un fichier vgv_dialogs.py et déplace-y toutes les classes de QDialog (SettingsDialog, AddGameDialog, EditMetadataDialog, etc.). Assure-toi qu'elles reçoivent les références nécessaires (parent, manager) dans leur __init__.
+Mets à jour ViGaVault_UI.py pour importer ces nouveaux modules.
+Vérifie qu'il n'y a pas d'imports circulaires et que l'application peut toujours se lancer.
+Procède étape par étape et demande-moi de valider chaque création de fichier.
+
+ -Platforms Manager !
 Future structure : 
-
 ViGaVault/
 ├── ViGaVault_UI.py             # (Existant - Ton interface)
 ├── ViGaVault_Scan.py           # (Existant - Ton LibraryManager et CSV)
 ├── ViGaVault_SCRAPPERS.py      # L'orchestrateur (À créer)
 └── connectors/                 
     └── steam_cloud.py          # Le spécialiste Steam (À créer)
-	
 Voici les informations techniques que tu dois donner à Gemini pour qu'il code le connecteur :
 Source de données : API Store Front de Steam.
 Endpoint : https://store.steampowered.com/api/appdetails?appids={APPID}&l=french
-
 Données à extraire (Metadata) :
 ---------------------------------------------------------------------------------------------------------
 Type,		Champ Steam API,									Action ViGaVault
@@ -93,5 +92,3 @@ Appeler l'API Steam Store pour chaque jeu.
 Télécharger les images et les vidéos MP4.
 
 Finalisation : Appeler LibraryManager.add_game_to_db pour chaque jeu pour garantir que le CSV est à jour et que les fichiers sont bien nommés (via get_safe_filename).
-
-274.84

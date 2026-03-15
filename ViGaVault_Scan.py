@@ -6,7 +6,6 @@ import shutil
 import ctypes
 import requests
 import sqlite3
-import argparse
 from datetime import datetime
 from urllib.parse import urlparse
 import difflib
@@ -27,84 +26,13 @@ except ImportError:
 # instead of relying on the unpredictable 'current working directory' (os.getcwd).
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-def get_db_path():
-    """Reads the db_path from settings.json, falling back to the default."""
-    # WHY: Construct absolute path using BASE_DIR to reliably find settings.json
-    settings_file = os.path.join(BASE_DIR, "settings.json")
-    default_db = os.path.join(BASE_DIR, "VGVDB.csv")
-    if os.path.exists(settings_file):
-        try:
-            with open(settings_file, "r", encoding='utf-8') as f:
-                settings = json.load(f)
-                return settings.get("db_path", default_db)
-        except Exception:
-            return default_db
-    return default_db
-
-LOG_DIR = os.path.join(BASE_DIR, "logs")
 BACKUP_DIR = os.path.join(BASE_DIR, "backups")
 VIDEO_EXTS = ('.mp4', '.mkv', '.avi', '.wmv', '.webm')
 MAX_FILES = 10 
 
-def get_library_settings_file():
-    """Returns the path to the JSON settings file for the current library."""
-    db_path = get_db_path() # This is fine, it's dynamic
-    return os.path.splitext(db_path)[0] + ".json"
-
-def get_video_path():
-    """Returns the configured video path or default 'videos' folder."""
-    settings_path = get_library_settings_file()
-    default_path = os.path.join(BASE_DIR, "videos")
-    if os.path.exists(settings_path):
-        try:
-            with open(settings_path, "r", encoding='utf-8') as f:
-                settings = json.load(f)
-                return settings.get("video_path", default_path)
-        except: pass
-    return default_path
-
-def get_root_path():
-    """Returns the configured root path from the library's settings."""
-    settings_path = get_library_settings_file()
-    default_path = r"\\madhdd02\Software\GAMES" # Keep a fallback
-    if os.path.exists(settings_path):
-        try:
-            with open(settings_path, "r", encoding='utf-8') as f:
-                settings = json.load(f)
-                return settings.get("root_path", default_path)
-        except: pass
-    # Fallback to global settings.json if library one fails or doesn't exist
-    global_settings_path = os.path.join(BASE_DIR, "settings.json")
-    if os.path.exists(global_settings_path):
-         try:
-            with open(global_settings_path, "r", encoding='utf-8') as f:
-                settings = json.load(f)
-                return settings.get("root_path", default_path)
-         except: pass
-    return default_path
-
 # --- API CONFIGURATION ---
 IGDB_CLIENT_ID = "a6q5htw1uxkye5kta223vwjs2qlace"
 IGDB_CLIENT_SECRET = "psmi013osf0leudnb0jlyzpr8xz9fq"
-
-# --- LOGGING SETUP ---
-def setup_logging():
-    os.makedirs(LOG_DIR, exist_ok=True)
-    logs = [os.path.join(LOG_DIR, f) for f in os.listdir(LOG_DIR) if f.startswith("scan_")]
-    logs.sort(key=os.path.getctime)
-    while len(logs) >= MAX_FILES:
-        os.remove(logs.pop(0))
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = os.path.join(LOG_DIR, f"scan_{timestamp}.log")
-    logging.basicConfig(
-        level=logging.INFO, 
-        format='%(asctime)s [%(levelname)s] %(message)s', 
-        handlers=[
-            logging.FileHandler(log_file, encoding='utf-8'), 
-            logging.StreamHandler() # This one sends everything to the console
-        ]
-    )
-setup_logging()
 
 def get_safe_filename(name):
     """Cleans a name to make it safe for a filename."""
@@ -117,89 +45,6 @@ def get_safe_filename(name):
     # Remove trailing dot (problematic on Windows)
     safe_name = safe_name.rstrip('. ')
     return safe_name
-
-def get_platform_config():
-    """Loads platform mapping and ignore list from settings.json or returns defaults."""
-    default_map = {
-        'gog': 'GOG', 
-        'steam': 'Steam', 
-        'epic': 'Epic Games Store',
-        'epic games store': 'Epic Games Store',
-        'uplay': 'Uplay', 
-        'ubisoft': 'Uplay',
-        'ubisoft connect': 'Uplay',
-        'origin': 'Origin', 
-        'ea': 'EA',
-        'ea app': 'EA',
-        'amazon': 'Amazon',
-        'amazon prime': 'Amazon',
-        'battlenet': 'Battle.net', 
-        'battle.net': 'Battle.net',
-        'rockstar': 'Rockstar', 
-        'bethesda': 'Bethesda',
-        'itch': 'itch.io',
-        'itch.io': 'itch.io',
-        'discord': 'Discord',
-        'ffxiv': 'Final Fantasy XIV',
-        'kartridge': 'Kartridge',
-        'minecraft': 'Minecraft',
-        'oculus': 'Oculus',
-        'paradox': 'Paradox',
-        'riot': 'Riot Games',
-        'stadia': 'Stadia',
-        'totalwar': 'Total War',
-        'twitch': 'Twitch',
-        'wargaming': 'Wargaming.net',
-        'winstore': 'Windows Store',
-        'windows store': 'Windows Store',
-        'beamdog': 'Beamdog',
-    }
-    
-    default_ignore = [
-        'humble', 'gmg', 'fanatical', 'nuuvem', 'indiegala', 
-        'd2d', 'direct2drive', 'dotemu', 'fxstore', 'gamehouse', 
-        'gamesessions', 'gameuk', 'playfire', 'weplay'
-    ]
-
-    # Try library specific settings first, then fall back to global settings.json
-    settings_path = get_library_settings_file()
-    global_settings_path = os.path.join(BASE_DIR, "settings.json")
-    if not os.path.exists(settings_path):
-        settings_path = global_settings_path
-
-    if os.path.exists(settings_path):
-        try:
-            with open(settings_path, "r", encoding='utf-8') as f:
-                settings = json.load(f)
-                return settings.get("platform_map", default_map), settings.get("ignored_prefixes", default_ignore)
-        except Exception as e:
-            logging.error(f"Error loading settings.json: {e}")
-    
-    return default_map, default_ignore
-
-def get_local_scan_config():
-    """Loads local scan configuration from settings.json."""
-    default_config = {
-        "ignore_hidden": True,
-        "scan_mode": "advanced",
-        "global_type": "Genre",
-        "folder_rules": {}
-    }
-    
-    # Try library specific settings first, then fall back to global settings.json
-    settings_path = get_library_settings_file()
-    global_settings_path = os.path.join(BASE_DIR, "settings.json")
-    if not os.path.exists(settings_path):
-        settings_path = global_settings_path
-        
-    if os.path.exists(settings_path):
-        try:
-            with open(settings_path, "r", encoding='utf-8') as f:
-                settings = json.load(f)
-                return settings.get("local_scan_config", default_config)
-        except:
-            pass
-    return default_config
 
 def is_hidden(filepath):
     try:
@@ -240,8 +85,9 @@ def _query_igdb_api(token, search_term=None, limit=5, by_id=False, custom_query=
         if by_id:
             query = f'fields {fields}; where id = {search_term};'
         else:
-            # Platforms filter (6=PC, 13=DOS, 14=Mac, 3=Linux)
-            query = f'search "{search_term}"; fields {fields}; where platforms = (6, 13, 14, 3); limit {limit};'
+            # Platforms filter (includes VR: 161=WinMR, 162=Oculus, 163=SteamVR)
+            # WHY: Add VR platforms as discussed and centralize the filter.
+            query = f'search "{search_term}"; fields {fields}; where platforms = (3, 6, 13, 14, 161, 162, 163); limit {limit};'
             
     try:
         response = requests.post(api_url, headers=headers, data=query, timeout=10)
@@ -255,7 +101,8 @@ def _query_igdb_api(token, search_term=None, limit=5, by_id=False, custom_query=
         return None
 
 class Game:
-    def __init__(self, **kwargs):
+    def __init__(self, config=None, **kwargs):
+        self.config = config or {}
         self.data = kwargs
         self.data.setdefault('Folder_Name', 'Unknown')
         self.data.setdefault('Path_Root', '')
@@ -276,13 +123,14 @@ class Game:
             tag_content = tag_match.group(1)
             
             # Map for platform name canonicalization
-            platform_map, _ = get_platform_config()
-            platform_pattern = r'|'.join(re.escape(k) for k in platform_map.keys())
-            found_platforms_raw = re.findall(platform_pattern, tag_content, re.IGNORECASE)
-            
-            if found_platforms_raw:
-                canonical_platforms = {platform_map[p.lower()] for p in found_platforms_raw}
-                self.data['Platforms'] = ", ".join(sorted(list(canonical_platforms)))
+            platform_map = self.config.get('platform_map', {})
+            if platform_map:
+                platform_pattern = r'|'.join(re.escape(k) for k in platform_map.keys())
+                found_platforms_raw = re.findall(platform_pattern, tag_content, re.IGNORECASE)
+                
+                if found_platforms_raw:
+                    canonical_platforms = {platform_map[p.lower()] for p in found_platforms_raw}
+                    self.data['Platforms'] = ", ".join(sorted(list(canonical_platforms)))
 
         if not self.data.get('Platforms'):
             if self.data.get('Path_Root'):
@@ -298,6 +146,91 @@ class Game:
         self.data['Clean_Title'] = clean_name
         self.data['Search_Title'] = clean_name
 
+    def update_media_filenames(self, old_title, old_date):
+        """
+        WHY: Centralized media renaming (DRY) so both the Edit Window and the Merge Tool 
+        can dynamically rename physical files without duplicating code.
+        """
+        new_title = self.data.get('Clean_Title', '')
+        new_date = self.data.get('Original_Release_Date', '')
+
+        if new_title != old_title or new_date != old_date:
+            base_filename = new_title
+            if new_date and len(new_date) >= 4:
+                base_filename += f" ({new_date[-4:]})"
+            
+            new_safe_name = get_safe_filename(base_filename)
+            
+            # Rename Image
+            old_img_path = self.data.get('Image_Link', '')
+            if old_img_path and os.path.exists(old_img_path):
+                dir_name = os.path.dirname(old_img_path)
+                ext = os.path.splitext(old_img_path)[1]
+                new_img_path = os.path.join(dir_name, f"{new_safe_name}{ext}")
+                if new_img_path != old_img_path:
+                    try:
+                        os.rename(old_img_path, new_img_path)
+                        self.data['Image_Link'] = new_img_path
+                    except Exception as e:
+                        logging.error(f"Failed to rename image: {e}")
+
+            # Rename Video
+            old_vid_path = self.data.get('Path_Video', '')
+            if old_vid_path and os.path.exists(old_vid_path):
+                dir_name = os.path.dirname(old_vid_path)
+                ext = os.path.splitext(old_vid_path)[1]
+                new_vid_path = os.path.join(dir_name, f"{new_safe_name}{ext}")
+                if new_vid_path != old_vid_path:
+                    try:
+                        os.rename(old_vid_path, new_vid_path)
+                        self.data['Path_Video'] = new_vid_path
+                    except Exception as e:
+                        logging.error(f"Failed to rename video: {e}")
+
+    def merge_with(self, other):
+        """
+        WHY: Handles the pure data logic of merging another game into this one. 
+        Automatically combines non-conflicting lists (IDs, Platforms) and returns a package 
+        of differing single-value fields for the user to resolve via the UI.
+        """
+        # 1. Combine IDs
+        ids = set(x.strip() for x in self.data.get('game_ID', '').split(',') if x.strip())
+        ids.update(x.strip() for x in other.data.get('game_ID', '').split(',') if x.strip())
+        self.data['game_ID'] = ", ".join(sorted(ids))
+
+        # 2. Combine Platforms
+        plats = set(x.strip() for x in self.data.get('Platforms', '').split(',') if x.strip())
+        plats.update(x.strip() for x in other.data.get('Platforms', '').split(',') if x.strip())
+        # Rule: If any real platform exists (including 'Unknown'), 'Warez' is removed
+        real_plats = [p for p in plats if p.lower() != 'warez']
+        if real_plats:
+            if 'Warez' in plats: plats.remove('Warez')
+            if 'warez' in plats: plats.remove('warez')
+        self.data['Platforms'] = ", ".join(sorted(plats))
+
+        # 3. Handle Reserved platform_ID_xx fields
+        for i in range(1, 51):
+            col = f"platform_ID_{i:02d}"
+            if not self.data.get(col) and other.data.get(col):
+                self.data[col] = other.data.get(col)
+
+        # 4. Detect Conflicts in descriptive fields
+        conflicts = {}
+        fields_to_check = ['Clean_Title', 'Summary', 'Original_Release_Date', 'Developer', 'Publisher', 'Genre', 'Collection', 'Path_Root', 'Path_Video', 'Image_Link', 'Trailer_Link', 'Year_Folder']
+        
+        for field in fields_to_check:
+            val_a = str(self.data.get(field, '')).strip()
+            val_b = str(other.data.get(field, '')).strip()
+            
+            # Empty vs Filled -> Auto-accept filled
+            if not val_a and val_b:
+                self.data[field] = val_b
+            # Both filled but differ (case-insensitive to prevent fake conflicts)
+            elif val_a and val_b and val_a.casefold() != val_b.casefold():
+                conflicts[field] = {'A': val_a, 'B': val_b}
+                
+        return conflicts
+
     def _find_video(self):
         # If a valid video path already exists, do nothing.
         current_path = self.data.get('Path_Video', '')
@@ -306,7 +239,7 @@ class Game:
 
         # Only look for videos in the centralized 'videos' folder
         # We ignore any video files that might exist in the game's own folder
-        video_dir = get_video_path()
+        video_dir = self.config.get('video_path', os.path.join(BASE_DIR, 'videos'))
         safe_name = get_safe_filename(self.data.get('Clean_Title') or self.data.get('Folder_Name', ''))
         
         for ext in VIDEO_EXTS:
@@ -383,117 +316,102 @@ class Game:
 
         logging.info(f"    [COVER FETCH] Fetching image URL for '{self.data['Clean_Title']}' (ID: {igdb_id})")
 
-        api_url = "https://api.igdb.com/v4/games"
-        headers = {"Client-ID": IGDB_CLIENT_ID, "Authorization": f"Bearer {token}"}
         query = f'fields cover.url; where id = {igdb_id};'
 
-        try:
-            response = requests.post(api_url, headers=headers, data=query, timeout=10)
-            if response.status_code == 200 and response.json():
-                game_info = response.json()[0]
-                # Forcing download because we are here due to a missing image
-                new_path = self._ensure_cover(game_info, force_download=True)
-                if new_path:
-                    self.data['Image_Link'] = new_path
-                    return True
-            else:
-                logging.error(f"    [COVER FETCH ERROR] Could not find info for ID {igdb_id}.")
-                return False
-        except Exception as e:
-            logging.error(f"    [COVER FETCH CRITICAL] Network error: {e}")
-            return False
+        # WHY: Use DRY helper function.
+        results = _query_igdb_api(token, custom_query=query)
+        
+        if results:
+            game_info = results[0]
+            # Forcing download because we are here due to a missing image
+            new_path = self._ensure_cover(game_info, force_download=True)
+            if new_path:
+                self.data['Image_Link'] = new_path
+                return True
+
+        logging.error(f"    [COVER FETCH ERROR] Could not find info for ID {igdb_id}.")
+        return False
 
     def fetch_metadata(self, token):
         # Prioritize Search_Title for the API request
         search_term = self.data.get('Search_Title') or self.data.get('Clean_Title') or self.data.get('Folder_Name')
         local_year = self.data.get('Year_Folder', '')
         
-        api_url = "https://api.igdb.com/v4/games"
-        headers = {"Client-ID": IGDB_CLIENT_ID, "Authorization": f"Bearer {token}"}
+        # WHY: Use DRY helper function for metadata fetching.
+        results = _query_igdb_api(token, search_term=search_term, limit=5)
         
-        # Fetch candidates (limit 5) to allow scoring by year
-        query = (f'search "{search_term}"; fields id, name, summary, genres.name, '
-                 'involved_companies.company.name, involved_companies.developer, '
-                 'involved_companies.publisher, videos.video_id, release_dates.date, cover.url; where platforms = (6, 13, 14, 3); limit 5;')
-        
-        try:
-            response = requests.post(api_url, headers=headers, data=query, timeout=10)
-            if response.status_code == 200 and response.json():
-                results = response.json()
+        if results:
+            # Scoring Logic
+            best_match = None
+            best_score = -1
+            
+            for g in results:
+                score = 0
+                # Title Score
+                if search_term.lower() in g.get('name', '').lower(): score += 10
                 
-                # Scoring Logic
-                best_match = None
-                best_score = -1
+                # Year Score
+                api_year = None
+                dates = g.get('release_dates', [])
+                if dates:
+                    try:
+                        ts = min([d['date'] for d in dates if 'date' in d])
+                        api_year = datetime.utcfromtimestamp(ts).strftime('%Y')
+                    except: pass
                 
-                for g in results:
-                    score = 0
-                    # Title Score
-                    if search_term.lower() in g.get('name', '').lower(): score += 10
-                    
-                    # Year Score
-                    api_year = None
-                    dates = g.get('release_dates', [])
-                    if dates:
-                        try:
-                            ts = min([d['date'] for d in dates if 'date' in d])
-                            api_year = datetime.utcfromtimestamp(ts).strftime('%Y')
-                        except: pass
-                    
-                    if local_year and api_year:
-                        if local_year == api_year:
-                            score += 20
-                        elif abs(int(local_year) - int(api_year)) <= 1:
-                            score += 10
-                    
-                    if score > best_score:
-                        best_score = score
-                        best_match = g
+                if local_year and api_year:
+                    if local_year == api_year:
+                        score += 20
+                    elif abs(int(local_year) - int(api_year)) <= 1:
+                        score += 10
                 
-                if best_match:
-                    g = best_match
-                    self.data['Clean_Title'] = g.get('name', self.data['Clean_Title'])
-                    self.data['Summary'] = g.get('summary', '')
-                    self.data['Genre'] = normalize_genre(", ".join([ge['name'] for ge in g.get('genres', [])]))
-                    
-                    companies = g.get('involved_companies', [])
-                    self.data['Developer'] = ", ".join([c['company']['name'] for c in companies if c.get('developer')])
-                    self.data['Publisher'] = ", ".join([c['company']['name'] for c in companies if c.get('publisher')])
-                    
-                    videos = g.get('videos', [])
-                    self.data['Trailer_Link'] = f"https://www.youtube.com/watch?v={videos[0]['video_id']}" if videos else ""
-                    
-                    dates = g.get('release_dates', [])
-                    api_year_str = ""
-                    if dates:
-                        valid_dates = [d['date'] for d in dates if 'date' in d]
-                        if valid_dates:
-                            orig_ts = min(valid_dates)
-                            self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%d/%m/%Y')
-                            api_year_str = datetime.utcfromtimestamp(orig_ts).strftime('%Y')
-                    
-                    # If the game has no platform defined (it's a "Warez"), store its IGDB ID.
-                    if self.data.get('Platforms') == 'Warez':
-                        if 'id' in g:
-                            current_ids = set(x.strip() for x in self.data.get('game_ID', '').split(',') if x.strip())
-                            current_ids.add(f"igdb_{g.get('id')}")
-                            self.data['game_ID'] = ", ".join(sorted(list(current_ids)))
+                if score > best_score:
+                    best_score = score
+                    best_match = g
+            
+            if best_match:
+                g = best_match
+                self.data['Clean_Title'] = g.get('name', self.data['Clean_Title'])
+                self.data['Summary'] = g.get('summary', '')
+                self.data['Genre'] = normalize_genre(", ".join([ge['name'] for ge in g.get('genres', [])]))
+                
+                companies = g.get('involved_companies', [])
+                self.data['Developer'] = ", ".join([c['company']['name'] for c in companies if c.get('developer')])
+                self.data['Publisher'] = ", ".join([c['company']['name'] for c in companies if c.get('publisher')])
+                
+                videos = g.get('videos', [])
+                self.data['Trailer_Link'] = f"https://www.youtube.com/watch?v={videos[0]['video_id']}" if videos else ""
+                
+                dates = g.get('release_dates', [])
+                api_year_str = ""
+                if dates:
+                    valid_dates = [d['date'] for d in dates if 'date' in d]
+                    if valid_dates:
+                        orig_ts = min(valid_dates)
+                        self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%d/%m/%Y')
+                        api_year_str = datetime.utcfromtimestamp(orig_ts).strftime('%Y')
+                
+                # If the game has no platform defined (it's a "Warez"), store its IGDB ID.
+                if self.data.get('Platforms') == 'Warez':
+                    if 'id' in g:
+                        current_ids = set(x.strip() for x in self.data.get('game_ID', '').split(',') if x.strip())
+                        current_ids.add(f"igdb_{g.get('id')}")
+                        self.data['game_ID'] = ", ".join(sorted(list(current_ids)))
 
-                    self.data['Image_Link'] = self._ensure_cover(g, silent=True)
-                    self.data['Status_Flag'] = 'OK'
-                    
-                    # Consolidated Log
-                    log_msg = f"    [IGDB] Found: {self.data['Clean_Title']}"
-                    if api_year_str:
-                        log_msg += f" ({api_year_str})"
-                    logging.info(log_msg)
-                    return True
-            else:
-                logging.warning(f"    [IGDB] No results for '{search_term}'")
-                self.data['Status_Flag'] = 'NEEDS_ATTENTION'
-                return False
-        except Exception as e:
-            logging.error(f"    [IGDB CRITICAL] Network error: {e}")
-            return False
+                self.data['Image_Link'] = self._ensure_cover(g, silent=True)
+                self.data['Status_Flag'] = 'OK'
+                
+                # Consolidated Log
+                log_msg = f"    [IGDB] Found: {self.data['Clean_Title']}"
+                if api_year_str:
+                    log_msg += f" ({api_year_str})"
+                logging.info(log_msg)
+                return True
+
+        if results is not None:
+            logging.warning(f"    [IGDB] No results for '{search_term}'")
+            self.data['Status_Flag'] = 'NEEDS_ATTENTION'
+        return False
 
     def fetch_smart_metadata(self, token, search_override=None):
         # 1. Define search term
@@ -503,74 +421,63 @@ class Game:
         local_dev = self.data.get('Developer', '').lower()
         local_year = self.data.get('Year_Folder', '')
 
-        api_url = "https://api.igdb.com/v4/games"
-        headers = {"Client-ID": IGDB_CLIENT_ID, "Authorization": f"Bearer {token}"}
+        # WHY: Use DRY helper function for smart metadata fetching.
+        results = _query_igdb_api(token, search_term=search_term, limit=5)
         
-        # 2. Request with a limit of 5 for scoring
-        query = (f'search "{search_term}"; fields name, summary, genres.name, '
-                 'involved_companies.company.name, involved_companies.developer, '
-                 'involved_companies.publisher, videos.video_id, release_dates.date, cover.url; where platforms = (6, 13, 14, 3); limit 5;')
-        
-        try:
-            response = requests.post(api_url, headers=headers, data=query, timeout=10)
-            if response.status_code == 200 and response.json():
-                results = response.json()
-                best_match = None
-                best_score = -1
+        if results:
+            best_match = None
+            best_score = -1
 
-                # 3. SCORING LOGIC (The "brain")
-                for g in results:
-                    score = 0
-                    # Score on title
-                    if search_term.lower() in g.get('name', '').lower(): score += 10
-                    
-                    # Score on developer
-                    devs = [c['company']['name'].lower() for c in g.get('involved_companies', []) if c.get('developer')]
-                    if local_dev and any(local_dev in d for d in devs): score += 5
-                    
-                    # Score on year
-                    dates = g.get('release_dates', [])
-                    if local_year and dates:
-                        try:
-                            api_year = datetime.utcfromtimestamp(min([d['date'] for d in dates if 'date' in d])).strftime('%Y')
-                            if local_year == api_year: score += 5
-                        except:
-                            pass
-                    
-                    logging.info(f"    [CANDIDATE] '{g.get('name')}' - Score: {score}")
-                    
-                    # Keep the best result
-                    if score > best_score:
-                        best_score = score
-                        best_match = g
+            # 3. SCORING LOGIC (The "brain")
+            for g in results:
+                score = 0
+                # Score on title
+                if search_term.lower() in g.get('name', '').lower(): score += 10
+                
+                # Score on developer
+                devs = [c['company']['name'].lower() for c in g.get('involved_companies', []) if c.get('developer')]
+                if local_dev and any(local_dev in d for d in devs): score += 5
+                
+                # Score on year
+                dates = g.get('release_dates', [])
+                if local_year and dates:
+                    try:
+                        api_year = datetime.utcfromtimestamp(min([d['date'] for d in dates if 'date' in d])).strftime('%Y')
+                        if local_year == api_year: score += 5
+                    except:
+                        pass
+                
+                logging.info(f"    [CANDIDATE] '{g.get('name')}' - Score: {score}")
+                
+                # Keep the best result
+                if score > best_score:
+                    best_score = score
+                    best_match = g
 
-                # 4. APPLYING THE BEST MATCH
-                if best_match:
-                    g = best_match
-                    self.data['Clean_Title'] = g.get('name', self.data['Clean_Title'])
-                    self.data['Summary'] = g.get('summary', '')
-                    self.data['Genre'] = normalize_genre(", ".join([ge['name'] for ge in g.get('genres', [])]))
-                    
-                    companies = g.get('involved_companies', [])
-                    self.data['Developer'] = ", ".join([c['company']['name'] for c in companies if c.get('developer')])
-                    self.data['Publisher'] = ", ".join([c['company']['name'] for c in companies if c.get('publisher')])
-                    
-                    videos = g.get('videos', [])
-                    self.data['Trailer_Link'] = f"https://www.youtube.com/watch?v={videos[0]['video_id']}" if videos else ""
-                    
-                    dates = g.get('release_dates', [])
-                    if dates:
-                        orig_ts = min([d['date'] for d in dates if 'date' in d])
-                        self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%d/%m/%Y')
-                    
-                    self.data['Image_Link'] = self._ensure_cover(g)
-                    self.data['Status_Flag'] = 'OK'
-                    logging.info(f"    [SMART SCAN] Match found: {self.data['Clean_Title']} (Score: {best_score})")
-                    return True
-            return False
-        except Exception as e:
-            logging.error(f"    [SMART SCAN CRITICAL] {e}")
-            return False
+            # 4. APPLYING THE BEST MATCH
+            if best_match:
+                g = best_match
+                self.data['Clean_Title'] = g.get('name', self.data['Clean_Title'])
+                self.data['Summary'] = g.get('summary', '')
+                self.data['Genre'] = normalize_genre(", ".join([ge['name'] for ge in g.get('genres', [])]))
+                
+                companies = g.get('involved_companies', [])
+                self.data['Developer'] = ", ".join([c['company']['name'] for c in companies if c.get('developer')])
+                self.data['Publisher'] = ", ".join([c['company']['name'] for c in companies if c.get('publisher')])
+                
+                videos = g.get('videos', [])
+                self.data['Trailer_Link'] = f"https://www.youtube.com/watch?v={videos[0]['video_id']}" if videos else ""
+                
+                dates = g.get('release_dates', [])
+                if dates:
+                    orig_ts = min([d['date'] for d in dates if 'date' in d])
+                    self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%d/%m/%Y')
+                
+                self.data['Image_Link'] = self._ensure_cover(g)
+                self.data['Status_Flag'] = 'OK'
+                logging.info(f"    [SMART SCAN] Match found: {self.data['Clean_Title']} (Score: {best_score})")
+                return True
+        return False
 
     def apply_candidate_data(self, g):
         logging.info(f"    [MANUAL APPLY] Application des données pour '{self.data.get('Clean_Title')}' -> '{g.get('name')}'")
@@ -608,9 +515,10 @@ class Game:
         return self.data
 
 class LibraryManager:
-    def __init__(self, root_path, db_file):
-        self.root_path = root_path
-        self.db_file = db_file
+    def __init__(self, config):
+        self.config = config
+        self.root_path = config.get('root_path', '')
+        self.db_file = config.get('db_file', '')
         self.games = {} 
 
     def sync_gog(self, worker_thread=None):
@@ -654,7 +562,7 @@ class LibraryManager:
 
         images_dir = os.path.join(BASE_DIR, "images")
         os.makedirs(images_dir, exist_ok=True)
-        video_dir = get_video_path()
+        video_dir = self.config.get('video_path', os.path.join(BASE_DIR, 'videos'))
         os.makedirs(video_dir, exist_ok=True)
         
         # Stats for the report
@@ -765,7 +673,8 @@ class LibraryManager:
                     prefix = releaseKey.split('_', 1)[0].lower()
                     
                     # Map known prefixes to "Pretty Names"
-                    platform_map, ignored_prefixes = get_platform_config()
+                    platform_map = self.config.get('platform_map', {})
+                    ignored_prefixes = self.config.get('ignored_prefixes', [])
 
                     if prefix in ignored_prefixes:
                         platform = 'Unknown'
@@ -893,7 +802,7 @@ class LibraryManager:
 
                     if folder_name in self.games:
                         folder_name = f"{title} [{releaseKey}]" # Avoids name duplicates
-                    game_obj = Game(Folder_Name=folder_name, Status_Flag='OK', Path_Root='')
+                    game_obj = Game(config=self.config, Folder_Name=folder_name, Status_Flag='OK', Path_Root='')
                     stats['new'] += 1
                     stats['new_by_platform'][platform] = stats['new_by_platform'].get(platform, 0) + 1
 
@@ -1286,7 +1195,7 @@ class LibraryManager:
             df = pd.read_csv(self.db_file, sep=';', encoding='utf-8').fillna('')
             for _, row in df.iterrows():
                 game_data = {k: str(v) for k, v in row.to_dict().items()}
-                self.games[game_data['Folder_Name']] = Game(**game_data)
+                self.games[game_data['Folder_Name']] = Game(config=self.config, **game_data)
             logging.info(f"{len(self.games)} games loaded.")
 
     def fetch_candidates(self, token, search_term, limit=10):
@@ -1294,23 +1203,11 @@ class LibraryManager:
         # Log start of search
         logging.info(f"    [MANUAL SCAN] API search for: {search_term}")
         
-        api_url = "https://api.igdb.com/v4/games"
-        headers = {"Client-ID": IGDB_CLIENT_ID, "Authorization": f"Bearer {token}"}
-
-        # If the term is a numeric ID, search by ID
-        if search_term.isdigit():
-            query = (f'fields id, name, summary, genres.name, '
-                     'involved_companies.company.name, involved_companies.developer, '
-                     f'involved_companies.publisher, videos.video_id, release_dates.date, cover.url; where id = {search_term};')
-        else:
-            query = (f'search "{search_term}"; fields id, name, summary, genres.name, '
-                     'involved_companies.company.name, involved_companies.developer, '
-                     f'involved_companies.publisher, videos.video_id, release_dates.date, cover.url; where platforms = (6, 13, 14, 3); limit {limit};')
+        # WHY: Use DRY helper function for manual candidates fetching.
+        is_id = search_term.isdigit()
+        results = _query_igdb_api(token, search_term=search_term, limit=limit, by_id=is_id)
         
-        response = requests.post(api_url, headers=headers, data=query, timeout=10)
-        
-        if response.status_code == 200:
-            results = response.json()
+        if results is not None:
             if results:
                 logging.info(f"    [MANUAL SCAN] {len(results)} candidates found:")
                 for g in results:
@@ -1331,13 +1228,11 @@ class LibraryManager:
             else:
                 logging.warning(f"    [MANUAL SCAN] No results for: {search_term}")
             return results
-        else:
-            logging.error(f"    [MANUAL SCAN CRITICAL] Erreur API : {response.status_code}")
-            return []
+        return []
 
     def scan(self, retry_failures=False, worker_thread=None):
         token = self.get_access_token()
-        scan_config = get_local_scan_config()
+        scan_config = self.config.get('local_scan_config', {})
         ignore_hidden_global = scan_config.get("ignore_hidden", True)
         scan_mode = scan_config.get("scan_mode", "advanced")
         folder_rules = scan_config.get("folder_rules", {})
@@ -1411,7 +1306,7 @@ class LibraryManager:
                         # Check if this folder matches a "Ghost" entry (from GOG sync, no path)
                         ghost_match_key = None
                         
-                        temp_game = Game(Folder_Name=folder)
+                        temp_game = Game(config=self.config, Folder_Name=folder)
                         local_clean_title = temp_game.data.get('Clean_Title', '')
                         local_norm_title = re.sub(r'[^a-z0-9]', '', local_clean_title.lower())
                         local_year = temp_game.data.get('Year_Folder', '')
@@ -1450,7 +1345,7 @@ class LibraryManager:
                             stats['updated'] += 1
                         else:
                             logging.info(f"    [NEW] Discovered: {folder}")
-                            self.games[folder] = Game(Folder_Name=folder, Path_Root=full_path)
+                            self.games[folder] = Game(config=self.config, Folder_Name=folder, Path_Root=full_path)
                             stats['new'] += 1
                     else:
                         # logging.info(f"    [CHECK] Checking existing game: {folder}")
@@ -1547,39 +1442,15 @@ class LibraryManager:
             had_a_path = bool(game_to_check.data.get('Path_Root'))
 
             if not is_on_disk and had_a_path:
-                # This is a true orphan. It was on disk, but now it's gone.
-                logging.info(f"    [DELETE] Game entry not found on disk, deleting: {folder}")
-                game_to_delete = game_to_check
                 # Check if this is a "Platform Game" (has platforms other than Warez/Unknown)
                 platforms_str = game_to_check.data.get('Platforms', '')
                 platform_list = [p.strip() for p in platforms_str.split(',') if p.strip()]
-                
-                # Delete associated media files before deleting the entry
-                # Deleting image
-                image_path = game_to_delete.data.get('Image_Link')
-                if image_path and os.path.exists(image_path):
-                    try:
-                        os.remove(image_path)
-                        logging.info(f"        -> Orphan image file deleted: {image_path}")
-                    except Exception as e:
-                        logging.error(f"        -> [DELETE ERROR] Could not delete image {image_path}: {e}")
-                # Filter out local-only tags to see if real platforms remain
                 real_platforms = [p for p in platform_list if p.lower() not in ['warez', 'unknown']]
                 
-                # Deleting video
-                video_path = game_to_delete.data.get('Path_Video')
-                if video_path and os.path.exists(video_path):
-                    try:
-                        os.remove(video_path)
-                        logging.info(f"        -> Orphan video file deleted: {video_path}")
-                    except Exception as e:
-                        logging.error(f"        -> [DELETE ERROR] Could not delete video {video_path}: {e}")
                 # Also check IDs for safety (e.g. if Platforms wasn't populated but ID exists)
                 game_ids = game_to_check.data.get('game_ID', '')
                 has_external_id = any(x in game_ids for x in ['gog_', 'steam_', 'epic_', 'uplay_', 'origin_'])
 
-                del self.games[folder]
-                stats['deleted'] += 1
                 if real_platforms or has_external_id:
                     # It's a Platform Game -> Downgrade to Digital Only (remove local path)
                     logging.info(f"    [UPDATE] Local files removed for '{folder}'. Reverting to Platform Entry.")
@@ -1726,20 +1597,3 @@ class LibraryManager:
         # The actual write operation
         df.fillna('').to_csv(self.db_file, sep=';', index=False, encoding='utf-8')
         logging.info(f"    [DB SAVE] Database saved to {self.db_file} ({len(df)} games).")
-
-if __name__ == "__main__":
-    manager = LibraryManager(get_root_path(), get_db_path())
-    manager.load_db()
-    
-    parser = argparse.ArgumentParser(description="ViGaVault Library Manager.")
-    parser.add_argument('--sync-gog', action='store_true', help='Sync games from the GOG Galaxy database.')
-    parser.add_argument('--retry', action='store_true', help="Retry fetching metadata for failed games (NEEDS_ATTENTION).")
-    parser.add_argument('--full-scan', action='store_true', help="Run GOG Sync followed by Local Scan.")
-    args = parser.parse_args()
-
-    if args.full_scan:
-        manager.scan_full(retry_failures=args.retry)
-    elif args.sync_gog:
-        manager.sync_gog()
-    else:
-        manager.scan(retry_failures=args.retry)
