@@ -134,7 +134,7 @@ class Game:
 
         if not self.data.get('Platforms'):
             if self.data.get('Path_Root'):
-                self.data['Platforms'] = 'Warez'
+                self.data['Platforms'] = 'Local Files'
 
         # Clean up the name for the title
         clean_name = re.sub(r'\s*\([^)]*\)$', '', name).strip() # Remove the last parenthesis
@@ -201,11 +201,11 @@ class Game:
         # 2. Combine Platforms
         plats = set(x.strip() for x in self.data.get('Platforms', '').split(',') if x.strip())
         plats.update(x.strip() for x in other.data.get('Platforms', '').split(',') if x.strip())
-        # Rule: If any real platform exists (including 'Unknown'), 'Warez' is removed
-        real_plats = [p for p in plats if p.lower() != 'warez']
+        # Rule: If any real platform exists (including 'Unknown'), 'Local Files' is removed
+        real_plats = [p for p in plats if p.lower() != 'local files']
         if real_plats:
-            if 'Warez' in plats: plats.remove('Warez')
-            if 'warez' in plats: plats.remove('warez')
+            if 'Local Files' in plats: plats.remove('Local Files')
+            if 'local files' in plats: plats.remove('local files')
         self.data['Platforms'] = ", ".join(sorted(plats))
 
         # 3. Handle Reserved platform_ID_xx fields
@@ -310,7 +310,7 @@ class Game:
         igdb_id = next((gid.replace('igdb_', '').strip() for gid in game_ids if gid.strip().startswith('igdb_')), None)
 
         if not igdb_id:
-            # Only warn if we really expected to find one (e.g. Warez) or if we are debugging
+            # Only warn if we really expected to find one (e.g. Local Copy) or if we are debugging
             # logging.warning(f"    [COVER FETCH] Cannot fetch image for '{self.data['Clean_Title']}', missing IGDB ID.")
             return False
 
@@ -391,8 +391,8 @@ class Game:
                         self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%d/%m/%Y')
                         api_year_str = datetime.utcfromtimestamp(orig_ts).strftime('%Y')
                 
-                # If the game has no platform defined (it's a "Warez"), store its IGDB ID.
-                if self.data.get('Platforms') == 'Warez':
+                # If the game has no platform defined (it's a "Local Files"), store its IGDB ID.
+                if self.data.get('Platforms') == 'Local Files':
                     if 'id' in g:
                         current_ids = set(x.strip() for x in self.data.get('game_ID', '').split(',') if x.strip())
                         current_ids.add(f"igdb_{g.get('id')}")
@@ -497,9 +497,9 @@ class Game:
             orig_ts = min([d['date'] for d in dates if 'date' in d])
             self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%d/%m/%Y')
         
-        # If the game has no platform defined (it's a "Warez"), store its IGDB ID.
+        # If the game has no platform defined (it's a "Local Files"), store its IGDB ID.
         # This will make future updates much more reliable.
-        if self.data.get('Platforms') == 'Warez':
+        if self.data.get('Platforms') == 'Local Files':
             if 'id' in g:
                 current_ids = set(x.strip() for x in self.data.get('game_ID', '').split(',') if x.strip())
                 current_ids.add(f"igdb_{g.get('id')}")
@@ -826,12 +826,12 @@ class LibraryManager:
                 current_platforms = set(x.strip() for x in game_obj.data.get('Platforms', '').split(',') if x.strip())
                 if 'Unknown' in current_platforms: current_platforms.remove('Unknown')
                 
-                # FIX: Also remove 'Warez' if we are adding a real platform
-                if platform != 'Unknown' and 'Warez' in current_platforms: current_platforms.remove('Warez')
+                # FIX: Also remove 'Local Files' if we are adding a real platform
+                if platform != 'Unknown' and 'Local Files' in current_platforms: current_platforms.remove('Local Files')
                 
-                # FIX: A Ghost entry (no local path) should never be 'Warez'
-                if not game_obj.data.get('Path_Root') and 'Warez' in current_platforms:
-                    current_platforms.remove('Warez')
+                # FIX: A Ghost entry (no local path) should never be 'Local Files'
+                if not game_obj.data.get('Path_Root') and 'Local Files' in current_platforms:
+                    current_platforms.remove('Local Files')
                 
                 # Add the new platform only if it's specific, or if we have nothing else
                 if platform != 'Unknown' or not current_platforms:
@@ -1338,7 +1338,7 @@ class LibraryManager:
                             # Merge platforms from folder tags
                             p_set = set(x.strip() for x in game_obj.data.get('Platforms', '').split(',') if x.strip())
                             p_set.update(x.strip() for x in temp_game.data.get('Platforms', '').split(',') if x.strip())
-                            if 'Warez' in p_set and len(p_set) > 1: p_set.remove('Warez')
+                            if 'Local Files' in p_set and len(p_set) > 1: p_set.remove('Local Files')
                             game_obj.data['Platforms'] = ", ".join(sorted(list(p_set)))
                             
                             self.games[folder] = game_obj
@@ -1380,10 +1380,10 @@ class LibraryManager:
                             elif content_type == "Year":
                                 game.data['Year_Folder'] = content_value
                         
-                        # Cleanup: If we have real platforms, remove 'Warez'
+                        # Cleanup: If we have real platforms, remove 'Local Files'
                         p_set = set(x.strip() for x in game.data.get('Platforms', '').split(',') if x.strip())
-                        if 'Warez' in p_set and len(p_set) > 1:
-                            p_set.remove('Warez')
+                        if 'Local Files' in p_set and len(p_set) > 1:
+                            p_set.remove('Local Files')
                             game.data['Platforms'] = ", ".join(sorted(list(p_set)))
                             
                         stats['updated'] += 1
@@ -1442,10 +1442,10 @@ class LibraryManager:
             had_a_path = bool(game_to_check.data.get('Path_Root'))
 
             if not is_on_disk and had_a_path:
-                # Check if this is a "Platform Game" (has platforms other than Warez/Unknown)
+                    # Check if this is a "Platform Game" (has platforms other than Local Files/Unknown)
                 platforms_str = game_to_check.data.get('Platforms', '')
                 platform_list = [p.strip() for p in platforms_str.split(',') if p.strip()]
-                real_platforms = [p for p in platform_list if p.lower() not in ['warez', 'unknown']]
+                    real_platforms = [p for p in platform_list if p.lower() not in ['local files', 'unknown']]
                 
                 # Also check IDs for safety (e.g. if Platforms wasn't populated but ID exists)
                 game_ids = game_to_check.data.get('game_ID', '')
@@ -1456,14 +1456,14 @@ class LibraryManager:
                     logging.info(f"    [UPDATE] Local files removed for '{folder}'. Reverting to Platform Entry.")
                     game_to_check.data['Path_Root'] = ''
                     
-                    # Remove 'Warez' from platforms
-                    if 'Warez' in platform_list:
-                        platform_list.remove('Warez')
+                    # Remove 'Local Copy' from platforms
+                    if 'Local Copy' in platform_list:
+                        platform_list.remove('Local Copy')
                         game_to_check.data['Platforms'] = ", ".join(sorted(platform_list))
                     
                     stats['updated'] += 1
                 else:
-                    # This is a true orphan (Local/Warez only). It was on disk, but now it's gone.
+                        # This is a true orphan (Local Files only). It was on disk, but now it's gone.
                     logging.info(f"    [DELETE] Game entry not found on disk, deleting: {folder}")
                     game_to_delete = game_to_check
                     

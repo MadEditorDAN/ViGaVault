@@ -1238,9 +1238,9 @@ class StatisticsDialog(QDialog):
             stats_data.append(("tools_stats_no_sum", len(valid_sums[valid_sums.str.strip() == ''])))
             
         if 'Platforms' in self.df.columns:
-            warez_count = len(self.df[self.df['Platforms'].astype(str).str.lower() == 'warez'])
-            warez_pct = round((warez_count / total_games * 100) if total_games else 0, 1)
-            stats_data.append(("tools_stats_warez_ratio", f"{warez_pct}% ({warez_count})"))
+            local_files_count = len(self.df[self.df['Platforms'].astype(str).str.lower() == 'local files'])
+            local_files_pct = round((local_files_count / total_games * 100) if total_games else 0, 1)
+            stats_data.append(("tools_stats_Local_Copy_ratio", f"{local_files_pct}% ({local_files_count})"))
 
         # WHY: Using QHBoxLayout with 3 QFormLayouts guarantees equal spacing horizontally 
         # and automatically aligns labels so the colons perfectly form a straight vertical line.

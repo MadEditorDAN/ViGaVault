@@ -410,6 +410,8 @@ class GameCard(QWidget):
         self.video_path = str(game_data.get('Path_Video', '')).strip()
         self.trailer_link = game_data.get('Trailer_Link', '')
 
+        local_folder_path = game_data.get('Path_Root', '')
+        has_local_folder = bool(local_folder_path and os.path.exists(local_folder_path))
         has_local_video = bool(self.video_path and os.path.exists(self.video_path))
         # Check for a valid trailer link, ignoring our special flags.
         has_trailer = bool(self.trailer_link and self.trailer_link not in ['no_section', 'no_mp4'])
@@ -417,7 +419,7 @@ class GameCard(QWidget):
         button_definitions = {
             'local_video': {'enabled': has_local_video, 'fallback': "🎞️", 'font_size': "32px"},
             'youtube':     {'enabled': has_trailer,     'fallback': "▶", 'font_size': "30px"},
-            'folder':      {'enabled': True,            'fallback': "📁", 'font_size': "32px"},
+            'folder':      {'enabled': has_local_folder,'fallback': "📁", 'font_size': "32px"},
             'edit':        {'enabled': True,            'fallback': "✏️", 'font_size': "28px"},
             'scan':        {'enabled': True,            'fallback': "🔍", 'font_size': "28px"}
         }
@@ -429,11 +431,12 @@ class GameCard(QWidget):
             self.buttons[name] = btn
 
             icon_to_load = name
-            if not props['enabled'] and name in ['local_video', 'youtube']:
+            if not props['enabled'] and name in ['local_video', 'youtube', 'folder']:
                 icon_to_load = f"{name}_disabled"
 
-            icon_path = f"icons/{icon_to_load}.png"
             icon_path = f"assets/{icon_to_load}.png"
+            if not os.path.exists(icon_path):
+                icon_path = f"icons/{icon_to_load}.png"
 
             if os.path.exists(icon_path):
                 btn.setIcon(QIcon(icon_path))
@@ -443,10 +446,11 @@ class GameCard(QWidget):
                 # Fallback to emoji if icon file is missing
                 fallback_emoji = props['fallback']
                 font_size = props['font_size']
-                style = f"font_size: {font_size}; border: none;"
+                style = f"font-size: {font_size}; border: none;"
                 if fallback_emoji == "▶":
                     style += " color: #FF0000;"
                 btn.setStyleSheet(style)
+                btn.setText(fallback_emoji)
             
             btn.setEnabled(props['enabled'])
             
