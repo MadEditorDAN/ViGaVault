@@ -109,6 +109,12 @@ class Game:
         self.data.setdefault('Status_Flag', 'NEW')
         self.data.setdefault('Platforms', '')
         self.data.setdefault('Collection', '')
+        
+        # WHY: Default Database flags as explicitly requested
+        self.data.setdefault('Is_Local', False)
+        self.data.setdefault('Has_Image', False)
+        self.data.setdefault('Has_Video', False)
+        
         if not self.data.get('Clean_Title'):
             self._parse_folder_name()
         self._find_video()
@@ -1521,6 +1527,11 @@ class LibraryManager:
         if worker_thread and worker_thread.isInterruptionRequested(): return
         # 2. Local Scan: Matches local folders to Ghosts and cleans up
         self.scan(retry_failures=retry_failures, worker_thread=worker_thread)
+        if worker_thread and worker_thread.isInterruptionRequested(): return
+        
+        # WHY: Synchronize the flags correctly at the end of every full scan automatically
+        logging.info("--- SYNCHRONIZING MEDIA FLAGS ---")
+        self.sync_media_flags_batch()
         logging.info("=== FULL SCAN FINISHED ===")
 
     def scan_single_game(self, game_name, manual_search_term=None):
@@ -1570,7 +1581,7 @@ class LibraryManager:
             'Folder_Name', 'Clean_Title', 'Search_Title', 'Path_Root', 'Path_Video', 
             'Status_Flag', 'Image_Link', 'Year_Folder', 'Platforms', 'Developer', 
             'Publisher', 'Original_Release_Date', 'Summary', 'Genre', 'Collection', 'Trailer_Link',
-            'game_ID'
+            'game_ID', 'Is_Local', 'Has_Image', 'Has_Video'
         ] + [f'platform_ID_{i:02d}' for i in range(1, 51)]
 
     def save_db(self):
@@ -1602,3 +1613,54 @@ class LibraryManager:
         # The actual write operation
         df.fillna('').to_csv(self.db_file, sep=';', index=False, encoding='utf-8')
         logging.info(f"    [DB SAVE] Database saved to {self.db_file} ({len(df)} games).")
+
+    def sync_media_flags_batch(self):
+        """
+        WHY: Global batch pre-read logic. Eliminates hard-drive checks in UI by loading the OS 
+        directory structures into memory Sets once, matching them, and saving booleans to the Database.
+        """
+        changes_made = False
+        
+        images_dir = os.path.join(BASE_DIR, "images")
+        videos_dir = self.config.get('video_path', os.path.join(BASE_DIR, 'videos'))
+        root_path = self.config.get('root_path', '')
+
+        # Creates O(1) Sets using batch OS reads
+        img_set = set(os.listdir(images_dir)) if os.path.exists(images_dir) else set()
+        vid_set = set(os.listdir(videos_dir)) if os.path.exists(videos_dir) else set()
+        
+        # Ensure root exists before marking missing (protects against disconnected drives)
+        root_accessible = os.path.exists(root_path)
+
+        for folder, game in self.games.items():
+            # Read old flags carefully handling stringed bools from CSV loading
+            old_img = str(game.data.get('Has_Image')).lower() in ['true', '1']
+            old_vid = str(game.data.get('Has_Video')).lower() in ['true', '1']
+            old_loc = str(game.data.get('Is_Local')).lower() in ['true', '1']
+
+            # Instantaneous memory check for media
+            img_path = game.data.get('Image_Link', '')
+            new_img = bool(img_path and os.path.basename(img_path) in img_set)
+
+            vid_path = game.data.get('Path_Video', '')
+            new_vid = bool(vid_path and os.path.basename(vid_path) in vid_set)
+
+            # For Path_Root, since it can have sub-levels, we check it individually. 
+            # It's fast enough on a background worker.
+            new_loc = old_loc
+            if root_accessible:
+                path_root = game.data.get('Path_Root', '')
+                new_loc = bool(path_root and os.path.exists(path_root))
+
+            # Only write back if the ground truth changed
+            if new_img != old_img or new_vid != old_vid or new_loc != old_loc:
+                game.data['Has_Image'] = new_img
+                game.data['Has_Video'] = new_vid
+                game.data['Is_Local'] = new_loc
+                changes_made = True
+
+        if changes_made:
+            self.save_db()
+            logging.info("    [SYNC] Media flags successfully synchronized.")
+            
+        return changes_made

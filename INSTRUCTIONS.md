@@ -9,3 +9,4 @@
 - Take what's in todo.txt in consideration, it will help you know what's will be done in the future and maybe adapt for it, but NEVER try to implement anything from it if it was not specifically asked.
 - If given precise instruction, don't extrapolate, do as asked and if you have an idea, a better solution or a suggestion, say it, but don't apply it before approval.
 - When asked an explanation or to discuss about something, stay theoretical, don't propose code right away, provide the request explanation/information and give new code or code modification only when instructed to.
+- Never use tooltip !

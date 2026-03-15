@@ -12,9 +12,10 @@ import webbrowser
 from ViGaVault_Scan import LibraryManager
 from PySide6.QtWidgets import (QApplication, QMainWindow, QListWidget, QListWidgetItem, 
                                QWidget, QHBoxLayout, QPushButton, QFileDialog, 
-                               QMessageBox, QAbstractItemView, QCheckBox, QSizePolicy)
-from PySide6.QtCore import Qt, QTimer, QByteArray, Slot, QThreadPool
-from PySide6.QtGui import QPixmap, QIcon, QAction, QPalette
+                               QMessageBox, QAbstractItemView, QCheckBox, QSizePolicy,
+                               QStackedLayout, QLabel)
+from PySide6.QtCore import Qt, QTimer, QByteArray, Slot, QThreadPool, QSize
+from PySide6.QtGui import QPixmap, QIcon, QAction, QPalette, QFont
 
 # WHY: Added imports for newly modularized utils and dialogs to maintain functionality without circular imports.
 from ViGaVault_utils import (BASE_DIR, LOG_DIR, get_db_path, get_library_settings_file, 
@@ -23,8 +24,8 @@ from ViGaVault_utils import (BASE_DIR, LOG_DIR, get_db_path, get_library_setting
                              translator, apply_theme, QtLogSignal, QtLogHandler)                             
 from ViGaVault_dialogs import (ActionDialog, MergeSelectionDialog, ConflictDialog, 
                                SettingsDialog, PlatformManagerDialog, ProgressBarDelegate, 
-                               StatisticsDialog, SelectionDialog)
-from ViGaVault_workers import FullScanWorker, FilterWorker, DbLoaderWorker
+                               StatisticsDialog, SelectionDialog, MediaManagerDialog)
+from ViGaVault_workers import FullScanWorker, FilterWorker, DbLoaderWorker, StartupSyncWorker
 from ViGaVault_widgets import CollapsibleFilterGroup, Sidebar, GameCard
 
 class MainWindow(QMainWindow):
@@ -64,12 +65,25 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
         
-        # 2. Game list (left, takes 3/4 of the space)
+        # 2. Game list and Loading screen (left, takes 3/4 of the space)
+        self.left_container = QWidget()
+        self.left_layout = QStackedLayout(self.left_container)
+        
+        self.loading_label = QLabel("Loading Database...")
+        self.loading_label.setAlignment(Qt.AlignCenter)
+        font = QFont()
+        font.setPointSize(24)
+        font.setBold(True)
+        self.loading_label.setFont(font)
+        
         self.list_widget = QListWidget()
         self.list_widget.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
         self.list_widget.verticalScrollBar().setSingleStep(25)
         self.list_widget.verticalScrollBar().valueChanged.connect(self.check_scroll_load)
-        main_layout.addWidget(self.list_widget, stretch=3)
+        
+        self.left_layout.addWidget(self.loading_label) # Index 0
+        self.left_layout.addWidget(self.list_widget)   # Index 1
+        main_layout.addWidget(self.left_container, stretch=3)
         
         # 3. Sidebar (right, takes 1/4 of the space)
         # The entire design (filters + scan) is handled in the Sidebar class
@@ -134,6 +148,11 @@ class MainWindow(QMainWindow):
         action_full_scan = QAction(translator.tr("sidebar_btn_full_scan"), self) # Reusing "Full Scan" translation
         action_full_scan.triggered.connect(self.start_full_scan)
         tools_menu.addAction(action_full_scan)
+        
+        # WHY: Appending the Media Manager window hook under Full Scan
+        action_media_manager = QAction(translator.tr("menu_tools_media_manager"), self)
+        action_media_manager.triggered.connect(self.show_media_manager)
+        tools_menu.addAction(action_media_manager)
         
         action_platforms = QAction(translator.tr("menu_tools_platform_manager"), self)
         action_platforms.triggered.connect(self.show_platform_manager)
@@ -229,15 +248,26 @@ class MainWindow(QMainWindow):
         dlg = PlatformManagerDialog(self)
         dlg.exec()
 
+    def show_media_manager(self):
+        # WHY: Capture the exact scroll position before opening the dialog so we can freeze it later.
+        current_scroll = self.list_widget.verticalScrollBar().value()
+        
+        # WHY: Opens the newly modularized Media Manager tool for fixing images and videos manually
+        dlg = MediaManagerDialog(self)
+        dlg.exec()
+        
+        # WHY: Instead of refreshing on every single apply click, we refresh only once when the manager closes.
+        if getattr(dlg, 'global_changes_made', False):
+            self.pending_scroll = current_scroll
+            self.refresh_data()
+
     def show_statistics(self):
         dlg = StatisticsDialog(self.master_df, self)
         dlg.exec()
 
     def load_database_async(self):
+        self.left_layout.setCurrentIndex(0) # Show Loading Label curtain
         self.list_widget.clear()
-        loading_item = QListWidgetItem("Loading Database...")
-        loading_item.setTextAlignment(Qt.AlignCenter)
-        self.list_widget.addItem(loading_item)
         self.sidebar.setEnabled(False)
         
         self.db_worker = DbLoaderWorker()
@@ -246,7 +276,8 @@ class MainWindow(QMainWindow):
 
     def on_db_loaded(self, df):
         self.master_df = df
-        self.list_widget.clear() # Remove Loading message
+        # WHY: Keep the "Loading Database..." message visible (Curtain effect) 
+        # until the filter worker completely finishes sorting and preparing the list.
         self.sidebar.setEnabled(True)
         
         # 2. Load all settings for the new library
@@ -282,7 +313,27 @@ class MainWindow(QMainWindow):
         enable_gog = lib_settings.get("enable_gog_db", True)
 
         # 6. Trigger a filter and display update
-        self.request_filter_update()
+        # WHY: Bypass the 600ms debounce timer during startup for an instant launch.
+        if self.is_startup:
+            self.start_filter_worker()
+        else:
+            self.request_filter_update()
+        
+        # WHY: Start the Silent Startup Sync ONLY once per application launch
+        if not hasattr(self, 'startup_sync_done'):
+            self.startup_sync_done = True
+            self.startup_worker = StartupSyncWorker(build_scanner_config())
+            self.startup_worker.finished.connect(self.on_startup_sync_finished)
+            self.startup_worker.start()
+
+    @Slot(bool)
+    def on_startup_sync_finished(self, changes_made):
+        """
+        WHY: If the silent sync detected changes on disk, we refresh the UI slightly in the background 
+        to lock the buttons natively.
+        """
+        if changes_made:
+            self.refresh_data()
 
     def save_database(self):
         """Saves the current in-memory database to the CSV file, including a backup."""
@@ -719,6 +770,25 @@ class MainWindow(QMainWindow):
         self.refresh_data()
         return True
 
+    def update_game_flags(self, folder_name, flags_dict):
+        """
+        WHY: Support function for Just-In-Time Database discrepancy modifications. 
+        Allows a specific UI component to inform the system that a file has vanished.
+        """
+        manager = LibraryManager(build_scanner_config())
+        manager.load_db()
+        game = manager.games.get(folder_name)
+        if game:
+            for k, v in flags_dict.items():
+                game.data[k] = v
+            manager.save_db()
+            
+            # Sync the Pandas dataframe so UI sorts/filters aren't out of step
+            idx = self.master_df.index[self.master_df['Folder_Name'] == folder_name].tolist()
+            if idx:
+                for k, v in flags_dict.items():
+                    self.master_df.at[idx[0], k] = v
+
     def on_manual_search_trigger(self):
         self.sidebar.scan_results.clear()
         item = QListWidgetItem("Searching on IGDB...")
@@ -1067,17 +1137,25 @@ class MainWindow(QMainWindow):
 
     @Slot(object)
     def on_filtering_finished(self, filtered_df):
+        # WHY: Use the StackedLayout curtain to completely hide the visual jitter of the list 
+        # while it rebuilds and restores the scroll position in the background.
+        has_scroll = hasattr(self, 'pending_scroll') and self.pending_scroll > 0
+            
         self.update_display_with_results(filtered_df)
+        
         QApplication.restoreOverrideCursor()
-        self.sidebar.setEnabled(True)
-        self.list_widget.setEnabled(True)
-        self.sidebar.search_bar.setFocus()
 
         if self.is_startup:
             self.is_startup = False
-            if hasattr(self, 'pending_scroll') and self.pending_scroll > 0:
-                # Use a timer to ensure the list has time to render before scrolling
-                QTimer.singleShot(100, self.restore_scroll_position)
+            
+        if has_scroll:
+            # Use a short timer to let the GUI event loop breathe before we start crawling.
+            QTimer.singleShot(100, self.restore_scroll_position)
+        else:
+            self.left_layout.setCurrentIndex(1) # Unveil the list
+            self.sidebar.setEnabled(True)
+            self.list_widget.setEnabled(True)
+            self.sidebar.search_bar.setFocus()
 
     def check_scroll_load(self, value):
         # If we are near the bottom (85%), load more
@@ -1171,7 +1249,7 @@ class MainWindow(QMainWindow):
 
         # Load the first batch
         self.load_more_items()
-
+        
         # --- ANCHORING: Restoration ---
         if anchor_folder:
             folders_list = self.current_df['Folder_Name'].tolist()
@@ -1191,7 +1269,11 @@ class MainWindow(QMainWindow):
         self.background_loader.start()
 
     def restore_scroll_position(self, retries=10):
-        if not hasattr(self, 'pending_scroll'): return
+        if not hasattr(self, 'pending_scroll'):
+            self.left_layout.setCurrentIndex(1) # Unveil the list
+            self.sidebar.setEnabled(True)
+            self.list_widget.setEnabled(True)
+            return
         
         sb = self.list_widget.verticalScrollBar()
         
@@ -1211,6 +1293,10 @@ class MainWindow(QMainWindow):
             # Target reached or everything loaded: apply final position
             sb.setValue(self.pending_scroll)
             del self.pending_scroll
+            self.left_layout.setCurrentIndex(1) # Unveil the list
+            self.sidebar.setEnabled(True)
+            self.list_widget.setEnabled(True)
+            self.sidebar.search_bar.setFocus()
 
     def refresh_styles(self):
         if hasattr(self, 'sidebar'):

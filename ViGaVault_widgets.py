@@ -410,10 +410,11 @@ class GameCard(QWidget):
         self.video_path = str(game_data.get('Path_Video', '')).strip()
         self.trailer_link = game_data.get('Trailer_Link', '')
 
-        local_folder_path = game_data.get('Path_Root', '')
-        has_local_folder = bool(local_folder_path and os.path.exists(local_folder_path))
-        has_local_video = bool(self.video_path and os.path.exists(self.video_path))
-        # Check for a valid trailer link by ensuring it starts with http, ignoring any text placeholders.
+        # WHY: Database driven truth mechanism. Using string match parsing because CSV loading
+        # can turn pure booleans into lowercased strings across data bridges.
+        has_local_folder = str(game_data.get('Is_Local')).lower() in ['true', '1']
+        has_local_video = str(game_data.get('Has_Video')).lower() in ['true', '1']
+        
         has_trailer = bool(self.trailer_link and self.trailer_link.startswith('http'))
 
         button_definitions = {
@@ -624,19 +625,31 @@ class GameCard(QWidget):
             webbrowser.open(self.trailer_link, new=1)
 
     def start_video(self):
-        if self.video_path and os.path.exists(self.video_path):
+        # WHY: Just-In-Time check to ensure no crashes happen.
+        if self.video_path:
             try:
-                logging.info(f"Opening local video with default player: {self.video_path}")
-                os.startfile(self.video_path)
+                if os.path.exists(self.video_path):
+                    logging.info(f"Opening local video with default player: {self.video_path}")
+                    os.startfile(self.video_path)
+                else:
+                    # Graceful UI rejection and self-correction
+                    QMessageBox.warning(self.parent_window, "Not Found", translator.tr("msg_jit_video_missing"))
+                    self.parent_window.update_game_flags(self.data.get('Folder_Name'), {'Has_Video': False})
+                    self.buttons['local_video'].setEnabled(False)
             except Exception as e:
                 logging.error(f"Could not open local video: {e}")
                 QMessageBox.critical(self.parent_window, "Error", f"Could not open video file:\n{e}")
-        else:
-            logging.warning(f"Attempted to play a non-existent local video: {self.video_path}")
 
     def open_folder(self):
-        if os.path.exists(self.data.get('Path_Root', '')):
-            os.startfile(self.data.get('Path_Root', ''))
+        path = self.data.get('Path_Root', '')
+        if path:
+            if os.path.exists(path):
+                os.startfile(path)
+            else:
+                # Graceful UI rejection and self-correction
+                QMessageBox.warning(self.parent_window, "Not Found", translator.tr("msg_jit_folder_missing"))
+                self.parent_window.update_game_flags(self.data.get('Folder_Name'), {'Is_Local': False})
+                self.buttons['folder'].setEnabled(False)
 
     def edit_game(self):
         dlg = ActionDialog("dialog_edit_title", self.data, self.parent_window)

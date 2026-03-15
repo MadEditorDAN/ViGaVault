@@ -115,3 +115,20 @@ class ImageLoader(QRunnable):
             image = QImage(self.path)
             if not image.isNull():
                 self.signals.loaded.emit(image)
+
+class StartupSyncWorker(QThread):
+    """
+    WHY: A silent startup worker designed to seamlessly align Database flags with OS Reality 
+    in the background immediately after boot without freezing the main visual interface.
+    """
+    finished = Signal(bool)
+    
+    def __init__(self, config, parent=None):
+        super().__init__(parent)
+        self.config = config
+        
+    def run(self):
+        manager = LibraryManager(self.config)
+        manager.load_db()
+        changes_made = manager.sync_media_flags_batch()
+        self.finished.emit(changes_made)
