@@ -188,7 +188,8 @@ class ActionDialog(QDialog):
         self.trailer_link = self.original_data.get('Trailer_Link', '')
         self.url_line_edit.setText(self.trailer_link)
 
-        if not self.trailer_link:
+        # WHY: UI Safeguard to ensure text placeholders aren't treated as playable URLs.
+        if not self.trailer_link or not self.trailer_link.startswith('http'):
             self.trailer_thumbnail_label.setText("No Trailer URL")
             self.trailer_thumbnail_label.setStyleSheet("border: 1px solid #555;")
             self.btn_play_trailer.setEnabled(False)
@@ -1240,7 +1241,7 @@ class StatisticsDialog(QDialog):
         if 'Platforms' in self.df.columns:
             local_files_count = len(self.df[self.df['Platforms'].astype(str).str.lower() == 'local files'])
             local_files_pct = round((local_files_count / total_games * 100) if total_games else 0, 1)
-            stats_data.append(("tools_stats_Local_Copy_ratio", f"{local_files_pct}% ({local_files_count})"))
+            stats_data.append(("tools_stats_local_copy_ratio", f"{local_files_pct}% ({local_files_count})"))
 
         # WHY: Using QHBoxLayout with 3 QFormLayouts guarantees equal spacing horizontally 
         # and automatically aligns labels so the colons perfectly form a straight vertical line.

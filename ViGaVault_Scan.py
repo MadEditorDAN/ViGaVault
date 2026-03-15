@@ -330,6 +330,16 @@ class Game:
                 return True
 
         logging.error(f"    [COVER FETCH ERROR] Could not find info for ID {igdb_id}.")
+        
+        # WHY: Case 3 - If IGDB explicitly returns no data for this ID, it's a dead ID.
+        # We remove it and append "Not_on_IGDB" so we don't query it again.
+        current_ids = [x.strip() for x in self.data.get('game_ID', '').split(',') if x.strip()]
+        if f"igdb_{igdb_id}" in current_ids:
+            current_ids.remove(f"igdb_{igdb_id}")
+        if "Not_on_IGDB" not in current_ids:
+            current_ids.append("Not_on_IGDB")
+        self.data['game_ID'] = ", ".join(sorted(current_ids))
+        
         return False
 
     def fetch_metadata(self, token):
@@ -958,12 +968,13 @@ class LibraryManager:
 
                                     if not video_url:
                                         logging.info(f"    [STEAM API] No usable video link found for '{title}' (AppID: {app_id}).")
-                                        video_url = 'no_mp4'
+                                        video_url = 'Not_on_Steam'
                                 else:
                                     logging.info(f"    [STEAM API] No 'movies' section in API response for '{title}' (AppID: {app_id}).")
-                                    video_url = 'no_section'
+                                    video_url = 'Not_on_Steam'
                             else:
                                 logging.warning(f"    [STEAM API] API returned success=false for '{title}' (AppID: {app_id}).")
+                                video_url = 'Not_on_Steam'
                         else:
                             logging.warning(f"    [STEAM API] Request for '{title}' (AppID: {app_id}) failed with status code {resp.status_code}.")
                     except requests.exceptions.Timeout:
@@ -1000,7 +1011,7 @@ class LibraryManager:
 
                 # Check if video_url is a real downloadable URL
                 is_youtube = video_url and ('youtube.com' in video_url or 'youtu.be' in video_url)
-                is_downloadable_url = video_url and video_url not in ['no_mp4', 'no_section'] and not is_youtube
+                is_downloadable_url = video_url and video_url.startswith('http') and not is_youtube
 
                 if is_downloadable_url and not video_exists_on_disk:
                     if YT_DLP_AVAILABLE:
@@ -1416,14 +1427,8 @@ class LibraryManager:
                             logging.warning(f"    [FAILURE] Failure for: {folder}")
                             stats['fetched_fail'] += 1
 
-                    # Case 3: Game is "OK", but the image is missing. Only fetch the image.
-                    elif status == 'OK' and image_is_missing:
-                        logging.info(f"    [COVER FETCH] Attempting for: {folder} (Reason: Missing image for OK game)")
-                        if token and game.refetch_cover(token):
-                            stats['fetched_success'] += 1
-                        else:
-                            logging.warning(f"    [FAILURE] Failure for: {folder}")
-                            stats['fetched_fail'] += 1
+                    # WHY: Case 2 - Download of missing images for "OK" games removed 
+                    # from the main scan loop. This will be handled by the upcoming Media Manager.
         
         # Cleanup: Deleting games no longer on disk
         existing_folders = list(self.games.keys())
@@ -1442,10 +1447,10 @@ class LibraryManager:
             had_a_path = bool(game_to_check.data.get('Path_Root'))
 
             if not is_on_disk and had_a_path:
-                    # Check if this is a "Platform Game" (has platforms other than Local Files/Unknown)
+                # Check if this is a "Platform Game" (has platforms other than Local Files/Unknown)
                 platforms_str = game_to_check.data.get('Platforms', '')
                 platform_list = [p.strip() for p in platforms_str.split(',') if p.strip()]
-                    real_platforms = [p for p in platform_list if p.lower() not in ['local files', 'unknown']]
+                real_platforms = [p for p in platform_list if p.lower() not in ['local files', 'unknown']]
                 
                 # Also check IDs for safety (e.g. if Platforms wasn't populated but ID exists)
                 game_ids = game_to_check.data.get('game_ID', '')
@@ -1463,7 +1468,7 @@ class LibraryManager:
                     
                     stats['updated'] += 1
                 else:
-                        # This is a true orphan (Local Files only). It was on disk, but now it's gone.
+                    # This is a true orphan (Local Files only). It was on disk, but now it's gone.
                     logging.info(f"    [DELETE] Game entry not found on disk, deleting: {folder}")
                     game_to_delete = game_to_check
                     

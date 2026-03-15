@@ -413,8 +413,8 @@ class GameCard(QWidget):
         local_folder_path = game_data.get('Path_Root', '')
         has_local_folder = bool(local_folder_path and os.path.exists(local_folder_path))
         has_local_video = bool(self.video_path and os.path.exists(self.video_path))
-        # Check for a valid trailer link, ignoring our special flags.
-        has_trailer = bool(self.trailer_link and self.trailer_link not in ['no_section', 'no_mp4'])
+        # Check for a valid trailer link by ensuring it starts with http, ignoring any text placeholders.
+        has_trailer = bool(self.trailer_link and self.trailer_link.startswith('http'))
 
         button_definitions = {
             'local_video': {'enabled': has_local_video, 'fallback': "🎞️", 'font_size': "32px"},

@@ -105,14 +105,14 @@
     "scan_new": false,
     "filter_states": {
         "Platforms": [
-            "Steam"
+            "Local Copy"
         ]
     },
     "db_path": "C:/Users/mad_e/OneDrive/Batch Collection/ViGaVault/VGVDB.csv",
     "enable_gog_db": true,
     "video_path": "d:\\VGV-Videos\\",
     "filter_expansion": {
-        "Platforms": true,
+        "Platforms": false,
         "Genre": false,
         "Collection": false
     }

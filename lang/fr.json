@@ -135,7 +135,7 @@
     "tools_stats_common_word": "Mot le plus fréquent (Titre)",
     "tools_stats_longest_sum": "Le Conteur (Résumé le plus long)",
     "tools_stats_no_sum": "Protagoniste Muet (Sans Résumé)",
-    "tools_stats_warez_ratio": "Le Ratio 'Warez'",
+    "tools_stats_local_copy_ratio": "Le Ratio 'Warez'",
     "tools_stats_col_count": "Nombre",
     "tools_stats_col_dist": "Distribution",
     "tools_stats_col_year": "Année",
