@@ -1,0 +1,646 @@
+# WHY: Extracted complex custom UI components to modularize the interface.
+# This keeps the main application window clean and delegates visual layout
+# concerns to dedicated classes.
+import os
+import re
+import webbrowser
+import logging
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, 
+                             QPushButton, QScrollArea, QFrame, QSizePolicy, QCheckBox, 
+                             QLineEdit, QComboBox, QListWidget, QListWidgetItem, 
+                             QMessageBox, QGroupBox, QApplication, QAbstractItemView)
+from PySide6.QtCore import Qt, QSize, QEvent
+from PySide6.QtGui import QIcon, QPixmap, QFont, QPalette
+
+from ViGaVault_utils import translator
+from ViGaVault_dialogs import ActionDialog
+from ViGaVault_workers import ImageLoader
+
+# --- CUSTOM WIDGETS ---
+# A custom group box that can collapse its content to save space in the sidebar.
+class CollapsibleFilterGroup(QGroupBox):
+    def __init__(self, title, parent_layout, parent=None):
+        super().__init__("", parent)
+        self.parent_layout = parent_layout
+        self.title = title
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setSpacing(0)
+
+        # Header Button (acts as the toggle trigger)
+        self.toggle_btn = QPushButton(f"▶ {title}")
+        self.toggle_btn.setCheckable(True)
+        self.toggle_btn.setChecked(False) # Default collapsed
+        self.toggle_btn.setStyleSheet("""
+            QPushButton { text-align: left; font-weight: bold; padding: 5px; border: none; background-color: palette(button); color: palette(button-text); }
+            QPushButton:hover { background-color: palette(midlight); }
+            QPushButton:checked { background-color: palette(button); }
+        """)
+        self.toggle_btn.toggled.connect(self.toggle_content)
+        self.layout.addWidget(self.toggle_btn)
+
+        # Content Area
+        self.content_area = QWidget()
+        self.content_area.setVisible(False)
+        self.content_layout = QVBoxLayout(self.content_area)
+        self.content_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # All/None Buttons Container
+        self.btns_layout = QHBoxLayout()
+        self.btns_layout.setContentsMargins(5, 5, 5, 5)
+        self.content_layout.addLayout(self.btns_layout)
+
+        # Scroll Area for Checkboxes (Limits size)
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.scroll.setFrameShape(QFrame.NoFrame)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        
+        # Grid layout for checkboxes (2 columns)
+        self.checkbox_container = QWidget()
+        self.checkbox_layout = QGridLayout(self.checkbox_container)
+        self.checkbox_layout.setAlignment(Qt.AlignTop)
+        self.scroll.setWidget(self.checkbox_container)
+        
+        self.content_layout.addWidget(self.scroll)
+        self.layout.addWidget(self.content_area)
+
+    def toggle_content(self, checked):
+        self.content_area.setVisible(checked)
+        arrow = "▼" if checked else "▶"
+        self.toggle_btn.setText(f"{arrow} {self.title}")
+        
+        if checked:
+            # Switch policy to Expanding so it can take available space...
+            self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+            
+            # ...BUT we manually calculate the exact required height.
+            # WHY: By default, Qt splits space equally (50/50) between 'Expanding' widgets.
+            # This looks bad if one group is small and another is huge. 
+            # By setting MaximumHeight to the content size, we force the layout to give this 
+            # group ONLY what it needs, leaving the remaining space for other large groups.
+            h_header = self.toggle_btn.sizeHint().height()
+            h_content = 0
+            if self.btns_layout.count() > 0:
+                h_content += self.btns_layout.sizeHint().height() + self.content_layout.spacing()
+            
+            self.checkbox_container.adjustSize()
+            h_list = self.checkbox_container.sizeHint().height()
+            h_chrome = 2 * self.scroll.frameWidth() + self.layout.contentsMargins().top() + self.layout.contentsMargins().bottom() + self.layout.spacing()
+            
+            total_h = h_header + h_content + h_list + h_chrome + 10
+            self.setMaximumHeight(total_h)
+
+            if self.parent_layout:
+                self.parent_layout.setStretchFactor(self, 1)
+        else:
+            # Revert to Maximum (Compact) when collapsed
+            self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+            self.setMaximumHeight(16777215) # Remove limit
+            if self.parent_layout:
+                self.parent_layout.setStretchFactor(self, 0)
+        
+        self.updateGeometry()
+
+# The right-hand sidebar containing Counters, Search, Sort, Filters, and the Scan Panel.
+class Sidebar(QWidget):
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent
+        self.setFixedWidth(350)
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(5, 5, 5, 5)
+        
+        # --- TOP CONTAINER (Search, Sort, Filters) ---
+        self.top_layout = QVBoxLayout()
+        self.top_layout.setSpacing(10) # Aération entre les cadres
+
+        font_lbl = QFont()
+        font_lbl.setBold(True)
+        font_lbl.setPixelSize(16)
+        
+        # Style commun pour les cadres (bordure visible + fond légèrement différent)
+        self.frame_style = """
+            QFrame#sidebar_frame {
+                border: 1px solid palette(mid);
+                border-radius: 6px;
+                background-color: palette(alternate-base);
+            }
+        """
+
+        # 1. Cadre 1: Compteurs et Nom de la librairie
+        self.frame_counters = QFrame()
+        self.frame_counters.setObjectName("sidebar_frame")
+        self.frame_counters.setStyleSheet(self.frame_style)
+        counters_layout = QHBoxLayout(self.frame_counters)
+        counters_layout.setContentsMargins(8, 8, 8, 8)
+
+        self.lbl_counter = QLabel("0/0")
+        self.lbl_counter.setFont(QFont(font_lbl.family(), 20, QFont.Bold))
+        counters_layout.addWidget(self.lbl_counter)
+        
+        counters_layout.addStretch()
+
+        self.lbl_lib_name = QLabel("")
+        self.lbl_lib_name.setFont(QFont(font_lbl.family(), 20, QFont.Bold))
+        self.lbl_lib_name.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        counters_layout.addWidget(self.lbl_lib_name)
+        
+        self.top_layout.addWidget(self.frame_counters)
+        
+        # 2. Cadre 2: Recherche
+        self.frame_search = QFrame()
+        self.frame_search.setObjectName("sidebar_frame")
+        self.frame_search.setStyleSheet(self.frame_style)
+        search_layout = QHBoxLayout(self.frame_search)
+        search_layout.setContentsMargins(8, 8, 8, 8)
+
+        lbl_search = QLabel(translator.tr("sidebar_search_label"))
+        lbl_search.setObjectName("sidebar_search_label")
+        lbl_search.setFont(font_lbl)
+        search_layout.addWidget(lbl_search)
+
+        self.search_bar = QLineEdit()
+        self.search_bar.setPlaceholderText(translator.tr("sidebar_search_placeholder"))
+        self.search_bar.setClearButtonEnabled(True)
+        search_layout.addWidget(self.search_bar, 1) # Stretch 1 pour prendre l'espace disponible
+        
+        self.top_layout.addWidget(self.frame_search)
+        
+        # 3. Cadre 3: Tri
+        self.frame_sort = QFrame()
+        self.frame_sort.setObjectName("sidebar_frame")
+        self.frame_sort.setStyleSheet(self.frame_style)
+        sort_layout = QHBoxLayout(self.frame_sort)
+        sort_layout.setContentsMargins(8, 8, 8, 8)
+
+        lbl_sort = QLabel(translator.tr("sidebar_sort_label"))
+        lbl_sort.setObjectName("sidebar_sort_label")
+        lbl_sort.setFont(font_lbl)
+        sort_layout.addWidget(lbl_sort)
+
+        self.combo_sort = QComboBox()
+        self.combo_sort.addItems([translator.tr("sidebar_sort_name"), translator.tr("sidebar_sort_release_date"), translator.tr("sidebar_sort_developer")])
+        sort_layout.addWidget(self.combo_sort, 1) # Stretch 1 pour prendre l'espace disponible
+        
+        self.btn_toggle_sort = QPushButton()
+        self.btn_toggle_sort.setFixedWidth(50)
+        self.update_sort_button(self.parent.sort_desc)
+        sort_layout.addWidget(self.btn_toggle_sort)
+        
+        self.top_layout.addWidget(self.frame_sort)
+
+        # 4. Cadre 4: Filtres
+        self.frame_filters = QFrame()
+        self.frame_filters.setObjectName("sidebar_frame")
+        self.frame_filters.setStyleSheet(self.frame_style)
+        filters_frame_layout = QVBoxLayout(self.frame_filters)
+        filters_frame_layout.setContentsMargins(8, 8, 8, 8)
+
+        # WHY: Grouping Filters label and Show NEW checkbox in the same horizontal line.
+        filters_header_layout = QHBoxLayout()
+        lbl_filters = QLabel(translator.tr("sidebar_filters_label"))
+        lbl_filters.setObjectName("sidebar_filters_label")
+        lbl_filters.setFont(font_lbl)
+        filters_header_layout.addWidget(lbl_filters)
+
+        # WHY: Add a stretch spacer to push the "Show NEW" checkbox to the far right edge of the layout.
+        filters_header_layout.addStretch()
+
+        # --- SHOW NEW CHECKBOX (Moved here) ---
+        self.chk_show_new = QCheckBox(translator.tr("sidebar_chk_show_new"))
+        self.chk_show_new.setLayoutDirection(Qt.RightToLeft)
+        filters_header_layout.addWidget(self.chk_show_new, 0, Qt.AlignRight)
+
+        filters_frame_layout.addLayout(filters_header_layout)
+
+        # We remove the outer scroll area to let individual groups handle their scrolling/sizing
+        self.filters_container = QWidget()
+        self.filters_layout = QVBoxLayout(self.filters_container)
+        self.filters_layout.setContentsMargins(0, 0, 0, 0)
+        
+        filters_frame_layout.addWidget(self.filters_container, 1)
+        
+        self.top_layout.addWidget(self.frame_filters, 1) # Give it stretch to take available space
+        self.layout.addLayout(self.top_layout, 1) # Give top part stretch priority
+
+        # --- SCAN PANEL (Manual Scan / Full Scan Logs) ---
+        # Hidden by default, shown when scanning starts
+        self.scan_panel = QWidget()
+        self.scan_layout = QVBoxLayout(self.scan_panel)
+        
+        # Separator line
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken) # Uses QPalette.Shadow, customized for dark mode
+        self.scan_layout.addWidget(line)
+        
+        self.scan_input = QLineEdit()
+        self.scan_input.setPlaceholderText(translator.tr("sidebar_manual_scan_placeholder"))
+
+        scan_action_layout = QHBoxLayout()
+        self.scan_btn = QPushButton(translator.tr("sidebar_manual_scan_search_btn"))
+        scan_action_layout.addWidget(self.scan_btn, 3)
+
+        self.scan_limit_combo = QComboBox()
+        self.scan_limit_combo.addItems(['10', '20', '30', '40', '50'])
+        self.scan_limit_combo.setCurrentText('10')
+        scan_action_layout.addWidget(self.scan_limit_combo, 1)
+
+        self.scan_results = QListWidget()
+        self.scan_results.setIconSize(QSize(50, 70))
+
+        self.btns_layout = QHBoxLayout()
+        self.btn_confirm = QPushButton(translator.tr("sidebar_manual_scan_confirm_btn"))
+        self.btn_cancel = QPushButton(translator.tr("sidebar_manual_scan_cancel_btn"))
+        self.btns_layout.addWidget(self.btn_confirm)
+        self.btns_layout.addWidget(self.btn_cancel)
+        
+        self.scan_title_label = QLabel(translator.tr("sidebar_manual_scan_title"))
+        self.scan_layout.addWidget(self.scan_title_label)
+        self.scan_layout.addWidget(self.scan_input)
+        self.scan_layout.addLayout(scan_action_layout)
+        self.scan_layout.addWidget(self.scan_results)
+        self.scan_layout.addLayout(self.btns_layout)
+
+        # --- BOTTOM CONTAINER (Scan Buttons) ---
+        self.bottom_layout = QHBoxLayout()
+        
+        # --- FULL SCAN BUTTON ---
+        self.btn_full_scan = QPushButton(translator.tr("sidebar_btn_full_scan"))
+        
+        # --- RETRY FAILURES CHECKBOX (Replaces Show NEW) ---
+        # WHY: Adding the Retry Failures option where Show NEW used to be.
+        self.chk_retry_failures = QCheckBox(translator.tr("sidebar_chk_retry_failures"))
+        self.chk_retry_failures.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.chk_retry_failures.setLayoutDirection(Qt.RightToLeft)
+
+        self.bottom_layout.addWidget(self.btn_full_scan, 2) # 2/3 stretch
+        self.bottom_layout.addWidget(self.chk_retry_failures, 1)  # 1/3 stretch
+
+        self.layout.addWidget(self.scan_panel)
+        self.scan_panel.hide()
+        self.layout.addLayout(self.bottom_layout)
+        
+        # --- CONNECTIONS ---
+        self.search_bar.textChanged.connect(self.parent.request_filter_update)
+        self.combo_sort.currentIndexChanged.connect(self.parent.request_filter_update)
+        self.btn_toggle_sort.clicked.connect(self.parent.toggle_sort_order)
+        self.btn_full_scan.clicked.connect(self.parent.start_full_scan)
+        self.chk_show_new.toggled.connect(self.parent.request_filter_update)
+
+        # Scan Connections
+        self.scan_btn.clicked.connect(self.parent.on_manual_search_trigger)
+        self.scan_input.returnPressed.connect(self.parent.on_manual_search_trigger)
+        self.btn_confirm.clicked.connect(self.parent.apply_inline_selection)
+        self.btn_cancel.clicked.connect(self.parent.cancel_inline_scan)
+        self.scan_results.itemDoubleClicked.connect(self.parent.apply_inline_selection)
+
+    def update_sort_button(self, is_desc):
+        # Updates label between UP (Ascending) and DOWN (Descending)
+        key = "sidebar_sort_descending" if is_desc else "sidebar_sort_ascending"
+        self.btn_toggle_sort.setText(translator.tr(key))
+
+    def refresh_styles(self):
+        # Only refresh elements that use stylesheets and might cache colors
+        for frame in [self.frame_counters, self.frame_search, self.frame_sort, self.frame_filters]:
+            frame.setStyleSheet(self.frame_style)
+
+        # Refresh Filter Groups to pick up new palette
+        for i in range(self.filters_layout.count()):
+            item = self.filters_layout.itemAt(i)
+            if item.widget() and isinstance(item.widget(), CollapsibleFilterGroup):
+                w = item.widget()
+                # Force re-eval of palette() keywords
+                sheet = w.toggle_btn.styleSheet()
+                w.toggle_btn.setStyleSheet("")
+                w.toggle_btn.setStyleSheet(sheet)
+
+    def retranslate_ui(self):
+        self.findChild(QLabel, "sidebar_search_label").setText(translator.tr("sidebar_search_label"))
+        self.search_bar.setPlaceholderText(translator.tr("sidebar_search_placeholder"))
+        self.findChild(QLabel, "sidebar_sort_label").setText(translator.tr("sidebar_sort_label"))
+        self.combo_sort.setItemText(0, translator.tr("sidebar_sort_name"))
+        self.combo_sort.setItemText(1, translator.tr("sidebar_sort_release_date"))
+        self.combo_sort.setItemText(2, translator.tr("sidebar_sort_developer"))
+        self.update_sort_button(self.parent.sort_desc)
+        self.findChild(QLabel, "sidebar_filters_label").setText(translator.tr("sidebar_filters_label"))
+        self.chk_show_new.setText(translator.tr("sidebar_chk_show_new"))
+        self.btn_full_scan.setText(translator.tr("sidebar_btn_full_scan"))
+        self.chk_retry_failures.setText(translator.tr("sidebar_chk_retry_failures"))
+        # Scan panel
+        self.scan_title_label.setText(translator.tr("sidebar_manual_scan_title"))
+        self.scan_input.setPlaceholderText(translator.tr("sidebar_manual_scan_placeholder"))
+        self.scan_btn.setText(translator.tr("sidebar_manual_scan_search_btn"))
+        self.btn_confirm.setText(translator.tr("sidebar_manual_scan_confirm_btn"))
+        self.btn_cancel.setText(translator.tr("sidebar_manual_scan_cancel_btn"))
+
+# The core display widget for a single game in the list.
+# Handles image display, text wrapping, and buttons.
+class GameCard(QWidget):
+    def __init__(self, game_data, parent_window, item):
+        super().__init__()
+        self.data = game_data
+        self.parent_window = parent_window
+        self.item = item
+        self.info_labels = [] # Store references for dynamic style updates
+        self.cached_pixmap = None
+        
+        main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(5, 5, 5, 5)
+        
+        # Get display settings from parent
+        settings = getattr(self.parent_window, 'display_settings', {'image': 200, 'button': 45, 'text': 22})
+        img_w = settings.get('image', 200)
+        img_h = int(img_w * 1.33) # Aspect ratio 3:4
+
+        # Image
+        self.img_label = QLabel()
+        self.img_label.setFixedSize(img_w, img_h)
+        self.img_label.setAlignment(Qt.AlignCenter)
+        img_path = game_data.get('Image_Link', '')
+        if img_path:
+            self.img_label.setText("Loading...")
+            self.start_image_load(img_path)
+        else:
+            self.img_label.setText("No Image")
+            self.img_label.setStyleSheet("border: 1px solid #555;")
+        self.img_label.installEventFilter(self)
+        main_layout.addWidget(self.img_label, 0, Qt.AlignTop)
+        
+        # --- RIGHT COLUMN (DETAILS) ---
+        # Details
+        details_layout = QVBoxLayout()
+        details_layout.setContentsMargins(0, 0, 0, 0) 
+        details_layout.setSpacing(0)
+        details_layout.setAlignment(Qt.AlignTop)
+        
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Title Layout (Title + Path Label)
+        title_layout = QVBoxLayout()
+        title_layout.setContentsMargins(0, 0, 0, 0)
+        title_layout.setSpacing(0)
+        
+        self.title_lbl = QLabel(game_data.get('Clean_Title', 'Unknown'))
+        self.title_lbl.setStyleSheet(f"font-weight: bold; font-size: {settings.get('text', 22)}px;")
+        self.title_lbl.setWordWrap(True)
+        self.title_lbl.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        # SizePolicy ignored to allow text to shrink/wrap correctly in tight spaces
+        self.title_lbl.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        self.title_lbl.setMinimumWidth(0)
+        title_layout.addWidget(self.title_lbl)
+
+        path_root = game_data.get('Path_Root', '')
+        path_text = f"({path_root})" if path_root else ""
+        self.path_lbl = QLabel(path_text)
+        self.path_lbl.setStyleSheet("font-size: 11px; color: gray;")
+        self.path_lbl.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.path_lbl.setWordWrap(True)
+        self.path_lbl.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        self.path_lbl.setMinimumWidth(0)
+        title_layout.addWidget(self.path_lbl)
+        
+        header_layout.addLayout(title_layout, 1) # Give title stretch priority
+        
+        # Buttons
+        self.video_path = str(game_data.get('Path_Video', '')).strip()
+        self.trailer_link = game_data.get('Trailer_Link', '')
+
+        has_local_video = bool(self.video_path and os.path.exists(self.video_path))
+        # Check for a valid trailer link, ignoring our special flags.
+        has_trailer = bool(self.trailer_link and self.trailer_link not in ['no_section', 'no_mp4'])
+
+        button_definitions = {
+            'local_video': {'enabled': has_local_video, 'fallback': "🎞️", 'font_size': "32px"},
+            'youtube':     {'enabled': has_trailer,     'fallback': "▶", 'font_size': "30px"},
+            'folder':      {'enabled': True,            'fallback': "📁", 'font_size': "32px"},
+            'edit':        {'enabled': True,            'fallback': "✏️", 'font_size': "28px"},
+            'scan':        {'enabled': True,            'fallback': "🔍", 'font_size': "28px"}
+        }
+
+        self.buttons = {}
+        btn_size = settings.get('button', 45)
+        for name, props in button_definitions.items():
+            btn = QPushButton()
+            self.buttons[name] = btn
+
+            icon_to_load = name
+            if not props['enabled'] and name in ['local_video', 'youtube']:
+                icon_to_load = f"{name}_disabled"
+
+            icon_path = f"icons/{icon_to_load}.png"
+            icon_path = f"assets/{icon_to_load}.png"
+
+            if os.path.exists(icon_path):
+                btn.setIcon(QIcon(icon_path))
+                btn.setIconSize(QSize(int(btn_size*0.7), int(btn_size*0.7)))
+                btn.setStyleSheet("border: none;")
+            else:
+                # Fallback to emoji if icon file is missing
+                fallback_emoji = props['fallback']
+                font_size = props['font_size']
+                style = f"font_size: {font_size}; border: none;"
+                if fallback_emoji == "▶":
+                    style += " color: #FF0000;"
+                btn.setStyleSheet(style)
+            
+            btn.setEnabled(props['enabled'])
+            
+            if name == 'local_video' and not props['enabled'] and self.video_path:
+                btn.setToolTip(f"File not found: {self.video_path}")
+
+        buttons = [self.buttons['local_video'], self.buttons['youtube'], self.buttons['folder'], self.buttons['edit'], self.buttons['scan']]
+            
+        for btn in buttons:
+            btn.setFixedSize(btn_size, btn_size)
+            btn.installEventFilter(self)
+            header_layout.addWidget(btn)
+
+        self.buttons['local_video'].clicked.connect(self.start_video)
+        self.buttons['youtube'].clicked.connect(self.start_trailer)
+        self.buttons['folder'].clicked.connect(self.open_folder)
+        self.buttons['edit'].clicked.connect(self.edit_game)
+        self.buttons['scan'].clicked.connect(self.scan_game)
+        
+        details_layout.addLayout(header_layout)
+        
+        # Info
+        info_font_size = max(10, settings.get('text', 22) - 6)
+        # WHY: Reordered fields to group Platforms/Genre, Dev/Pub, and Collection. Added spacing between these groups.
+        for field in ['Original_Release_Date', 'Platforms', 'Genre', 'Developer', 'Publisher', 'Collection']:
+            display_name = 'Developer' # Default
+            if field == 'Original_Release_Date': display_name = translator.tr("gamecard_info_release_date")
+            elif field == 'Platforms': display_name = translator.tr("gamecard_info_platforms")
+            elif field == 'Genre': display_name = translator.tr("gamecard_info_genre")            
+            elif field == 'Developer': display_name = translator.tr("gamecard_info_developer")
+            elif field == 'Publisher': display_name = translator.tr("gamecard_info_publisher")
+            elif field == 'Collection': display_name = translator.tr("gamecard_info_collection")
+            label = QLabel(f"<b>{display_name}:</b> {game_data.get(field, '')}")
+            label.setStyleSheet(f"font-weight: bold; font-size: {info_font_size}px;")
+            label.setWordWrap(True)
+            label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            # Policy and MinimumWidth are crucial to prevent "disappearing buttons" bug
+            label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+            label.setMinimumWidth(0)
+            details_layout.addWidget(label)
+            self.info_labels.append(label)
+            
+            if field in ['Genre', 'Publisher']:
+                details_layout.addSpacing(10)
+        
+        self.summary_title = QLabel(translator.tr("gamecard_summary_title"))
+        self.summary_title.setStyleSheet(f"font-weight: bold; font-size: {info_font_size}px;")
+        details_layout.addWidget(self.summary_title)
+
+        summary_font_size = max(10, settings.get('text', 22) - 8)
+        self.summary_content = QLabel(game_data.get('Summary', ''))
+        self.summary_content.setWordWrap(True)
+        self.summary_content.setStyleSheet(f"font-size: {summary_font_size}px;")
+        self.summary_content.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        # Vertical Policy Minimum prevents the summary from forcing the card to be too tall
+        self.summary_content.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        details_layout.addWidget(self.summary_content)
+        main_layout.addLayout(details_layout)
+
+    def start_image_load(self, path):
+        loader = ImageLoader(path)
+        loader.signals.loaded.connect(self.on_image_loaded)
+        self.parent_window.thread_pool.start(loader)
+
+    def on_image_loaded(self, image):
+        self.cached_pixmap = QPixmap.fromImage(image)
+        self.update_image_display()
+
+    def update_image_display(self):
+        settings = getattr(self.parent_window, 'display_settings', {'image': 200})
+        img_w = settings.get('image', 200)
+        img_h = int(img_w * 1.33)
+        
+        if self.cached_pixmap:
+            self.img_label.setPixmap(self.cached_pixmap.scaled(img_w, img_h, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.img_label.setText("") # Clear text
+
+    def update_style(self, settings):
+        """Updates the card style dynamically."""
+        img_w = settings.get('image', 200)
+        img_h = int(img_w * 1.33)
+        btn_size = settings.get('button', 45)
+        text_size = settings.get('text', 22)
+        
+        # Update Image
+        self.img_label.setFixedSize(img_w, img_h)
+        if self.cached_pixmap:
+            self.img_label.setPixmap(self.cached_pixmap.scaled(img_w, img_h, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            
+        # Update Buttons
+        for btn in self.buttons.values():
+            btn.setFixedSize(btn_size, btn_size)
+            if btn.icon().isNull(): # Emoji fallback
+                # Simple heuristic for emoji font size
+                btn.setStyleSheet(f"font-size: {int(btn_size*0.7)}px; border: none;")
+            else:
+                btn.setIconSize(QSize(int(btn_size*0.7), int(btn_size*0.7)))
+
+        # Update Text
+        self.title_lbl.setStyleSheet(f"font-weight: bold; font-size: {text_size}px;")
+        
+        info_size = max(10, text_size - 6)
+        for lbl in self.info_labels:
+            lbl.setStyleSheet(f"font-weight: bold; font-size: {info_size}px;")
+        self.summary_title.setStyleSheet(f"font-weight: bold; font-size: {info_size}px;")
+        self.summary_content.setStyleSheet(f"font-size: {max(10, text_size - 8)}px;")
+
+    def calculate_size_hint(self, target_width):
+        """
+        Manually calculates the exact required height for the card at a specific width.
+        Why: The standard sizeHint() often fails during resize events or when text wraps,
+        leading to huge vertical gaps or cut-off text. We compute the math manually to guarantee precision.
+        """
+        m = self.layout().contentsMargins()
+        spacing_main = self.layout().spacing()
+        if spacing_main == -1: spacing_main = 6
+        
+        img_w = self.img_label.width()
+        img_h = self.img_label.height()
+        
+        # Width available for the Details Column
+        details_w = target_width - m.left() - m.right() - img_w - spacing_main
+        if details_w <= 50: return QSize(target_width, max(img_h + m.top() + m.bottom(), 100))
+        
+        # 1. Header Height
+        spacing_header = 6
+        btn_count = 5
+        btn_size = self.buttons['edit'].width()
+        # 5 buttons + spacing between title_layout and buttons
+        buttons_block_w = (btn_count * btn_size) + (btn_count * spacing_header)
+        
+        title_w = details_w - buttons_block_w
+        if title_w < 10: title_w = 10
+        
+        h_title = self.title_lbl.heightForWidth(title_w)
+        h_path = self.path_lbl.heightForWidth(title_w)
+        # Fallback if heightForWidth returns -1 (valid for non-wrapping, but safe to check)
+        if h_title <= 0: h_title = self.title_lbl.sizeHint().height()
+        if h_path <= 0: h_path = self.path_lbl.sizeHint().height()
+        
+        h_header = max(h_title + h_path, btn_size)
+        
+        # 2. Rest of the content (Info + Summary)
+        h_rest = 0
+        labels_to_measure = self.info_labels + [self.summary_title, self.summary_content]
+        for lbl in labels_to_measure:
+            h = lbl.heightForWidth(details_w)
+            if h <= 0: h = lbl.sizeHint().height()
+            h_rest += h
+            
+        h_rest += 20 # WHY: Account for the 2x10px spacing added between info groups
+            
+        final_h = max(img_h, h_header + h_rest) + m.top() + m.bottom() + 4 # +4 buffer
+        return QSize(target_width, final_h)
+
+    def mousePressEvent(self, event):
+        self.item.listWidget().setCurrentItem(self.item)
+        super().mousePressEvent(event)
+
+    def eventFilter(self, obj, event):
+        try:
+            if event.type() == QEvent.MouseButtonPress:
+                self.item.listWidget().setCurrentItem(self.item)
+            return super().eventFilter(obj, event)
+        except (KeyboardInterrupt, RuntimeError, AttributeError):
+            return False
+
+    def start_trailer(self):
+        if self.trailer_link:
+            logging.info(f"Opening trailer in browser: {self.trailer_link}")
+            webbrowser.open(self.trailer_link, new=1)
+
+    def start_video(self):
+        if self.video_path and os.path.exists(self.video_path):
+            try:
+                logging.info(f"Opening local video with default player: {self.video_path}")
+                os.startfile(self.video_path)
+            except Exception as e:
+                logging.error(f"Could not open local video: {e}")
+                QMessageBox.critical(self.parent_window, "Error", f"Could not open video file:\n{e}")
+        else:
+            logging.warning(f"Attempted to play a non-existent local video: {self.video_path}")
+
+    def open_folder(self):
+        if os.path.exists(self.data.get('Path_Root', '')):
+            os.startfile(self.data.get('Path_Root', ''))
+
+    def edit_game(self):
+        dlg = ActionDialog("dialog_edit_title", self.data, self.parent_window)
+        if dlg.exec():
+            new_data = dlg.get_data()
+            if new_data:
+                self.parent_window.update_game_data(self.data['Folder_Name'], new_data)
+
+    def scan_game(self):
+        if hasattr(self.parent_window, 'start_inline_scan'):
+            self.parent_window.start_inline_scan(self.data)

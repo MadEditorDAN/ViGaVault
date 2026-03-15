@@ -1,7 +1,8 @@
 - Always use English in application GUI, Logs and code comments/documentation.
 - Apply only the specific changes I request. 
 - Remember the language json files.
-- Comment the code and explain why each modification is done.
+- Comment the code and explain why each modification is done. 
+- Don't remove previous comment to do ti, you can combine them. only delete when the subject of the comment has also been deleted.
 - Use DRY principle when applicable
 - Every change you make must be a direct and literal implementation of my instructions.
 - Never make any unsolicited modifications, including but not limited to: code cleanup, refactoring, feature removal, or style adjustments, if one of those is needed, you can suggest to do it, but wait for my approval before offering code.
