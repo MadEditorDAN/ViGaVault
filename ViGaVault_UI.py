@@ -22,9 +22,9 @@ from ViGaVault_utils import (BASE_DIR, LOG_DIR, get_db_path, get_library_setting
                              get_video_path, get_root_path, get_platform_config, 
                              get_local_scan_config, build_scanner_config, setup_logging, 
                              translator, apply_theme, QtLogSignal, QtLogHandler)                             
-from ViGaVault_dialogs import (ActionDialog, MergeSelectionDialog, ConflictDialog, 
-                               SettingsDialog, PlatformManagerDialog, ProgressBarDelegate, 
-                               StatisticsDialog, SelectionDialog, MediaManagerDialog)
+from dialogs import (ActionDialog, MergeSelectionDialog, ConflictDialog, 
+                     SettingsDialog, PlatformManagerDialog, ProgressBarDelegate, 
+                     StatisticsDialog, SelectionDialog, MediaManagerDialog)
 from ViGaVault_workers import FullScanWorker, FilterWorker, DbLoaderWorker, StartupSyncWorker
 from ViGaVault_widgets import CollapsibleFilterGroup, Sidebar, GameCard
 

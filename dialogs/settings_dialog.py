@@ -1,0 +1,525 @@
+# WHY: Single Responsibility Principle - Handles ONLY UI interactions relating to global and local settings.
+import os
+import json
+import logging
+import shutil
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget, QFormLayout, 
+                               QComboBox, QSlider, QLabel, QCheckBox, QGroupBox, QLineEdit, QPushButton, 
+                               QFileDialog, QGridLayout, QScrollArea, QFrame, QMessageBox, QSizePolicy)
+from PySide6.QtCore import Qt
+
+from ViGaVault_utils import BASE_DIR, get_library_settings_file, translator
+
+class SettingsDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent_window = parent
+        self.setWindowTitle(translator.tr("settings_title"))
+
+        self.IMG_SIZES = [120, 140, 160, 180, 200, 225, 250, 275, 300, 325]
+        self.BTN_SIZES = [25, 30, 35, 40, 45, 50, 55, 60, 65, 70]
+        self.TXT_SIZES = [14, 16, 18, 20, 22, 24, 26, 28, 30, 32]
+
+        self.resize(700, 500)
+        
+        layout = QVBoxLayout(self)
+        self.tabs = QTabWidget()
+        layout.addWidget(self.tabs)
+        
+        self.tab_display = QWidget()
+        self.setup_display_tab()
+        self.tabs.addTab(self.tab_display, translator.tr("settings_tab_display"))
+        
+        self.tab_folders = QWidget()
+        self.setup_folders_tab()
+        self.tabs.addTab(self.tab_folders, translator.tr("settings_tab_folders"))
+        
+        self.tab_data = QWidget()
+        self.setup_data_tab()
+        self.tabs.addTab(self.tab_data, translator.tr("settings_tab_data"))
+        
+        btn_layout = QHBoxLayout()
+        btn_apply = QPushButton(translator.tr("settings_btn_apply"))
+        btn_save = QPushButton(translator.tr("settings_btn_save"))
+        btn_cancel = QPushButton(translator.tr("settings_btn_cancel"))
+        btn_apply.clicked.connect(self.apply_settings)
+        btn_save.clicked.connect(self.accept)
+        btn_cancel.clicked.connect(self.reject)
+        btn_layout.addStretch()
+        btn_layout.addWidget(btn_apply)
+        btn_layout.addWidget(btn_save)
+        btn_layout.addWidget(btn_cancel)
+        layout.addLayout(btn_layout)
+
+        self.load_settings()
+
+    def setup_display_tab(self):
+        layout = QFormLayout(self.tab_display)
+        
+        self.combo_theme = QComboBox()
+        self.combo_theme.addItems([translator.tr("theme_system"), translator.tr("theme_dark"), translator.tr("theme_light")])
+        layout.addRow(translator.tr("settings_display_theme"), self.combo_theme)
+        
+        self.combo_lang = QComboBox()
+        self.combo_lang.addItems(["English", "French", "German", "Spanish", "Italian"])
+        layout.addRow(translator.tr("settings_display_language"), self.combo_lang)
+        
+        img_layout = QHBoxLayout()
+        self.slider_img_size = QSlider(Qt.Horizontal)
+        self.slider_img_size.setRange(0, 9)
+        self.slider_img_size.setPageStep(1)
+        self.slider_img_size.setTickInterval(1)
+        self.slider_img_size.setTickPosition(QSlider.TicksBelow)
+        self.lbl_img_size = QLabel("200 px")
+        self.lbl_img_size.setFixedWidth(60)
+        img_layout.addWidget(self.slider_img_size)
+        img_layout.addWidget(self.lbl_img_size)
+        layout.addRow(translator.tr("settings_display_img_size"), img_layout)
+
+        btn_layout = QHBoxLayout()
+        self.slider_btn_size = QSlider(Qt.Horizontal)
+        self.slider_btn_size.setRange(0, 9)
+        self.slider_btn_size.setPageStep(1)
+        self.slider_btn_size.setTickInterval(1)
+        self.slider_btn_size.setTickPosition(QSlider.TicksBelow)
+        self.lbl_btn_size = QLabel("45 px")
+        self.lbl_btn_size.setFixedWidth(60)
+        btn_layout.addWidget(self.slider_btn_size)
+        btn_layout.addWidget(self.lbl_btn_size)
+        layout.addRow(translator.tr("settings_display_btn_size"), btn_layout)
+
+        txt_layout = QHBoxLayout()
+        self.slider_text_size = QSlider(Qt.Horizontal)
+        self.slider_text_size.setRange(0, 9)
+        self.slider_text_size.setPageStep(1)
+        self.slider_text_size.setTickInterval(1)
+        self.slider_text_size.setTickPosition(QSlider.TicksBelow)
+        self.lbl_text_size = QLabel("22 px")
+        self.lbl_text_size.setFixedWidth(60)
+        txt_layout.addWidget(self.slider_text_size)
+        txt_layout.addWidget(self.lbl_text_size)
+        layout.addRow(translator.tr("settings_display_txt_size"), txt_layout)
+
+        self.slider_img_size.valueChanged.connect(self.update_preview_labels)
+        self.slider_btn_size.valueChanged.connect(self.update_preview_labels)
+        self.slider_text_size.valueChanged.connect(self.update_preview_labels)
+
+    def update_preview_labels(self):
+        self.lbl_img_size.setText(f"{self.IMG_SIZES[self.slider_img_size.value()]} px")
+        self.lbl_btn_size.setText(f"{self.BTN_SIZES[self.slider_btn_size.value()]} px")
+        self.lbl_text_size.setText(f"{self.TXT_SIZES[self.slider_text_size.value()]} px")
+
+    def setup_folders_tab(self):
+        layout = QVBoxLayout(self.tab_folders)
+        
+        self.chk_scan_local = QCheckBox(translator.tr("settings_folders_scan_local"))
+        self.chk_scan_local.setChecked(True)
+        self.chk_scan_local.toggled.connect(self.toggle_local_scan_options)
+        layout.addWidget(self.chk_scan_local)
+
+        grp_root = QGroupBox(translator.tr("settings_folders_root_group"))
+        layout_root = QFormLayout(grp_root)
+        self.root_path_input = QLineEdit(r"\\madhdd02\Software\GAMES")
+        self.btn_browse_root = QPushButton("...")
+        self.btn_browse_root.setFixedWidth(40)
+        self.btn_browse_root.clicked.connect(self.browse_root_path)
+        
+        path_layout = QHBoxLayout()
+        path_layout.addWidget(self.root_path_input)
+        path_layout.addWidget(self.btn_browse_root)
+        
+        layout_root.addRow(translator.tr("settings_folders_main_path"), path_layout)
+        layout.addWidget(grp_root)
+        
+        grp_structure = QGroupBox(translator.tr("settings_folders_structure_group"))
+        self.struct_layout = QVBoxLayout(grp_structure)
+        
+        self.chk_ignore_hidden = QCheckBox(translator.tr("settings_folders_ignore_hidden"))
+        self.struct_layout.addWidget(self.chk_ignore_hidden)
+
+        self.mode_simple_widget = QWidget()
+        simple_layout = QVBoxLayout(self.mode_simple_widget)
+        simple_layout.setContentsMargins(0, 10, 0, 0)
+        
+        lbl_simple = QLabel(translator.tr("settings_folders_simple_mode_label"))
+        lbl_simple.setStyleSheet("font-weight: bold; color: #4CAF50;")
+        simple_layout.addWidget(lbl_simple)
+        
+        form_simple = QFormLayout()
+        self.combo_global_type = QComboBox()
+        self.combo_global_type.addItems(["Direct (Root -> Games)", "Genre", "Collection", "Publisher", "Developer", "Year", "Other", "None"])
+        form_simple.addRow(translator.tr("settings_folders_simple_mode_content"), self.combo_global_type)
+        
+        self.chk_global_filter = QCheckBox(translator.tr("settings_folders_simple_mode_add_filter"))
+        form_simple.addRow("", self.chk_global_filter)
+        simple_layout.addLayout(form_simple)
+        
+        self.btn_switch_advanced = QPushButton(translator.tr("settings_folders_simple_mode_switch_btn"))
+        self.btn_switch_advanced.clicked.connect(self.switch_to_advanced)
+        simple_layout.addWidget(self.btn_switch_advanced)
+        simple_layout.addStretch()
+        
+        self.struct_layout.addWidget(self.mode_simple_widget)
+
+        self.mode_advanced_widget = QWidget()
+        adv_layout = QVBoxLayout(self.mode_advanced_widget)
+        adv_layout.setContentsMargins(0, 10, 0, 0)
+        
+        lbl_adv = QLabel(translator.tr("settings_folders_adv_mode_label"))
+        lbl_adv.setStyleSheet("font-weight: bold; color: #2196F3;")
+        adv_layout.addWidget(lbl_adv)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        
+        self.levels_container = QWidget()
+        self.folders_grid = QGridLayout(self.levels_container)
+        self.folders_grid.setAlignment(Qt.AlignTop)
+        self.folders_grid.setContentsMargins(0, 0, 0, 0)
+        
+        scroll.setWidget(self.levels_container)
+        adv_layout.addWidget(scroll)
+
+        btn_layout = QHBoxLayout()
+        self.btn_switch_simple = QPushButton(translator.tr("settings_folders_adv_mode_switch_btn"))
+        self.btn_switch_simple.clicked.connect(self.switch_to_simple)
+        btn_layout.addWidget(self.btn_switch_simple)
+        btn_layout.addStretch()
+        adv_layout.addLayout(btn_layout)
+        
+        self.struct_layout.addWidget(self.mode_advanced_widget)
+        layout.addWidget(grp_structure, 1)
+
+    def toggle_local_scan_options(self, checked):
+        self.root_path_input.setEnabled(checked)
+        self.btn_browse_root.setEnabled(checked)
+        for i in range(self.struct_layout.count()):
+            item = self.struct_layout.itemAt(i)
+            if item.widget():
+                item.widget().setEnabled(checked)
+
+    def switch_to_simple(self):
+        self.mode_advanced_widget.hide()
+        self.mode_simple_widget.show()
+        self.current_scan_mode = "simple"
+
+    def switch_to_advanced(self):
+        self.mode_simple_widget.hide()
+        self.mode_advanced_widget.show()
+        self.current_scan_mode = "advanced"
+
+    def populate_folders_list(self, saved_rules):
+        while self.folders_grid.count():
+            item = self.folders_grid.takeAt(0)
+            if item.widget(): item.widget().deleteLater()
+
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_folder")), 0, 0)
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_content_type")), 0, 1)
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_filter")), 0, 2)
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_scan")), 0, 3)
+
+        root = self.root_path_input.text().strip()
+        disk_folders = set()
+        if os.path.exists(root):
+            try: disk_folders = {f for f in os.listdir(root) if os.path.isdir(os.path.join(root, f))}
+            except: pass
+        
+        all_folders = sorted(list(disk_folders.union(saved_rules.keys())))
+        self.folder_widgets = {}
+        
+        row = 1
+        for folder in all_folders:
+            lbl = QLabel(folder)
+            if folder not in disk_folders:
+                lbl.setStyleSheet("color: red;")
+            
+            combo = QComboBox()
+            combo.addItems(["None", "Genre", "Collection", "Publisher", "Developer", "Year", "Other"])
+            
+            chk_filter = QCheckBox()
+            chk_scan = QCheckBox()
+            
+            if folder in saved_rules:
+                rule = saved_rules[folder]
+                combo.setCurrentText(rule.get("type", "None"))
+                chk_filter.setChecked(rule.get("filter", False))
+                chk_scan.setChecked(rule.get("scan", True))
+            else:
+                chk_scan.setChecked(False)
+            
+            combo.setEnabled(chk_scan.isChecked())
+            chk_filter.setEnabled(chk_scan.isChecked())
+            
+            chk_scan.stateChanged.connect(lambda state, c=combo, f=chk_filter: (c.setEnabled(state), f.setEnabled(state)))
+            
+            self.folders_grid.addWidget(lbl, row, 0)
+            self.folders_grid.addWidget(combo, row, 1)
+            self.folders_grid.addWidget(chk_filter, row, 2)
+            self.folders_grid.addWidget(chk_scan, row, 3)
+            
+            self.folder_widgets[folder] = {"combo": combo, "filter": chk_filter, "scan": chk_scan}
+            row += 1
+
+    def setup_data_tab(self):
+        layout = QVBoxLayout(self.tab_data)
+
+        grp_gog = QGroupBox(translator.tr("settings_data_gog_group"))
+        layout_gog = QGridLayout(grp_gog)
+        
+        self.chk_enable_gog = QCheckBox(translator.tr("settings_data_gog_checkbox"))
+        self.chk_enable_gog.toggled.connect(self.toggle_gog_input)
+
+        self.gog_db_input = QLineEdit()
+        default_path = os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db')
+        self.gog_db_input.setText(default_path)
+        
+        self.btn_browse_gog = QPushButton("...")
+        self.btn_browse_gog.setFixedWidth(40)
+        self.btn_browse_gog.clicked.connect(self.browse_gog_db)
+        
+        layout_gog.addWidget(self.chk_enable_gog, 0, 0)
+        layout_gog.addWidget(self.gog_db_input, 0, 1)
+        layout_gog.addWidget(self.btn_browse_gog, 0, 2)
+        
+        layout.addWidget(grp_gog)
+        
+        grp_media = QGroupBox(translator.tr("settings_data_media_group"))
+        layout_media = QGridLayout(grp_media)
+        
+        self.chk_download_videos = QCheckBox(translator.tr("settings_data_media_download_videos"))
+        
+        self.image_path_input = QLineEdit()
+        self.btn_browse_image = QPushButton("...")
+        self.btn_browse_image.setFixedWidth(40)
+        self.btn_browse_image.clicked.connect(self.browse_image_path)
+        
+        self.video_path_input = QLineEdit()
+        self.btn_browse_video = QPushButton("...")
+        self.btn_browse_video.setFixedWidth(40)
+        self.btn_browse_video.clicked.connect(self.browse_video_path)
+        
+        layout_media.addWidget(self.chk_download_videos, 0, 0, 1, 4)
+        layout_media.addWidget(QLabel(translator.tr("settings_data_media_images_path")), 1, 0)
+        layout_media.addWidget(self.image_path_input, 1, 1, 1, 2)
+        layout_media.addWidget(self.btn_browse_image, 1, 3)
+        
+        layout_media.addWidget(QLabel(translator.tr("settings_data_media_videos_path")), 2, 0)
+        layout_media.addWidget(self.video_path_input, 2, 1, 1, 2)
+        layout_media.addWidget(self.btn_browse_video, 2, 3)
+        
+        layout.addWidget(grp_media)
+        layout.addStretch()
+
+    def browse_root_path(self):
+        dir_path = QFileDialog.getExistingDirectory(self, "Select Root Folder", self.root_path_input.text())
+        if dir_path: self.root_path_input.setText(os.path.normpath(dir_path))
+
+    def browse_gog_db(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select GOG Database", self.gog_db_input.text(), "SQLite DB (*.db);;All Files (*.*)")
+        if file_path: self.gog_db_input.setText(file_path)
+
+    def browse_image_path(self):
+        dir_path = QFileDialog.getExistingDirectory(self, "Select Images Folder", self.image_path_input.text())
+        if dir_path: self.image_path_input.setText(os.path.normpath(dir_path))
+
+    def browse_video_path(self):
+        dir_path = QFileDialog.getExistingDirectory(self, "Select Videos Folder", self.video_path_input.text())
+        if dir_path: self.video_path_input.setText(os.path.normpath(dir_path))
+
+    def toggle_gog_input(self, checked):
+        self.gog_db_input.setEnabled(checked)
+        self.btn_browse_gog.setEnabled(checked)
+
+    def load_settings(self):
+        global_settings = {}
+        if os.path.exists("settings.json"):
+            try:
+                with open("settings.json", "r", encoding='utf-8') as f:
+                    global_settings = json.load(f)
+            except: pass
+
+        lib_settings_file = get_library_settings_file()
+        lib_settings = {}
+        if os.path.exists(lib_settings_file):
+            try:
+                with open(lib_settings_file, "r", encoding='utf-8') as f:
+                    lib_settings = json.load(f)
+            except: pass
+        else:
+            lib_settings = global_settings
+                
+        theme_map = {
+            "System": translator.tr("theme_system"),
+            "Dark": translator.tr("theme_dark"),
+            "Light": translator.tr("theme_light")
+        }
+        saved_theme_key = global_settings.get("theme", "System")
+        self.combo_theme.setCurrentText(theme_map.get(saved_theme_key, translator.tr("theme_system")))
+        self.combo_lang.setCurrentText(global_settings.get("language", "English"))
+
+        saved_img_size = global_settings.get("card_image_size", 200)
+        img_index = self.IMG_SIZES.index(min(self.IMG_SIZES, key=lambda x:abs(x-saved_img_size)))
+        self.slider_img_size.setValue(img_index)
+
+        saved_btn_size = global_settings.get("card_button_size", 45)
+        btn_index = self.BTN_SIZES.index(min(self.BTN_SIZES, key=lambda x:abs(x-saved_btn_size)))
+        self.slider_btn_size.setValue(btn_index)
+
+        saved_txt_size = global_settings.get("card_text_size", 22)
+        txt_index = self.TXT_SIZES.index(min(self.TXT_SIZES, key=lambda x:abs(x-saved_txt_size)))
+        self.slider_text_size.setValue(txt_index)
+        self.update_preview_labels()
+
+        self.root_path_input.setText(lib_settings.get("root_path", r"\\madhdd02\Software\GAMES"))
+        
+        local_config = lib_settings.get("local_scan_config", {})
+        self.chk_scan_local.setChecked(local_config.get("enable_local_scan", True))
+        self.toggle_local_scan_options(self.chk_scan_local.isChecked())
+        self.chk_ignore_hidden.setChecked(local_config.get("ignore_hidden", True))
+        
+        self.current_scan_mode = local_config.get("scan_mode", "advanced")
+        self.combo_global_type.setCurrentText(local_config.get("global_type", "Genre"))
+        self.chk_global_filter.setChecked(local_config.get("global_filter", True))
+
+        if self.current_scan_mode == "simple": self.switch_to_simple()
+        else: self.switch_to_advanced()
+        
+        self.populate_folders_list(local_config.get("folder_rules", {}))
+        
+        self.chk_enable_gog.setChecked(lib_settings.get("enable_gog_db", True))
+        self.gog_db_input.setText(lib_settings.get("gog_db_path", self.gog_db_input.text()))
+        self.toggle_gog_input(self.chk_enable_gog.isChecked())
+        
+        default_image_path = os.path.join(BASE_DIR, "images")
+        self.image_path_input.setText(lib_settings.get("image_path", default_image_path))
+        self.original_image_path = self.image_path_input.text()
+        
+        self.chk_download_videos.setChecked(lib_settings.get("download_videos", False))
+        default_video_path = os.path.join(BASE_DIR, "videos")
+        self.video_path_input.setText(lib_settings.get("video_path", default_video_path))
+        self.original_video_path = self.video_path_input.text()
+
+    def save_settings(self):
+        global_settings = {}
+        if os.path.exists("settings.json"):
+            try:
+                with open("settings.json", "r", encoding='utf-8') as f:
+                    global_settings = json.load(f)
+            except: pass
+            
+        theme_map_rev = {
+            translator.tr("theme_system"): "System",
+            translator.tr("theme_dark"): "Dark",
+            translator.tr("theme_light"): "Light"
+        }
+        global_settings["theme"] = theme_map_rev.get(self.combo_theme.currentText(), "System")
+        global_settings["language"] = self.combo_lang.currentText()
+        global_settings["card_image_size"] = self.IMG_SIZES[self.slider_img_size.value()]
+        global_settings["card_button_size"] = self.BTN_SIZES[self.slider_btn_size.value()]
+        global_settings["card_text_size"] = self.TXT_SIZES[self.slider_text_size.value()]
+        
+        try:
+            with open("settings.json", "w", encoding='utf-8') as f:
+                json.dump(global_settings, f, indent=4)
+        except Exception as e: pass
+
+        lib_settings_file = get_library_settings_file()
+        lib_settings = {}
+        if os.path.exists(lib_settings_file):
+            try:
+                with open(lib_settings_file, "r", encoding='utf-8') as f:
+                    lib_settings = json.load(f)
+            except: pass
+        elif os.path.exists("settings.json"):
+             lib_settings.update(global_settings)
+
+        lib_settings["root_path"] = self.root_path_input.text()
+        
+        folder_rules = {}
+        for folder, widgets in self.folder_widgets.items():
+            folder_rules[folder] = {
+                "type": widgets["combo"].currentText(),
+                "filter": widgets["filter"].isChecked(),
+                "scan": widgets["scan"].isChecked()
+            }
+        
+        lib_settings["local_scan_config"] = {
+            "enable_local_scan": self.chk_scan_local.isChecked(),
+            "ignore_hidden": self.chk_ignore_hidden.isChecked(),
+            "scan_mode": self.current_scan_mode,
+            "global_type": self.combo_global_type.currentText(),
+            "global_filter": self.chk_global_filter.isChecked(),
+            "folder_rules": folder_rules
+        }
+        
+        lib_settings["enable_gog_db"] = self.chk_enable_gog.isChecked()
+        lib_settings["gog_db_path"] = self.gog_db_input.text()
+        lib_settings["download_videos"] = self.chk_download_videos.isChecked()
+        
+        new_image_path = self.image_path_input.text()
+        lib_settings["image_path"] = new_image_path
+        
+        if new_image_path != self.original_image_path and os.path.exists(self.original_image_path):
+            reply = QMessageBox.question(self, "Move Image Files?",
+                f"The image folder has changed from:\n{self.original_image_path}\nto:\n{new_image_path}\n\n"
+                "Do you want to move existing image files to the new location?\n\n"
+                "YES: Moves files to the new location.\n"
+                "NO: Does NOT move files (Links may break until you move files manually).",
+                QMessageBox.Yes | QMessageBox.No)
+            
+            if reply == QMessageBox.Yes:
+                self.move_media_files(self.original_image_path, new_image_path, "image")
+        self.original_image_path = new_image_path
+        
+        new_video_path = self.video_path_input.text()
+        lib_settings["video_path"] = new_video_path
+        
+        if new_video_path != self.original_video_path and os.path.exists(self.original_video_path):
+            reply = QMessageBox.question(self, "Move Video Files?",
+                f"The video folder has changed from:\n{self.original_video_path}\nto:\n{new_video_path}\n\n"
+                "Do you want to move existing video files to the new location?\n\n"
+                "YES: Moves files to the new location.\n"
+                "NO: Does NOT move files (Links may break until you move files manually).",
+                QMessageBox.Yes | QMessageBox.No)
+            
+            if reply == QMessageBox.Yes:
+                self.move_media_files(self.original_video_path, new_video_path, "video")
+        
+        self.original_video_path = new_video_path
+        
+        try:
+            with open(lib_settings_file, "w", encoding='utf-8') as f:
+                json.dump(lib_settings, f, indent=4)
+        except Exception as e: pass
+
+        if self.parent_window and hasattr(self.parent_window, 'display_settings'):
+            self.parent_window.display_settings['image'] = self.IMG_SIZES[self.slider_img_size.value()]
+            self.parent_window.display_settings['button'] = self.BTN_SIZES[self.slider_btn_size.value()]
+            self.parent_window.display_settings['text'] = self.TXT_SIZES[self.slider_text_size.value()]
+
+    def move_media_files(self, old_path, new_path, media_type):
+        try:
+            os.makedirs(new_path, exist_ok=True)
+            files = [f for f in os.listdir(old_path) if os.path.isfile(os.path.join(old_path, f))]
+            count = 0
+            for f in files:
+                src = os.path.join(old_path, f)
+                dst = os.path.join(new_path, f)
+                shutil.move(src, dst)
+                count += 1
+            QMessageBox.information(self, "Success", f"Moved {count} files to new {media_type} folder.")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to move files: {e}")
+
+    def apply_settings(self):
+        self.save_settings()
+        if self.parent_window:
+            if hasattr(self.parent_window, 'reload_global_settings'):
+                self.parent_window.reload_global_settings()
+            if hasattr(self.parent_window, 'refresh_data'):
+                self.parent_window.refresh_data()
+
+    def accept(self):
+        self.apply_settings()
+        super().accept()

@@ -13,7 +13,7 @@ from PySide6.QtCore import Qt, QSize, QEvent
 from PySide6.QtGui import QIcon, QPixmap, QFont, QPalette
 
 from ViGaVault_utils import translator, get_image_path, get_video_path
-from ViGaVault_dialogs import ActionDialog
+from dialogs import ActionDialog
 from ViGaVault_workers import ImageLoader
 
 # --- CUSTOM WIDGETS ---
