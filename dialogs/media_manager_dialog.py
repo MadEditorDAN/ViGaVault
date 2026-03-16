@@ -319,7 +319,18 @@ class MediaManagerDialog(QDialog):
             
         if changes_made:
             self.manager.save_db()
-            self.global_changes_made = True
+            
+            # WHY: Target update without reloading the entire UI.
+            new_data = game.to_dict()
+            idx = self.parent_window.master_df.index[self.parent_window.master_df['Folder_Name'] == folder_name].tolist()
+            if idx:
+                for k, v in new_data.items(): self.parent_window.master_df.at[idx[0], k] = v
+            c_idx = self.parent_window.current_df.index[self.parent_window.current_df['Folder_Name'] == folder_name].tolist()
+            if c_idx:
+                for k, v in new_data.items(): self.parent_window.current_df.at[c_idx[0], k] = v
+                
+            if hasattr(self.parent_window, 'list_controller'):
+                self.parent_window.list_controller.update_single_card(folder_name)
             
             has_img = str(game.data.get('Has_Image')).lower() in ['true', '1']
             has_vid = str(game.data.get('Has_Video')).lower() in ['true', '1']

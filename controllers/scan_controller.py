@@ -206,8 +206,17 @@ class ScanController(QObject):
                     if reply == QMessageBox.Cancel:
                         return
 
-            self.mw.pending_anchor_folder = self.mw.current_scan_game.get('Folder_Name')
-            self.mw.library_controller.refresh_data()
+            # WHY: Target update without reloading the entire UI.
+            folder_name = self.mw.current_scan_game.get('Folder_Name')
+            new_data = game_obj.to_dict()
+            idx = self.mw.master_df.index[self.mw.master_df['Folder_Name'] == folder_name].tolist()
+            if idx:
+                for k, v in new_data.items(): self.mw.master_df.at[idx[0], k] = v
+            c_idx = self.mw.current_df.index[self.mw.current_df['Folder_Name'] == folder_name].tolist()
+            if c_idx:
+                for k, v in new_data.items(): self.mw.current_df.at[c_idx[0], k] = v
+                
+            self.mw.list_controller.update_single_card(folder_name)
             
             self.mw.sidebar.scan_results.clear()
             item = QListWidgetItem(translator.tr("sidebar_log_update_complete"))

@@ -175,8 +175,20 @@ class LibraryController(QObject):
                 reply = QMessageBox.warning(self.mw, "File Locked", translator.tr("msg_file_locked", db_path=get_db_path()), QMessageBox.Ok | QMessageBox.Cancel)
                 if reply == QMessageBox.Cancel: return
         
-        self.mw.pending_anchor_folder = folder_name
-        self.refresh_data()
+        # WHY: Patch Memory and Trigger Targeted Update instead of Hard Reload
+        # Extract the final dictionary from the Game object AFTER media renaming has occurred
+        final_data = game_obj.to_dict()
+        
+        idx = self.mw.master_df.index[self.mw.master_df['Folder_Name'] == folder_name].tolist()
+        if idx:
+            for k, v in final_data.items(): self.mw.master_df.at[idx[0], k] = v
+            
+        c_idx = self.mw.current_df.index[self.mw.current_df['Folder_Name'] == folder_name].tolist()
+        if c_idx:
+            for k, v in final_data.items(): self.mw.current_df.at[c_idx[0], k] = v
+            
+        self.mw.list_controller.update_single_card(folder_name)
+        self.save_settings()
 
     def execute_merge(self, folder_a, folder_b):
         manager = LibraryManager(build_scanner_config())
@@ -210,8 +222,22 @@ class LibraryController(QObject):
             except: pass
                 
         manager.save_db()
-        self.mw.pending_anchor_folder = folder_a
-        self.refresh_data()
+        
+        # WHY: Soft-refresh logic (Memory Patch + Visually deleting the sacrificed card)
+        new_data_a = game_a.to_dict()
+        idx_a = self.mw.master_df.index[self.mw.master_df['Folder_Name'] == folder_a].tolist()
+        if idx_a:
+            for k, v in new_data_a.items(): self.mw.master_df.at[idx_a[0], k] = v
+        c_idx_a = self.mw.current_df.index[self.mw.current_df['Folder_Name'] == folder_a].tolist()
+        if c_idx_a:
+            for k, v in new_data_a.items(): self.mw.current_df.at[c_idx_a[0], k] = v
+            
+        self.mw.master_df = self.mw.master_df[self.mw.master_df['Folder_Name'] != folder_b]
+        self.mw.current_df = self.mw.current_df[self.mw.current_df['Folder_Name'] != folder_b]
+
+        self.mw.list_controller.update_single_card(folder_a)
+        self.mw.list_controller.remove_single_card(folder_b)
+        self.save_settings()
         return True
 
     def update_game_flags(self, folder_name, flags_dict):
@@ -224,6 +250,9 @@ class LibraryController(QObject):
             idx = self.mw.master_df.index[self.mw.master_df['Folder_Name'] == folder_name].tolist()
             if idx:
                 for k, v in flags_dict.items(): self.mw.master_df.at[idx[0], k] = v
+            c_idx = self.mw.current_df.index[self.mw.current_df['Folder_Name'] == folder_name].tolist()
+            if c_idx:
+                for k, v in flags_dict.items(): self.mw.current_df.at[c_idx[0], k] = v
 
     def save_settings(self):
         global_settings = {}

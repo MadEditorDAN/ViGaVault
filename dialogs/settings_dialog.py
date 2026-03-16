@@ -395,6 +395,15 @@ class SettingsDialog(QDialog):
         self.image_path_input.setText(lib_settings.get("image_path", default_image_path))
         self.original_image_path = self.image_path_input.text()
         
+        # WHY: "Dirty Flags" initialization. We save the starting states of purely cosmetic variables.
+        self.initial_theme = global_settings.get("theme", "System")
+        self.initial_lang = global_settings.get("language", "English")
+        self.initial_img_size = global_settings.get("card_image_size", 200)
+        self.initial_btn_size = global_settings.get("card_button_size", 45)
+        self.initial_txt_size = global_settings.get("card_text_size", 22)
+        self.initial_gog = lib_settings.get("enable_gog_db", True)
+        self.initial_local = lib_settings.get("local_scan_config", {}).get("enable_local_scan", True)
+        
         self.chk_download_videos.setChecked(lib_settings.get("download_videos", False))
         default_video_path = os.path.join(BASE_DIR, "videos")
         self.video_path_input.setText(lib_settings.get("video_path", default_video_path))
@@ -514,11 +523,40 @@ class SettingsDialog(QDialog):
 
     def apply_settings(self):
         self.save_settings()
-        if self.parent_window:
-            if hasattr(self.parent_window, 'reload_global_settings'):
+        
+        # WHY: Smart Refresh logic checking Dirty Flags
+        theme_map_rev = {translator.tr("theme_system"): "System", translator.tr("theme_dark"): "Dark", translator.tr("theme_light"): "Light"}
+        new_theme = theme_map_rev.get(self.combo_theme.currentText(), "System")
+        new_lang = self.combo_lang.currentText()
+        new_img = self.IMG_SIZES[self.slider_img_size.value()]
+        new_btn = self.BTN_SIZES[self.slider_btn_size.value()]
+        new_txt = self.TXT_SIZES[self.slider_text_size.value()]
+        
+        if new_theme != self.initial_theme or new_lang != self.initial_lang:
+            if self.parent_window and hasattr(self.parent_window, 'reload_global_settings'):
                 self.parent_window.reload_global_settings()
-            if hasattr(self.parent_window, 'refresh_data'):
-                self.parent_window.refresh_data()
+                self.initial_theme = new_theme
+                self.initial_lang = new_lang
+                
+        if new_img != self.initial_img_size or new_btn != self.initial_btn_size or new_txt != self.initial_txt_size:
+            if self.parent_window and hasattr(self.parent_window, 'list_controller'):
+                self.parent_window.list_controller.apply_display_settings(self.parent_window.display_settings)
+                self.initial_img_size = new_img
+                self.initial_btn_size = new_btn
+                self.initial_txt_size = new_txt
+                
+        new_gog = self.chk_enable_gog.isChecked()
+        new_local = self.chk_scan_local.isChecked()
+        
+        # WHY: Dynamically push disabled states back to the quick-toggles in the sidebar
+        if new_gog != self.initial_gog or new_local != self.initial_local:
+            if self.parent_window and hasattr(self.parent_window, 'sidebar'):
+                self.parent_window.sidebar.chk_scan_gog.setEnabled(new_gog)
+                if not new_gog: self.parent_window.sidebar.chk_scan_gog.setChecked(False)
+                self.parent_window.sidebar.chk_scan_local.setEnabled(new_local)
+                if not new_local: self.parent_window.sidebar.chk_scan_local.setChecked(False)
+            self.initial_gog = new_gog
+            self.initial_local = new_local
 
     def accept(self):
         self.apply_settings()

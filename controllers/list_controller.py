@@ -50,6 +50,9 @@ class ListController(QObject):
         vp_width = self.mw.list_widget.viewport().width()
         viewport_width = vp_width if vp_width > 100 else 600
         
+        # WHY: Anchor to the top visible item to prevent the view from jumping when resizing.
+        top_item = self.mw.list_widget.itemAt(0, 0)
+
         for i in range(self.mw.list_widget.count()):
             item = self.mw.list_widget.item(i)
             widget = self.mw.list_widget.itemWidget(item)
@@ -60,6 +63,51 @@ class ListController(QObject):
                 widget.setMinimumWidth(0)
                 widget.setMaximumWidth(16777215)
         self.mw.last_viewport_width = viewport_width
+        
+        if top_item:
+            self.mw.list_widget.scrollToItem(top_item, QAbstractItemView.PositionAtTop)
+
+    def update_single_card(self, folder_name):
+        """WHY: Finds a specific GameCard and forces it to redraw using updated memory data."""
+        row_data = self.mw.master_df[self.mw.master_df['Folder_Name'] == folder_name]
+        if row_data.empty: return
+        game_dict = row_data.iloc[0].to_dict()
+        
+        for i in range(self.mw.list_widget.count()):
+            item = self.mw.list_widget.item(i)
+            if item.data(Qt.UserRole) == folder_name:
+                card = self.mw.list_widget.itemWidget(item)
+                if card:
+                    card.data = game_dict
+                    card.refresh_ui_from_data()
+                    item.setSizeHint(card.calculate_size_hint(card.width()))
+                break
+
+    def remove_single_card(self, folder_name):
+        """WHY: Visually destroys a GameCard instantly without a full database reload (Used in Merges)."""
+        for i in range(self.mw.list_widget.count()):
+            item = self.mw.list_widget.item(i)
+            if item.data(Qt.UserRole) == folder_name:
+                self.mw.list_widget.takeItem(i)
+                if self.mw.loaded_count > 0:
+                    self.mw.loaded_count -= 1
+                self.mw.sidebar.lbl_counter.setText(f"{len(self.mw.current_df)}/{len(self.mw.master_df)}")
+                break
+
+    def apply_display_settings(self, settings):
+        """WHY: Extremely fast loop to dynamically scale all visual cards during setting changes."""
+        # WHY: Anchor to the top visible item to prevent the view from jumping when settings change.
+        top_item = self.mw.list_widget.itemAt(0, 0)
+        
+        for i in range(self.mw.list_widget.count()):
+            item = self.mw.list_widget.item(i)
+            card = self.mw.list_widget.itemWidget(item)
+            if card:
+                card.update_style(settings)
+                item.setSizeHint(card.calculate_size_hint(card.width()))
+                
+        if top_item:
+            self.mw.list_widget.scrollToItem(top_item, QAbstractItemView.PositionAtTop)
 
     def restore_scroll_position(self, retries=10):
         if not hasattr(self.mw, 'pending_scroll'):

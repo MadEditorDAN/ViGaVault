@@ -526,6 +526,52 @@ class GameCard(QWidget):
         details_layout.addWidget(self.summary_content)
         main_layout.addLayout(details_layout)
 
+    def refresh_ui_from_data(self):
+        """WHY: Allows surgical updates of the UI instantly without reloading the widget or the list."""
+        # Update Texts
+        self.title_lbl.setText(self.data.get('Clean_Title', 'Unknown'))
+        path_root = self.data.get('Path_Root', '')
+        self.path_lbl.setText(f"({path_root})" if path_root else "")
+        
+        # Update Buttons
+        vid_name = str(self.data.get('Path_Video', '')).strip()
+        self.video_path = os.path.join(get_video_path(), os.path.basename(vid_name)) if vid_name else ''
+        self.trailer_link = self.data.get('Trailer_Link', '')
+        
+        has_local_folder = str(self.data.get('Is_Local')).lower() in ['true', '1']
+        has_local_video = str(self.data.get('Has_Video')).lower() in ['true', '1']
+        has_trailer = bool(self.trailer_link and self.trailer_link.startswith('http'))
+        
+        self.buttons['local_video'].setEnabled(has_local_video)
+        self.buttons['youtube'].setEnabled(has_trailer)
+        self.buttons['folder'].setEnabled(has_local_folder)
+        
+        # Update Image (Only reload if path actually changed to save IO)
+        img_name = self.data.get('Image_Link', '')
+        new_image_path = os.path.join(get_image_path(), os.path.basename(img_name)) if img_name else ''
+        if new_image_path != self.image_path:
+            self.image_path = new_image_path
+            if self.image_path:
+                self.start_image_load(self.image_path)
+            else:
+                self.img_label.setText("No Image")
+                self.img_label.setStyleSheet("border: 1px solid #555;")
+                self.cached_pixmap = None
+                
+        # Update Metadata info labels dynamically
+        fields = ['Original_Release_Date', 'Platforms', 'Genre', 'Developer', 'Publisher', 'Collection']
+        for i, field in enumerate(fields):
+            display_name = 'Developer'
+            if field == 'Original_Release_Date': display_name = translator.tr("gamecard_info_release_date")
+            elif field == 'Platforms': display_name = translator.tr("gamecard_info_platforms")
+            elif field == 'Genre': display_name = translator.tr("gamecard_info_genre")            
+            elif field == 'Developer': display_name = translator.tr("gamecard_info_developer")
+            elif field == 'Publisher': display_name = translator.tr("gamecard_info_publisher")
+            elif field == 'Collection': display_name = translator.tr("gamecard_info_collection")
+            self.info_labels[i].setText(f"<b>{display_name}:</b> {self.data.get(field, '')}")
+            
+        self.summary_content.setText(self.data.get('Summary', ''))
+
     def start_image_load(self, path):
         loader = ImageLoader(path)
         loader.signals.loaded.connect(self.on_image_loaded)
