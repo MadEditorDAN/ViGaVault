@@ -7,7 +7,7 @@ import pandas as pd
 from PySide6.QtCore import QThread, Signal, QRunnable, QObject
 from PySide6.QtGui import QImage
 
-from ViGaVault_Scan import LibraryManager
+from backend.library import LibraryManager
 from ViGaVault_utils import get_db_path, build_scanner_config
 
 # --- WORKER THREADS ---

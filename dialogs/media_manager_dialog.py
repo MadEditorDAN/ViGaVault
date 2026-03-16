@@ -10,8 +10,8 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, Q
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QIcon
 
-from ViGaVault_Scan import LibraryManager, get_safe_filename
-from ViGaVault_utils import BASE_DIR, build_scanner_config, translator
+from backend.library import LibraryManager
+from ViGaVault_utils import BASE_DIR, build_scanner_config, translator, get_safe_filename
 
 class MediaManagerDialog(QDialog):
     def __init__(self, parent=None):

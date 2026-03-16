@@ -210,7 +210,6 @@ class FilterController(QObject):
         if has_scroll:
             QTimer.singleShot(100, self.mw.list_controller.restore_scroll_position)
         else:
-            self.mw.left_layout.setCurrentIndex(1)
             self.mw.sidebar.setEnabled(True)
             self.mw.list_widget.setEnabled(True)
             self.mw.sidebar.search_bar.setFocus()

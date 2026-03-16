@@ -11,8 +11,8 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QWidget, QGrou
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 
-from ViGaVault_Scan import LibraryManager, get_safe_filename
-from ViGaVault_utils import BASE_DIR, get_image_path, get_video_path, build_scanner_config, translator
+from backend.library import LibraryManager
+from ViGaVault_utils import BASE_DIR, get_image_path, get_video_path, build_scanner_config, translator, get_safe_filename
 
 # WHY: Use a relative import to access the Merge tool from within the same package safely.
 from .merge_tool_dialogs import MergeSelectionDialog

@@ -7,7 +7,7 @@ from PySide6.QtCore import QObject, Qt, QTimer
 from PySide6.QtWidgets import QMessageBox, QListWidgetItem
 from PySide6.QtGui import QPixmap, QIcon
 
-from ViGaVault_Scan import LibraryManager
+from backend.library import LibraryManager
 from ViGaVault_utils import build_scanner_config, get_db_path, translator, QtLogSignal, QtLogHandler
 from ViGaVault_workers import FullScanWorker
 

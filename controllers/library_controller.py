@@ -4,10 +4,10 @@ import shutil
 import logging
 from datetime import datetime
 import pandas as pd
-from PySide6.QtCore import QObject, Slot
+from PySide6.QtCore import QObject, Slot, QByteArray
 from PySide6.QtWidgets import QFileDialog, QMessageBox, QApplication
 
-from ViGaVault_Scan import LibraryManager
+from backend.library import LibraryManager
 from ViGaVault_utils import (get_db_path, get_library_settings_file, build_scanner_config, 
                              get_platform_config, apply_theme, translator)
 from ViGaVault_workers import DbLoaderWorker, StartupSyncWorker
@@ -70,7 +70,6 @@ class LibraryController(QObject):
         self.load_database_async()
 
     def load_database_async(self):
-        self.mw.left_layout.setCurrentIndex(0) 
         self.mw.list_widget.clear()
         self.mw.sidebar.setEnabled(False)
         self.db_worker = DbLoaderWorker()
@@ -89,6 +88,12 @@ class LibraryController(QObject):
                 with open(lib_settings_file, "r", encoding='utf-8') as f:
                     lib_settings = json.load(f)
             except: pass
+
+        # WHY: Ensure scroll position is seamlessly recovered when switching libraries mid-session.
+        if not hasattr(self.mw, 'pending_scroll') and not getattr(self.mw, 'pending_anchor_folder', None):
+            saved_scroll = lib_settings.get("scroll_value", 0)
+            if saved_scroll > 0:
+                self.mw.pending_scroll = saved_scroll
 
         saved_filters = lib_settings.get("filter_states")
         saved_expansion = lib_settings.get("filter_expansion")
@@ -298,7 +303,8 @@ class LibraryController(QObject):
 
         try:
             if "geometry" in global_settings:
-                self.mw.restoreGeometry(global_settings["geometry"].encode())
+                # WHY: The JSON stores a base64 string. We must decode it back to a binary QByteArray for Qt.
+                self.mw.restoreGeometry(QByteArray.fromBase64(global_settings["geometry"].encode('utf-8')))
             self.mw.sort_desc = lib_settings.get("sort_desc", True)
             self.mw.sidebar.update_sort_button(self.mw.sort_desc)
             
@@ -345,6 +351,11 @@ class LibraryController(QObject):
             return 0
 
     def refresh_data(self):
+        # WHY: Automatically preserve the user's scroll position during mid-session refreshes 
+        # (like Full Scans) as long as no explicit game anchor was requested.
+        if not getattr(self.mw, 'pending_anchor_folder', None):
+            self.mw.pending_scroll = self.mw.list_widget.verticalScrollBar().value()
+            
         self.save_settings()
         self.load_database_async()
 

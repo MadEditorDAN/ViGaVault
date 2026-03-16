@@ -2,7 +2,9 @@
 # to keep the main UI file cleaner and more maintainable.
 import os
 import json
+import re
 import logging
+import ctypes
 from datetime import datetime
 from PySide6.QtWidgets import QApplication, QStyleFactory
 from PySide6.QtGui import QPalette, QColor
@@ -10,6 +12,34 @@ from PySide6.QtCore import Qt, QObject, Signal
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
+
+def get_safe_filename(name):
+    safe_name = name.replace(':', ' ')
+    safe_name = re.sub(r'[^\w\s\-\.\(\)\[\]]', '', safe_name).strip()
+    safe_name = re.sub(r'\s{2,}', ' ', safe_name).strip()
+    safe_name = safe_name.rstrip('. ')
+    return safe_name
+
+def is_hidden(filepath):
+    try:
+        attrs = ctypes.windll.kernel32.GetFileAttributesW(filepath)
+        return attrs != -1 and (attrs & 2)
+    except:
+        return False
+
+def normalize_genre(text):
+    if not text: return ""
+    parts = str(text).split(',')
+    clean_parts = []
+    seen = set()
+    for p in parts:
+        p = p.strip()
+        if not p: continue
+        p_norm = p.title()
+        if p_norm.lower() not in seen:
+            clean_parts.append(p_norm)
+            seen.add(p_norm.lower())
+    return ", ".join(clean_parts)
 
 def get_db_path():
     """Reads the db_path from settings.json, falling back to the default."""
@@ -127,6 +157,22 @@ def get_local_scan_config():
 def build_scanner_config():
     """Builds the comprehensive configuration dict required by LibraryManager."""
     p_map, p_ignore = get_platform_config()
+    
+    settings_path = get_library_settings_file()
+    global_settings_path = os.path.join(BASE_DIR, "settings.json")
+    if not os.path.exists(settings_path):
+        settings_path = global_settings_path
+        
+    enable_gog = True
+    gog_path = os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db')
+    if os.path.exists(settings_path):
+        try:
+            with open(settings_path, "r", encoding='utf-8') as f:
+                settings = json.load(f)
+                enable_gog = settings.get("enable_gog_db", True)
+                gog_path = settings.get("gog_db_path", gog_path)
+        except: pass
+
     return {
         'db_file': get_db_path(),
         'root_path': get_root_path(),
@@ -134,7 +180,9 @@ def build_scanner_config():
         'video_path': get_video_path(),
         'platform_map': p_map,
         'ignored_prefixes': p_ignore,
-        'local_scan_config': get_local_scan_config()
+        'local_scan_config': get_local_scan_config(),
+        'enable_gog_db': enable_gog,
+        'gog_db_path': gog_path
     }
 
 def setup_logging():

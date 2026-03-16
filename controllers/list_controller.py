@@ -63,7 +63,6 @@ class ListController(QObject):
 
     def restore_scroll_position(self, retries=10):
         if not hasattr(self.mw, 'pending_scroll'):
-            self.mw.left_layout.setCurrentIndex(1)
             self.mw.sidebar.setEnabled(True)
             self.mw.list_widget.setEnabled(True)
             return
@@ -79,7 +78,6 @@ class ListController(QObject):
         else:
             sb.setValue(self.mw.pending_scroll)
             del self.mw.pending_scroll
-            self.mw.left_layout.setCurrentIndex(1)
             self.mw.sidebar.setEnabled(True)
             self.mw.list_widget.setEnabled(True)
             self.mw.sidebar.search_bar.setFocus()

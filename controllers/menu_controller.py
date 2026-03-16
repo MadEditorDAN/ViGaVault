@@ -70,11 +70,10 @@ class MenuController(QObject):
         dlg.exec()
 
     def show_media_manager(self):
-        current_scroll = self.mw.list_widget.verticalScrollBar().value()
+        # WHY: Media manager refresh relies on the centralized scroll tracking in LibraryController (DRY).
         dlg = MediaManagerDialog(self.mw)
         dlg.exec()
         if getattr(dlg, 'global_changes_made', False):
-            self.mw.pending_scroll = current_scroll
             self.mw.library_controller.refresh_data()
 
     def show_statistics(self):

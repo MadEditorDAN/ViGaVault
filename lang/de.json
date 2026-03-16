@@ -178,7 +178,6 @@
     "sidebar_log_searching": "Suche auf IGDB...",
     "sidebar_log_no_results": "Keine Ergebnisse gefunden.",
     "sidebar_log_update_complete": "Aktualisierung abgeschlossen!",
-    "msg_loading_db": "Datenbank wird geladen...",
     "msg_save_success": "Bibliothek erfolgreich gespeichert unter\n{db_path}.",
     "msg_file_locked": "Die Datei {db_path} ist in einem anderen Programm (z.B. Excel) geöffnet.\n\nBitte schließen Sie es und versuchen Sie es erneut."
 }

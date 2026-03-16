@@ -6,7 +6,7 @@ import pandas as pd
 import os
 import json
 from PySide6.QtWidgets import (QApplication, QMainWindow, QListWidget, QWidget, 
-                               QHBoxLayout, QAbstractItemView, QStackedLayout, QLabel)
+                               QHBoxLayout, QAbstractItemView)
 from PySide6.QtCore import Qt, QTimer, QThreadPool, Slot
 from PySide6.QtGui import QFont
 
@@ -46,23 +46,11 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
         
-        self.left_container = QWidget()
-        self.left_layout = QStackedLayout(self.left_container)
-        
-        self.loading_label = QLabel("Loading Database...")
-        self.loading_label.setAlignment(Qt.AlignCenter)
-        font = QFont()
-        font.setPointSize(24)
-        font.setBold(True)
-        self.loading_label.setFont(font)
-        
         self.list_widget = QListWidget()
         self.list_widget.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
         self.list_widget.verticalScrollBar().setSingleStep(25)
         
-        self.left_layout.addWidget(self.loading_label) # Index 0
-        self.left_layout.addWidget(self.list_widget)   # Index 1
-        main_layout.addWidget(self.left_container, stretch=3)
+        main_layout.addWidget(self.list_widget, stretch=3)
         
         # 3. Sidebar (right, takes 1/4 of the space)
         # The entire design (filters + scan) is handled in the Sidebar class
