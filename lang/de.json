@@ -47,6 +47,7 @@
     "settings_data_gog_group": "GOG Galaxy",
     "settings_data_gog_checkbox": "GOG Galaxy DB",
     "settings_data_media_group": "Medien-Download",
+    "settings_data_media_download_images": "Bilder herunterladen",
     "settings_data_media_download_videos": "Videos herunterladen",
     "settings_data_media_images_path": "Bildpfad:",
     "settings_data_media_videos_path": "Videopfad:",

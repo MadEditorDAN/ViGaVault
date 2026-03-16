@@ -165,12 +165,16 @@ def build_scanner_config():
         
     enable_gog = True
     gog_path = os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db')
+    download_images = True
+    download_videos = False
     if os.path.exists(settings_path):
         try:
             with open(settings_path, "r", encoding='utf-8') as f:
                 settings = json.load(f)
                 enable_gog = settings.get("enable_gog_db", True)
                 gog_path = settings.get("gog_db_path", gog_path)
+                download_images = settings.get("download_images", True)
+                download_videos = settings.get("download_videos", False)
         except: pass
 
     return {
@@ -182,7 +186,9 @@ def build_scanner_config():
         'ignored_prefixes': p_ignore,
         'local_scan_config': get_local_scan_config(),
         'enable_gog_db': enable_gog,
-        'gog_db_path': gog_path
+        'gog_db_path': gog_path,
+        'download_images': download_images,
+        'download_videos': download_videos
     }
 
 def setup_logging():

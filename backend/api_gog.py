@@ -271,9 +271,145 @@ def sync_gog_database(config, games_dict, worker_thread=None):
             file_year = f" ({release_date[-4:]})" if release_date else ''
             safe_filename = get_safe_filename(f"{base_filename}{file_year}")
 
-            # Bypassing media code for brevity in this architectural split - it functions identical to old code.
+            # --- VIDEO MANAGEMENT (Trailer & Download) ---
             video_url = game_obj.data.get('Trailer_Link')
-            steam_app_id = releaseKey.replace('steam_', '') if platform == 'Steam' else next((r.replace('steam_', '') for r in releases_list if r.startswith('steam_')), None)
+            existing_trailer = game_obj.data.get('Trailer_Link', '')
+            
+            steam_app_id = None
+            if platform == 'Steam':
+                steam_app_id = releaseKey.replace('steam_', '')
+            else:
+                for r in releases_list:
+                    if r.startswith('steam_'):
+                        steam_app_id = r.replace('steam_', '')
+                        break
+
+            if not existing_trailer and steam_app_id and steam_app_id.isdigit():
+                try:
+                    app_id = steam_app_id
+                    steam_url = f"https://store.steampowered.com/api/appdetails?appids={app_id}"
+                    headers = {'User-Agent': 'ViGaVault/1.0'}
+                    resp = requests.get(steam_url, timeout=5, headers=headers)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if data and data.get(app_id, {}).get('success'):
+                            movies = data[app_id]['data'].get('movies', [])
+                            if movies:
+                                video_url = movies[0].get('mp4', {}).get('max')
+                                if not video_url: video_url = movies[0].get('hls_h264')
+                                if not video_url: video_url = 'Not_on_Steam'
+                            else:
+                                video_url = 'Not_on_Steam'
+                        else:
+                            video_url = 'Not_on_Steam'
+                except Exception as e: pass
+
+            if video_url: game_obj.data['Trailer_Link'] = video_url
+
+            # --- C. Video Download (yt-dlp) & Physical Check ---
+            existing_video_name = game_obj.data.get('Path_Video')
+            existing_video_path = os.path.join(video_dir, os.path.basename(existing_video_name)) if existing_video_name else ''
+            video_exists_on_disk = bool(existing_video_name and os.path.exists(existing_video_path))
+            
+            if video_exists_on_disk: stats['videos_found_existing'] += 1
+
+            if not video_exists_on_disk:
+                for ext in VIDEO_EXTS:
+                    potential_path = os.path.join(video_dir, f"{safe_filename}{ext}")
+                    if os.path.exists(potential_path):
+                        game_obj.data['Path_Video'] = f"{safe_filename}{ext}"
+                        video_exists_on_disk = True
+                        stats['videos_found_existing'] += 1
+                        break
+
+            if worker_thread and worker_thread.isInterruptionRequested(): break
+
+            is_youtube = video_url and ('youtube.com' in video_url or 'youtu.be' in video_url)
+            is_downloadable_url = video_url and video_url.startswith('http') and not is_youtube
+
+            if is_downloadable_url and not video_exists_on_disk:
+                # WHY: Respect the Media Download config
+                if config.get('download_videos', False):
+                    if YT_DLP_AVAILABLE:
+                        try:
+                            logging.info(f"    [VIDEO] Found video URL, downloading with yt-dlp: {safe_filename} ...")
+                            def progress_hook(d):
+                                if worker_thread and worker_thread.isInterruptionRequested():
+                                    raise Exception("Download interrupted by user")
+                            ydl_opts = {
+                                'outtmpl': os.path.join(video_dir, f"{safe_filename}.%(ext)s"),
+                                'quiet': True,
+                                'no_warnings': True,
+                                'format': 'bestvideo+bestaudio/best', 
+                                'progress_hooks': [progress_hook],
+                            }
+                            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                                info = ydl.extract_info(video_url, download=True)
+                                filename = ydl.prepare_filename(info)
+                                if os.path.exists(filename):
+                                    game_obj.data['Path_Video'] = os.path.basename(filename)
+                                    stats['videos_downloaded'] += 1
+                        except Exception as e:
+                            if "Download interrupted" in str(e): break
+                            stats['videos_download_fail'] += 1
+                    else:
+                        if not getattr(LibraryManager, '_yt_dlp_warning_logged', False):
+                            logging.warning("    [VIDEO] yt-dlp module not installed, skipping video downloads.")
+                            LibraryManager._yt_dlp_warning_logged = True
+
+            # --- D. Image Download & Physical Check ---
+            cover_url = meta_data.get('image')
+            if not cover_url:
+                orig_imgs = safe_json_load(original_images_json)
+                if orig_imgs:
+                    cover_url = orig_imgs.get('verticalCover') or orig_imgs.get('boxart') or orig_imgs.get('poster') or orig_imgs.get('squareIcon') or orig_imgs.get('background')
+
+            if not cover_url and ld_images:
+                imgs = safe_json_load(ld_images)
+                if isinstance(imgs, list) and len(imgs) > 0:
+                    preferred_types = ['boxart', 'vertical_cover', 'packshot', 'poster']
+                    cover_url = next((img.get('url') for img in imgs if img.get('type') in preferred_types), None)
+                    if not cover_url:
+                        cover_url = next((img.get('url') for img in imgs if img.get('type') != 'screenshot'), None)
+            
+            if cover_url:
+                if cover_url.startswith('//'): cover_url = "https:" + cover_url
+                
+                existing_image_name = game_obj.data.get('Image_Link')
+                existing_image_path = os.path.join(images_dir, os.path.basename(existing_image_name)) if existing_image_name else ''
+                image_exists_on_disk = bool(existing_image_name and os.path.exists(existing_image_path))
+
+                if image_exists_on_disk: stats['images_found_existing'] += 1
+
+                if not image_exists_on_disk:
+                    for check_ext in ['.jpg', '.png', '.jpeg', '.webp']:
+                        check_path = os.path.join(images_dir, f"{safe_filename}{check_ext}")
+                        if os.path.exists(check_path):
+                            game_obj.data['Image_Link'] = f"{safe_filename}{check_ext}"
+                            image_exists_on_disk = True
+                            stats['images_found_existing'] += 1
+                            break
+
+                if not image_exists_on_disk:
+                    try:
+                        path = urlparse(cover_url).path
+                        ext = os.path.splitext(path)[1]
+                        if not ext and 'gog.com' in cover_url: ext = '.webp'
+                        elif not ext: ext = '.jpg'
+                    except: ext = '.jpg'
+                    
+                    save_path = os.path.join(images_dir, f"{safe_filename}{ext}")
+                    
+                    # WHY: Respect the Media Download config
+                    if config.get('download_images', True):
+                        try:
+                            response = requests.get(cover_url, timeout=5)
+                            if response.status_code == 200:
+                                with open(save_path, 'wb') as f: f.write(response.content)
+                                game_obj.data['Image_Link'] = f"{safe_filename}{ext}"
+                                logging.info(f"    [IMAGE] Downloaded missing image: {safe_filename}{ext}")
+                                stats['images_downloaded'] += 1
+                        except Exception as e: pass
 
             # End of loop assignment
             if force_media_refresh: game_obj.data['Status_Flag'] = 'OK'

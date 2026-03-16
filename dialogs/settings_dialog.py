@@ -285,28 +285,32 @@ class SettingsDialog(QDialog):
         layout.addWidget(grp_gog)
         
         grp_media = QGroupBox(translator.tr("settings_data_media_group"))
-        layout_media = QGridLayout(grp_media)
+        # WHY: Using QVBoxLayout containing QHBoxLayouts to tightly pack items horizontally and push checkboxes to the right edge.
+        layout_media = QVBoxLayout(grp_media)
         
-        self.chk_download_videos = QCheckBox(translator.tr("settings_data_media_download_videos"))
-        
+        row_img = QHBoxLayout()
+        row_img.addWidget(QLabel(translator.tr("settings_data_media_images_path")))
         self.image_path_input = QLineEdit()
+        row_img.addWidget(self.image_path_input, 1) # stretch=1 forces the text box to take all dead space
         self.btn_browse_image = QPushButton("...")
         self.btn_browse_image.setFixedWidth(40)
         self.btn_browse_image.clicked.connect(self.browse_image_path)
+        row_img.addWidget(self.btn_browse_image)
+        self.chk_download_images = QCheckBox(translator.tr("settings_data_media_download_images"))
+        row_img.addWidget(self.chk_download_images)
+        layout_media.addLayout(row_img)
         
+        row_vid = QHBoxLayout()
+        row_vid.addWidget(QLabel(translator.tr("settings_data_media_videos_path")))
         self.video_path_input = QLineEdit()
+        row_vid.addWidget(self.video_path_input, 1) # stretch=1
         self.btn_browse_video = QPushButton("...")
         self.btn_browse_video.setFixedWidth(40)
         self.btn_browse_video.clicked.connect(self.browse_video_path)
-        
-        layout_media.addWidget(self.chk_download_videos, 0, 0, 1, 4)
-        layout_media.addWidget(QLabel(translator.tr("settings_data_media_images_path")), 1, 0)
-        layout_media.addWidget(self.image_path_input, 1, 1, 1, 2)
-        layout_media.addWidget(self.btn_browse_image, 1, 3)
-        
-        layout_media.addWidget(QLabel(translator.tr("settings_data_media_videos_path")), 2, 0)
-        layout_media.addWidget(self.video_path_input, 2, 1, 1, 2)
-        layout_media.addWidget(self.btn_browse_video, 2, 3)
+        row_vid.addWidget(self.btn_browse_video)
+        self.chk_download_videos = QCheckBox(translator.tr("settings_data_media_download_videos"))
+        row_vid.addWidget(self.chk_download_videos)
+        layout_media.addLayout(row_vid)
         
         layout.addWidget(grp_media)
         layout.addStretch()
@@ -464,6 +468,7 @@ class SettingsDialog(QDialog):
         
         lib_settings["enable_gog_db"] = self.chk_enable_gog.isChecked()
         lib_settings["gog_db_path"] = self.gog_db_input.text()
+        lib_settings["download_images"] = self.chk_download_images.isChecked()
         lib_settings["download_videos"] = self.chk_download_videos.isChecked()
         
         new_image_path = self.image_path_input.text()

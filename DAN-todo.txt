@@ -2,7 +2,7 @@
 
 @workspace, read the file INSTRUCTIONS.md and use it as a set of rules for all your future answers on this project.
 
-Let's discuss, no code.
+
 
 For each point, give your insight and some explanation of why/how it happened and how you fixed it.
 Remember to always : 
@@ -11,6 +11,14 @@ Remember to always :
  - Use DRY principle 
  - Use the Single Responsibility Principle
  - Do not put all the code in the UI script, use all the other script as they were created for.
+ - when possible use the "smart refresh" and the "targeted update"
+ 
+Let's discuss, no code.
+
+
+
+
+
 
 Games to fix :
 Doom project

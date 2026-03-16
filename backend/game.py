@@ -178,12 +178,14 @@ class Game:
 
             save_path = os.path.join(images_dir, f"{safe_filename}{ext}")
             
-            try:
-                response = requests.get(cover_url, stream=True)
-                if response.status_code == 200:
-                    with open(save_path, 'wb') as f: shutil.copyfileobj(response.raw, f)
-                    return f"{safe_filename}{ext}"
-            except Exception as e: pass
+            # WHY: Only process the HTTP download request if allowed globally, or manually overridden.
+            if self.config.get('download_images', True) or force_download:
+                try:
+                    response = requests.get(cover_url, stream=True)
+                    if response.status_code == 200:
+                        with open(save_path, 'wb') as f: shutil.copyfileobj(response.raw, f)
+                        return f"{safe_filename}{ext}"
+                except Exception as e: pass
         return ""
 
     def fetch_metadata(self, token):

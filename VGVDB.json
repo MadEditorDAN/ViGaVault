@@ -8,7 +8,7 @@
         "Epic Games Store"
     ],
     "search_text": "",
-    "scroll_value": 192413,
+    "scroll_value": 136033,
     "chk_new": false,
     "chk_a_tester": false,
     "chk_vr": false,
@@ -112,7 +112,7 @@
     "enable_gog_db": true,
     "video_path": "D:\\ViGaVault\\Videos",
     "filter_expansion": {
-        "Platforms": false,
+        "Platforms": true,
         "Genre": false,
         "Collection": false
     },
