@@ -43,7 +43,11 @@ class FilterWorker(QThread):
         # 1. Text Filter (Search Bar)
         search = self.params['search_text'].lower()
         if search:
-            df = df[df['Clean_Title'].str.lower().str.contains(search)]
+            # WHY: Extended the search to evaluate across Title, Folder Name, and Search Title simultaneously.
+            mask_title = df['Clean_Title'].fillna('').str.lower().str.contains(search)
+            mask_folder = df['Folder_Name'].fillna('').str.lower().str.contains(search)
+            mask_search = df['Search_Title'].fillna('').str.lower().str.contains(search) if 'Search_Title' in df.columns else False
+            df = df[mask_title | mask_folder | mask_search]
             
         is_scan_new = self.params.get('scan_new', False)
 

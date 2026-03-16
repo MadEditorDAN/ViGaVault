@@ -8,7 +8,7 @@
         "Epic Games Store"
     ],
     "search_text": "",
-    "scroll_value": 198563,
+    "scroll_value": 69495,
     "chk_new": false,
     "chk_a_tester": false,
     "chk_vr": false,
@@ -112,7 +112,7 @@
     "enable_gog_db": true,
     "video_path": "d:\\VGV-Videos\\",
     "filter_expansion": {
-        "Platforms": false,
+        "Platforms": true,
         "Genre": false,
         "Collection": false
     }

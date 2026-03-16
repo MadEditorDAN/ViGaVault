@@ -30,7 +30,7 @@ class ActionDialog(QDialog):
         super().__init__(parent)
         self.parent_window = parent # WHY: Store reference to main window to access master_df for merging
         self.setWindowTitle(translator.tr(title))
-        self.setMinimumWidth(850)
+        self.setMinimumWidth(1300) # WHY: Simulated 16:9 aspect ratio width to widen the metadata text area
         self.original_data = data.copy()
         self.updated_data = {}
 
@@ -85,14 +85,49 @@ class ActionDialog(QDialog):
         self.cover_image_label = QLabel(translator.tr("dialog_edit_no_cover"))
         self.cover_image_label.setAlignment(Qt.AlignCenter)
         self.cover_image_label.setFixedSize(200, 266)
-        self.update_cover_display()
-        btn_select_image = QPushButton(translator.tr("dialog_edit_select_image_btn"))
+        
+        path_layout_img = QHBoxLayout()
+        path_layout_img.addWidget(QLabel(translator.tr("dialog_edit_path_label")))
+        self.img_path_edit = QLineEdit()
+        self.img_path_edit.setReadOnly(True)
+        path_layout_img.addWidget(self.img_path_edit, 1)
+        btn_select_image = QPushButton(translator.tr("dialog_edit_select_btn"))
         btn_select_image.clicked.connect(self.select_new_image)
-        cover_layout.addWidget(self.cover_image_label, 0, Qt.AlignHCenter)
-        cover_layout.addWidget(btn_select_image)
-        right_layout.addWidget(cover_group)
+        path_layout_img.addWidget(btn_select_image)
 
-        # Section 2: Trailer
+        self.btn_view_image = QPushButton(translator.tr("dialog_edit_view_full_size_btn"))
+        self.btn_view_image.clicked.connect(self.view_full_image)
+
+        cover_layout.addWidget(self.cover_image_label, 0, Qt.AlignHCenter)
+        cover_layout.addLayout(path_layout_img)
+        cover_layout.addWidget(self.btn_view_image)
+        right_layout.addWidget(cover_group)
+        
+        self.update_cover_display() # WHY: Moved here to safely access newly created line edit and view button
+
+        # Section 2: Video File (NEW)
+        video_group = QGroupBox(translator.tr("dialog_edit_video_group"))
+        video_layout = QVBoxLayout(video_group)
+        
+        path_layout_vid = QHBoxLayout()
+        path_layout_vid.addWidget(QLabel(translator.tr("dialog_edit_path_label")))
+        self.vid_path_edit = QLineEdit()
+        self.vid_path_edit.setReadOnly(True)
+        path_layout_vid.addWidget(self.vid_path_edit, 1)
+        self.btn_select_video = QPushButton(translator.tr("dialog_edit_select_btn"))
+        self.btn_select_video.clicked.connect(self.select_new_video)
+        path_layout_vid.addWidget(self.btn_select_video)
+        
+        self.btn_play_video = QPushButton(translator.tr("dialog_edit_video_play_btn"))
+        self.btn_play_video.clicked.connect(self.play_video)
+        
+        video_layout.addLayout(path_layout_vid)
+        video_layout.addWidget(self.btn_play_video)
+        right_layout.addWidget(video_group)
+        
+        self.update_video_display() # Needs to be called AFTER btn_play_video is instantiated so it can be disabled
+        
+        # Section 3: Trailer
         self.trailer_group = QGroupBox(translator.tr("dialog_edit_trailer_group"))
         self.trailer_layout = QVBoxLayout(self.trailer_group)
         self.trailer_thumbnail_label = QLabel("No Trailer")
@@ -108,9 +143,12 @@ class ActionDialog(QDialog):
         copy_btn = QPushButton(translator.tr("dialog_edit_trailer_copy_btn"))
         copy_btn.clicked.connect(self.copy_trailer_url)
         url_layout.addWidget(copy_btn)
-        self.trailer_layout.addLayout(url_layout)
 
         self.btn_play_trailer = QPushButton(translator.tr("dialog_edit_trailer_play_btn"))
+        self.trailer_layout.addWidget(self.btn_play_trailer)
+
+        self.trailer_layout.addWidget(self.trailer_thumbnail_label, 0, Qt.AlignHCenter)
+        self.trailer_layout.addLayout(url_layout)
         self.trailer_layout.addWidget(self.btn_play_trailer)
 
         self.setup_trailer_section()
@@ -153,12 +191,17 @@ class ActionDialog(QDialog):
 
     def update_cover_display(self):
         img_path = self.updated_data.get('Image_Link') or self.original_data.get('Image_Link', '')
+        self.img_path_edit.setText(img_path)
+        self.img_path_edit.setCursorPosition(0)
         if img_path and os.path.exists(img_path):
             pixmap = QPixmap(img_path).scaled(200, 266, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.cover_image_label.setPixmap(pixmap)
+            self.cover_image_label.setStyleSheet("")
+            self.btn_view_image.setEnabled(True)
         else:
             self.cover_image_label.setText("No Cover Image")
             self.cover_image_label.setStyleSheet("border: 1px solid #555;")
+            self.btn_view_image.setEnabled(False)
 
     def select_new_image(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Select Image", "", "Image Files (*.png *.jpg *.jpeg *.webp)")
@@ -177,6 +220,59 @@ class ActionDialog(QDialog):
         except Exception as e:
             logging.error(f"Failed to copy new image: {e}")
             QMessageBox.critical(self, "Error", f"Could not copy the image: {e}")
+
+    def update_video_display(self):
+        vid_path = self.updated_data.get('Path_Video') or self.original_data.get('Path_Video', '')
+        self.vid_path_edit.setText(vid_path)
+        self.vid_path_edit.setCursorPosition(0)
+        if vid_path and os.path.exists(vid_path):
+            self.btn_play_video.setEnabled(True)
+        else:
+            self.btn_play_video.setEnabled(False)
+
+    def select_new_video(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, translator.tr("dialog_edit_select_video_btn"), "", "Video Files (*.mp4 *.mkv *.avi *.wmv *.webm)")
+        if not file_path:
+            return
+        safe_filename_base = get_safe_filename(self.original_data.get('Folder_Name', ''))
+        _, ext = os.path.splitext(file_path)
+        new_filename = f"{safe_filename_base}{ext}"
+        
+        # WHY: Instantiate LibraryManager logic via configs to know the correct video destination dynamically.
+        manager = LibraryManager(build_scanner_config())
+        dest_dir = manager.config.get('video_path', os.path.join(BASE_DIR, 'videos'))
+        dest_path = os.path.join(dest_dir, new_filename)
+        
+        try:
+            os.makedirs(dest_dir, exist_ok=True)
+            shutil.copy2(file_path, dest_path)
+            logging.info(f"Video manually changed. New video at: {dest_path}")
+            self.updated_data['Path_Video'] = dest_path
+            self.updated_data['Has_Video'] = True
+            self.update_video_display()
+        except Exception as e:
+            logging.error(f"Failed to copy new video: {e}")
+            QMessageBox.critical(self, "Error", f"Could not copy the video: {e}")
+            
+    def play_video(self):
+        # WHY: Play the video externally using os.startfile, identically to GameCard's logic.
+        vid_path = self.updated_data.get('Path_Video') or self.original_data.get('Path_Video', '')
+        if vid_path and os.path.exists(vid_path):
+            try:
+                os.startfile(vid_path)
+            except Exception as e:
+                logging.error(f"Could not open local video from edit dialog: {e}")
+                QMessageBox.critical(self, "Error", f"Could not open video file:\n{e}")
+
+    def view_full_image(self):
+        # WHY: View the image externally using os.startfile.
+        img_path = self.updated_data.get('Image_Link') or self.original_data.get('Image_Link', '')
+        if img_path and os.path.exists(img_path):
+            try:
+                os.startfile(img_path)
+            except Exception as e:
+                logging.error(f"Could not open image from edit dialog: {e}")
+                QMessageBox.critical(self, "Error", f"Could not open image file:\n{e}")
 
     def copy_trailer_url(self):
         if self.trailer_link:
@@ -1239,9 +1335,10 @@ class StatisticsDialog(QDialog):
             stats_data.append(("tools_stats_no_sum", len(valid_sums[valid_sums.str.strip() == ''])))
             
         if 'Platforms' in self.df.columns:
-            local_files_count = len(self.df[self.df['Platforms'].astype(str).str.lower() == 'local files'])
-            local_files_pct = round((local_files_count / total_games * 100) if total_games else 0, 1)
-            stats_data.append(("tools_stats_local_copy_ratio", f"{local_files_pct}% ({local_files_count})"))
+            # WHY: Corrected the exact database string matching from 'local files' to 'local copy' as discovered in the data.
+            local_copy_count = len(self.df[self.df['Platforms'].astype(str).str.lower() == 'local copy'])
+            local_copy_pct = round((local_copy_count / total_games * 100) if total_games else 0, 1)
+            stats_data.append(("tools_stats_local_copy_ratio", f"{local_copy_pct}% ({local_copy_count})"))
 
         # WHY: Using QHBoxLayout with 3 QFormLayouts guarantees equal spacing horizontally 
         # and automatically aligns labels so the colons perfectly form a straight vertical line.
@@ -1422,17 +1519,32 @@ class MediaManagerDialog(QDialog):
         self.btn_scan.setFont(font)
         self.btn_scan.clicked.connect(self.scan_media)
         
-        # WHY: 3 checkboxes for filtering the scan vertically
-        checkbox_layout = QVBoxLayout()
+        # WHY: Using QGridLayout to align checkboxes and their missing count labels vertically and cleanly.
+        checkbox_layout = QGridLayout()
+        
         self.chk_image = QCheckBox(translator.tr("media_manager_col_image"))
         self.chk_video = QCheckBox(translator.tr("media_manager_col_video"))
         self.chk_trailer = QCheckBox(translator.tr("media_manager_col_trailer"))
         self.chk_image.setChecked(True)
         self.chk_video.setChecked(True)
         self.chk_trailer.setChecked(True)
-        checkbox_layout.addWidget(self.chk_image)
-        checkbox_layout.addWidget(self.chk_video)
-        checkbox_layout.addWidget(self.chk_trailer)
+        
+        # WHY: Labels initialized empty, waiting for the first scan to display numbers.
+        self.lbl_missing_img = QLabel("")
+        self.lbl_missing_vid = QLabel("")
+        self.lbl_missing_trl = QLabel("")
+        # WHY: Removed the hardcoded orange color so it renders in the standard text color.
+        label_style = "font-style: italic;"
+        self.lbl_missing_img.setStyleSheet(label_style)
+        self.lbl_missing_vid.setStyleSheet(label_style)
+        self.lbl_missing_trl.setStyleSheet(label_style)
+        
+        checkbox_layout.addWidget(self.chk_image, 0, 0)
+        checkbox_layout.addWidget(self.lbl_missing_img, 0, 1)
+        checkbox_layout.addWidget(self.chk_video, 1, 0)
+        checkbox_layout.addWidget(self.lbl_missing_vid, 1, 1)
+        checkbox_layout.addWidget(self.chk_trailer, 2, 0)
+        checkbox_layout.addWidget(self.lbl_missing_trl, 2, 1)
         
         # Notice about acceptable file URLs
         lbl_notice = QLabel(translator.tr("media_manager_notice"))
@@ -1484,16 +1596,23 @@ class MediaManagerDialog(QDialog):
         header.setSectionResizeMode(len(headers) - 2, QHeaderView.Stretch) # URL
         header.setSectionResizeMode(len(headers) - 1, QHeaderView.ResizeToContents) # Apply
         
+        missing_img_count = 0
+        missing_vid_count = 0
+        missing_trl_count = 0
+        
         missing_games = []
         for folder, game in self.manager.games.items():
-            img_path = game.data.get('Image_Link', '')
-            vid_path = game.data.get('Path_Video', '')
             trailer_link = game.data.get('Trailer_Link', '')
             
             # WHY: Restore missing variable definitions, leveraging the fast memory flags instead of disk checks.
             has_img = str(game.data.get('Has_Image')).lower() in ['true', '1']
             has_vid = str(game.data.get('Has_Video')).lower() in ['true', '1']
             has_trl = bool(trailer_link and trailer_link.startswith('http'))
+            
+            # WHY: Calculate actual totals of missing media across the entire database
+            if not has_img: missing_img_count += 1
+            if not has_vid: missing_vid_count += 1
+            if not has_trl: missing_trl_count += 1
             
             is_missing = False
             if check_img and not has_img: is_missing = True
@@ -1509,6 +1628,11 @@ class MediaManagerDialog(QDialog):
                     'has_trl': has_trl,
                     'game_obj': game
                 })
+        
+        # Update missing count labels
+        self.lbl_missing_img.setText(translator.tr("media_manager_missing_count", count=missing_img_count))
+        self.lbl_missing_vid.setText(translator.tr("media_manager_missing_count", count=missing_vid_count))
+        self.lbl_missing_trl.setText(translator.tr("media_manager_missing_count", count=missing_trl_count))
         
         # Sorting titles alphabetically to keep list organized
         for game_info in sorted(missing_games, key=lambda x: x['title'].lower()):
