@@ -40,7 +40,8 @@ class ScanController(QObject):
         self.mw.sidebar.btn_full_scan.setEnabled(False)
         self.mw.sidebar.btn_full_scan.setText(translator.tr("sidebar_btn_scanning"))
         self.mw.sidebar.chk_show_new.setEnabled(False)
-        self.mw.sidebar.chk_retry_failures.setEnabled(False)
+        self.mw.sidebar.chk_scan_gog.setEnabled(False)
+        self.mw.sidebar.chk_scan_local.setEnabled(False)
         self.mw.filter_controller.set_filters_ui_state(False)
 
         self.mw.sidebar.scan_panel.show()
@@ -62,8 +63,9 @@ class ScanController(QObject):
         self.qt_log_handler = QtLogHandler(self.log_signal)
         logging.getLogger().addHandler(self.qt_log_handler)
 
-        do_retry = self.mw.sidebar.chk_retry_failures.isChecked()
-        self.full_scan_worker = FullScanWorker(retry_failures=do_retry)
+        do_gog = self.mw.sidebar.chk_scan_gog.isChecked()
+        do_local = self.mw.sidebar.chk_scan_local.isChecked()
+        self.full_scan_worker = FullScanWorker(do_gog=do_gog, do_local=do_local)
         self.full_scan_worker.finished.connect(self.finish_full_scan)
         self.full_scan_worker.start()
 
@@ -82,7 +84,8 @@ class ScanController(QObject):
         self.mw.sidebar.btn_full_scan.setEnabled(True)
         self.mw.sidebar.btn_full_scan.setText(translator.tr("sidebar_btn_full_scan"))
         self.mw.sidebar.chk_show_new.setEnabled(True)
-        self.mw.sidebar.chk_retry_failures.setEnabled(True)
+        self.mw.sidebar.chk_scan_gog.setEnabled(True)
+        self.mw.sidebar.chk_scan_local.setEnabled(True)
 
         if self.mw.sidebar.scan_panel.isVisible():
             self.mw.sidebar.scan_results.addItem(translator.tr("sidebar_log_scan_finish"))

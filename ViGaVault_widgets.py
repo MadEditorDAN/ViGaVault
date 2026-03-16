@@ -270,15 +270,29 @@ class Sidebar(QWidget):
         
         # --- FULL SCAN BUTTON ---
         self.btn_full_scan = QPushButton(translator.tr("sidebar_btn_full_scan"))
+        self.btn_full_scan.setMinimumHeight(80) # WHY: Taller button to accommodate the 3 checkboxes visually
+        font_scan = QFont()
+        font_scan.setBold(True)
+        font_scan.setPointSize(16)
+        self.btn_full_scan.setFont(font_scan)
         
-        # --- RETRY FAILURES CHECKBOX (Replaces Show NEW) ---
-        # WHY: Adding the Retry Failures option where Show NEW used to be.
-        self.chk_retry_failures = QCheckBox(translator.tr("sidebar_chk_retry_failures"))
-        self.chk_retry_failures.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.chk_retry_failures.setLayoutDirection(Qt.RightToLeft)
+        # --- SCAN OPTIONS ---
+        # WHY: Changed to QGridLayout to support a multi-column layout (easily scalable for Steam/Epic later).
+        scan_opts_layout = QGridLayout()
+        scan_opts_layout.setSpacing(2)
+        
+        self.chk_scan_gog = QCheckBox("GOG Galaxy")
+        self.chk_scan_gog.setChecked(True)
+        
+        self.chk_scan_local = QCheckBox("Local Copy")
+        self.chk_scan_local.setChecked(True)
+        
+        # WHY: Removed the retry failures checkbox to enforce use of the new Media Manager for edge cases.
+        scan_opts_layout.addWidget(self.chk_scan_gog, 0, 0)
+        scan_opts_layout.addWidget(self.chk_scan_local, 0, 1)
 
-        self.bottom_layout.addWidget(self.btn_full_scan, 2) # 2/3 stretch
-        self.bottom_layout.addWidget(self.chk_retry_failures, 1)  # 1/3 stretch
+        self.bottom_layout.addWidget(self.btn_full_scan, 1) # 1 part stretch (1/3 of total width)
+        self.bottom_layout.addLayout(scan_opts_layout, 2)   # 2 parts stretch (2/3 of total width)
 
         self.layout.addWidget(self.scan_panel)
         self.scan_panel.hide()
@@ -329,7 +343,6 @@ class Sidebar(QWidget):
         self.findChild(QLabel, "sidebar_filters_label").setText(translator.tr("sidebar_filters_label"))
         self.chk_show_new.setText(translator.tr("sidebar_chk_show_new"))
         self.btn_full_scan.setText(translator.tr("sidebar_btn_full_scan"))
-        self.chk_retry_failures.setText(translator.tr("sidebar_chk_retry_failures"))
         # Scan panel
         self.scan_title_label.setText(translator.tr("sidebar_manual_scan_title"))
         self.scan_input.setPlaceholderText(translator.tr("sidebar_manual_scan_placeholder"))

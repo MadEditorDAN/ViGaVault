@@ -14,17 +14,26 @@ from ViGaVault_utils import get_db_path, build_scanner_config
 # Operations like scanning or filtering can take time. We run them in separate threads
 # to prevent the GUI from freezing (becoming unresponsive) while they process.
 class FullScanWorker(QThread):
-    def __init__(self, retry_failures=False, parent=None):
+    def __init__(self, do_gog=True, do_local=True, parent=None):
         super().__init__(parent)
-        self.retry_failures = retry_failures
+        self.do_gog = do_gog
+        self.do_local = do_local
         self.config = build_scanner_config()
 
     def run(self):
         """Runs the full scan process."""
+        # WHY: Dynamically overriding the execution config with UI instructions
+        # ensures the LibraryManager respects user choice cleanly without modifying permanent settings.
+        self.config['enable_gog_db'] = self.do_gog
+        
+        if 'local_scan_config' not in self.config:
+            self.config['local_scan_config'] = {}
+        self.config['local_scan_config']['enable_local_scan'] = self.do_local
+        
         try:
             manager = LibraryManager(self.config)
             manager.load_db()
-            manager.scan_full(retry_failures=self.retry_failures, worker_thread=self)
+            manager.scan_full(worker_thread=self)
         except Exception as e:
             logging.error(f"Critical error in full scan thread: {e}")
 

@@ -345,6 +345,16 @@ class LibraryController(QObject):
                     for chk in checkboxes: chk.blockSignals(False)
             
             self.mw.sidebar.chk_show_new.blockSignals(False)
+            
+            # WHY: Sync the scan panel's quick-toggle checkboxes with the global configuration.
+            # If a feature is disabled in the main settings, it is correctly greyed out and forced off here.
+            enable_gog = lib_settings.get("enable_gog_db", True)
+            enable_local = lib_settings.get("local_scan_config", {}).get("enable_local_scan", True)
+            self.mw.sidebar.chk_scan_gog.setEnabled(enable_gog)
+            if not enable_gog: self.mw.sidebar.chk_scan_gog.setChecked(False)
+            self.mw.sidebar.chk_scan_local.setEnabled(enable_local)
+            if not enable_local: self.mw.sidebar.chk_scan_local.setChecked(False)
+            
             return lib_settings.get("scroll_value", 0)
         except Exception as e:
             print(f"Error loading settings: {e}")
@@ -372,7 +382,7 @@ class LibraryController(QObject):
             translator.load_language(global_settings.get("language", "English"))
             self.retranslate_ui()
             
-        self.mw.refresh_styles()
+        self.mw.sidebar.refresh_styles()
 
     def retranslate_ui(self):
         self.mw.setWindowTitle(translator.tr("app_title"))

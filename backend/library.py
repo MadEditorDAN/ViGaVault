@@ -28,19 +28,23 @@ class LibraryManager:
                 game_data = {k: str(v) for k, v in row.to_dict().items()}
                 self.games[game_data['Folder_Name']] = Game(config=self.config, **game_data)
 
-    def scan_full(self, retry_failures=False, worker_thread=None):
+    def scan_full(self, worker_thread=None):
         logging.info("=== STARTING FULL INTELLIGENT SCAN ===")
         if self.config.get("enable_gog_db", True):
             sync_gog_database(self.config, self.games, worker_thread=worker_thread)
             self.save_db()
             if worker_thread and worker_thread.isInterruptionRequested(): return
         else:
-            logging.info("--- GOG SYNC DISABLED IN SETTINGS ---")
+            logging.info("--- GOG SYNC DISABLED FOR THIS SCAN ---")
         
-        token = get_igdb_access_token()
-        scan_local_system(self.config, self.games, token, retry_failures=retry_failures, worker_thread=worker_thread)
-        self.save_db()
-        if worker_thread and worker_thread.isInterruptionRequested(): return
+        local_config = self.config.get('local_scan_config', {})
+        if local_config.get("enable_local_scan", True):
+            token = get_igdb_access_token()
+            scan_local_system(self.config, self.games, token, worker_thread=worker_thread)
+            self.save_db()
+            if worker_thread and worker_thread.isInterruptionRequested(): return
+        else:
+            logging.info("--- LOCAL SCAN DISABLED FOR THIS SCAN ---")
         
         self.sync_media_flags_batch()
         logging.info("=== FULL SCAN FINISHED ===")

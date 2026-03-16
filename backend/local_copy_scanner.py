@@ -6,7 +6,7 @@ import re
 from ViGaVault_utils import BASE_DIR, is_hidden, normalize_genre
 from .game import Game
 
-def scan_local_system(config, games_dict, token, retry_failures=False, worker_thread=None):
+def scan_local_system(config, games_dict, token, worker_thread=None):
     scan_config = config.get('local_scan_config', {})
     ignore_hidden_global = scan_config.get("ignore_hidden", True)
     scan_mode = scan_config.get("scan_mode", "advanced")
@@ -15,7 +15,6 @@ def scan_local_system(config, games_dict, token, retry_failures=False, worker_th
     root_path = config.get('root_path', '')
 
     logging.info("--- START OF SCAN ---")
-    if retry_failures: logging.info("'Retry failures' mode enabled.")
     
     stats = {'scanned': 0, 'new': 0, 'updated': 0, 'deleted': 0, 'fetched_success': 0, 'fetched_fail': 0}
     found_folders = set()
@@ -101,12 +100,6 @@ def scan_local_system(config, games_dict, token, retry_failures=False, worker_th
 
                 status = game.data.get('Status_Flag')
                 if status == 'NEW':
-                    if token and game.fetch_metadata(token): stats['fetched_success'] += 1
-                    else: 
-                        logging.warning(f"    [FAILURE] Failure for: {folder}")
-                        stats['fetched_fail'] += 1
-                elif status == 'NEEDS_ATTENTION' and retry_failures:
-                    logging.info(f"    [FETCHING] Attempting for: {folder} (Reason: Retrying a previous failure)")
                     if token and game.fetch_metadata(token): stats['fetched_success'] += 1
                     else: 
                         logging.warning(f"    [FAILURE] Failure for: {folder}")
