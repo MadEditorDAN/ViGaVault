@@ -168,5 +168,17 @@
     "media_manager_err_invalid_ext": "Extension invalide. Autorisées : images (jpg, png, webp) ou vidéos (mp4, mkv, avi, wmv, webm).",
     "media_manager_err_invalid_url": "URL invalide. Veuillez entrer un lien valide commençant par http:// ou https://.",
     "msg_jit_video_missing": "Fichier vidéo introuvable sur le disque. La base de données a été mise à jour.",
-    "msg_jit_folder_missing": "Dossier du jeu introuvable sur le disque. La base de données a été mise à jour."
+    "msg_jit_folder_missing": "Dossier du jeu introuvable sur le disque. La base de données a été mise à jour.",
+    "msg_task_in_progress": "Une autre tâche est déjà en cours.",
+    "sidebar_btn_scanning": "Analyse...",
+    "sidebar_scan_title_full": "Scan Intelligent Complet",
+    "sidebar_btn_stop": "Stop",
+    "sidebar_log_scan_start": "Démarrage du scan complet (Synchro GOG + Local)...",
+    "sidebar_log_scan_finish": "--- Scan complet terminé ! ---",
+    "sidebar_log_searching": "Recherche sur IGDB...",
+    "sidebar_log_no_results": "Aucun résultat trouvé.",
+    "sidebar_log_update_complete": "Mise à jour terminée !",
+    "msg_loading_db": "Chargement de la base de données...",
+    "msg_save_success": "Bibliothèque sauvegardée avec succès dans\n{db_path}.",
+    "msg_file_locked": "Le fichier {db_path} est ouvert dans un autre programme (ex: Excel).\n\nVeuillez le fermer et réessayer."
 }

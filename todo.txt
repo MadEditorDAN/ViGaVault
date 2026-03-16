@@ -6,18 +6,33 @@ TO DO MAYBE :
 - Pour ne pas perdre l'avantage du CSV (la visibilité), tu pourras utiliser un outil gratuit comme "DB Browser for SQLite". C'est un logiciel qui te permet de voir ta base SQL exactement comme un tableau Excel, de modifier les cases à la main et de faire des recherches. Ça t'enlèvera la peur de "ne plus voir tes données".
 
 TO DO :
- - Fix the "Unknown" platform issue.
 
- - Use folder structure from the /local folder to add a tag 
+- ViGaVaukt_UI is also getting quite big, is there a way to split it intelligently ?
+ - ViGaVault_Scan.py is also getting quite big, is there a way to split it intelligently ?
+- in the merge selection windows the path is never displaied instead I see \..
 
- - make the text selectable in the statistic windows
+- In the edit windows, I wouldlike to have+/- the same layout for the 3 media zones (image, video and trailer, video will not have an image of course, but i want the same layout for the buttons and field.
+So instead of URL it would be PATH for image and video,  use a textbox (not editable) with the the image/video full path in it, instead of copy, pu a select button, and instead of "play in browser" put "view full size" for the image and "play video" for the video. I hape i was clear enough :-)
 
- - Clean up genre, we have duplicates in genre because of the different way the same genre is named, example, we currently have RPG, Role Playing Game and Role playing game (RPG). We need to normalize this and we need to do it at the scan level, when that metadata is acquired. But the normalization should not be limited ti punctation or capital letters, there are a lot of acronyms to consider, like the example.
- Could you ceate a normalisation scheme for the genres.
+- make the text selectable in the statistic windows
 
- - when searching on igdb, isn't there a way to choose between the igdb candidates, the original game instaed of the dlc, or a collector version. i know that on the igdb site, I can see some tags, like "main game" or "standalone expansion" or "port"... can we use these to identify the main game ? Is it relevant for our case. Because I noticed that in many ces it took the most recent updated version of the game instead of the game itself.
+- Clean up genre, we have duplicates in genre because of the different way the same genre is named, example, we currently have RPG, Role Playing Game and Role playing game (RPG). We need to normalize this and we need to do it at the scan level, when that metadata is acquired. But the normalization should not be limited ti punctation or capital letters, there are a lot of acronyms to consider, like the example.
+Could you ceate a normalisation scheme for the genres.
 
- - In Settings/data source, Add a personnalized images folder exactly like we havbe for the videos folder
+- when searching on igdb, isn't there a way to choose between the igdb candidates, the original game instaed of the dlc, or a collector version. i know that on the igdb site, I can see some tags, like "main game" or "standalone expansion" or "port"... can we use these to identify the main game ? Is it relevant for our case. Because I noticed that in many ces it took the most recent updated version of the game instead of the game itself.
+
+- Fix the "Unknown" platform issue.
+
+- Use folder structure from the /local folder to add a tag 
+
+- To select a gamecard I noticed that some "zones" in the gamecard will not react to the click and other would. If you click on the image it always work, but if you click on the text zone it almost never work but somtimes it does. and if you click under the text it does.
+
+- In the media manager , despite all modification to speed up db acceesses, when clicking on the scan button with all 3 checkboxes selected, it can take up to 15 sec to show a result, this is way too long. How can we fix this ?
+
+ - In Settings/Local Sources/media download, movbe the Download video checkmark on the same line as video path at the for right. remove the space between the text"video path" and the text box for the path itself. Do the same for Images by adding the download images checkbox and adapt the program to take in account the checkbox to download or not the images.
+
+ - If trying to go in the media manager, manual scan or settings while a FULL Scan is ongoing should give a message popup saying, "please wait for the scan to finish" to avoid data corruption/issues.
+
 
  -Platforms Manager !
 Future structure : 

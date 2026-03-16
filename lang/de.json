@@ -168,5 +168,17 @@
     "media_manager_err_invalid_ext": "Ungültige Dateiendung. Erlaubt: Bilder (jpg, png, webp) oder Videos (mp4, mkv, avi, wmv, webm).",
     "media_manager_err_invalid_url": "Ungültige URL. Bitte geben Sie einen gültigen Link ein, der mit http:// oder https:// beginnt.",
     "msg_jit_video_missing": "Videodatei auf dem Datenträger nicht gefunden. Die Datenbank wurde aktualisiert.",
-    "msg_jit_folder_missing": "Spieleordner auf dem Datenträger nicht gefunden. Die Datenbank wurde aktualisiert."
+    "msg_jit_folder_missing": "Spieleordner auf dem Datenträger nicht gefunden. Die Datenbank wurde aktualisiert.",
+    "msg_task_in_progress": "Eine andere Aufgabe ist bereits in Bearbeitung.",
+    "sidebar_btn_scanning": "Scannen...",
+    "sidebar_scan_title_full": "Vollständiger intelligenter Scan",
+    "sidebar_btn_stop": "Stopp",
+    "sidebar_log_scan_start": "Starte vollständigen Scan (GOG Sync + Lokal)...",
+    "sidebar_log_scan_finish": "--- Vollständiger Scan beendet! ---",
+    "sidebar_log_searching": "Suche auf IGDB...",
+    "sidebar_log_no_results": "Keine Ergebnisse gefunden.",
+    "sidebar_log_update_complete": "Aktualisierung abgeschlossen!",
+    "msg_loading_db": "Datenbank wird geladen...",
+    "msg_save_success": "Bibliothek erfolgreich gespeichert unter\n{db_path}.",
+    "msg_file_locked": "Die Datei {db_path} ist in einem anderen Programm (z.B. Excel) geöffnet.\n\nBitte schließen Sie es und versuchen Sie es erneut."
 }

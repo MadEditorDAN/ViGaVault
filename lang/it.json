@@ -168,5 +168,17 @@
     "media_manager_err_invalid_ext": "Estensione file non valida. Consentiti: immagini (jpg, png, webp) o video (mp4, mkv, avi, wmv, webm).",
     "media_manager_err_invalid_url": "URL non valido. Inserisci un link valido che inizi con http:// o https://.",
     "msg_jit_video_missing": "File video non trovato sul disco. Il database è stato aggiornato.",
-    "msg_jit_folder_missing": "Cartella del gioco non trovata sul disco. Il database è stato aggiornato."
+    "msg_jit_folder_missing": "Cartella del gioco non trovata sul disco. Il database è stato aggiornato.",
+    "msg_task_in_progress": "Un'altra attività è già in corso.",
+    "sidebar_btn_scanning": "Scansione...",
+    "sidebar_scan_title_full": "Scansione Intelligente Completa",
+    "sidebar_btn_stop": "Stop",
+    "sidebar_log_scan_start": "Avvio scansione completa (Sync GOG + Locale)...",
+    "sidebar_log_scan_finish": "--- Scansione completa terminata! ---",
+    "sidebar_log_searching": "Ricerca su IGDB...",
+    "sidebar_log_no_results": "Nessun risultato trovato.",
+    "sidebar_log_update_complete": "Aggiornamento completato!",
+    "msg_loading_db": "Caricamento database...",
+    "msg_save_success": "Libreria salvata con successo in\n{db_path}.",
+    "msg_file_locked": "Il file {db_path} è aperto in un altro programma (es. Excel).\n\nChiudilo e riprova."
 }
