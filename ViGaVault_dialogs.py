@@ -19,7 +19,8 @@ from PySide6.QtGui import QPixmap, QIcon, QAction, QPalette, QColor, QFont, QIma
 
 from ViGaVault_Scan import LibraryManager, get_safe_filename, normalize_genre
 from ViGaVault_utils import (BASE_DIR, LOG_DIR, get_db_path, get_library_settings_file, 
-                             get_video_path, get_root_path, get_platform_config, 
+                             get_video_path, get_image_path, get_root_path, 
+                             get_platform_config, 
                              get_local_scan_config, build_scanner_config, setup_logging, 
                              translator, apply_theme)
 
@@ -190,7 +191,8 @@ class ActionDialog(QDialog):
                     self.accept()
 
     def update_cover_display(self):
-        img_path = self.updated_data.get('Image_Link') or self.original_data.get('Image_Link', '')
+        img_name = self.updated_data.get('Image_Link') or self.original_data.get('Image_Link', '')
+        img_path = os.path.join(get_image_path(), os.path.basename(img_name)) if img_name else ''
         self.img_path_edit.setText(img_path)
         self.img_path_edit.setCursorPosition(0)
         if img_path and os.path.exists(img_path):
@@ -210,19 +212,25 @@ class ActionDialog(QDialog):
         safe_filename_base = get_safe_filename(self.original_data.get('Folder_Name', ''))
         _, ext = os.path.splitext(file_path)
         new_filename = f"{safe_filename_base}{ext}"
-        dest_path = os.path.join("images", new_filename)
+        
+        # WHY: Instantiate LibraryManager logic via configs to know the correct image destination dynamically.
+        manager = LibraryManager(build_scanner_config())
+        dest_dir = manager.config.get('image_path', os.path.join(BASE_DIR, 'images'))
+        dest_path = os.path.join(dest_dir, new_filename)
         try:
-            os.makedirs("images", exist_ok=True)
+            os.makedirs(dest_dir, exist_ok=True)
             shutil.copy(file_path, dest_path)
             logging.info(f"Image manually changed. New image at: {dest_path}")
-            self.updated_data['Image_Link'] = dest_path
+            # WHY: Store only the filename in the DB
+            self.updated_data['Image_Link'] = new_filename
             self.update_cover_display()
         except Exception as e:
             logging.error(f"Failed to copy new image: {e}")
             QMessageBox.critical(self, "Error", f"Could not copy the image: {e}")
 
     def update_video_display(self):
-        vid_path = self.updated_data.get('Path_Video') or self.original_data.get('Path_Video', '')
+        vid_name = self.updated_data.get('Path_Video') or self.original_data.get('Path_Video', '')
+        vid_path = os.path.join(get_video_path(), os.path.basename(vid_name)) if vid_name else ''
         self.vid_path_edit.setText(vid_path)
         self.vid_path_edit.setCursorPosition(0)
         if vid_path and os.path.exists(vid_path):
@@ -247,7 +255,8 @@ class ActionDialog(QDialog):
             os.makedirs(dest_dir, exist_ok=True)
             shutil.copy2(file_path, dest_path)
             logging.info(f"Video manually changed. New video at: {dest_path}")
-            self.updated_data['Path_Video'] = dest_path
+            # WHY: Store only the filename in the DB
+            self.updated_data['Path_Video'] = new_filename
             self.updated_data['Has_Video'] = True
             self.update_video_display()
         except Exception as e:
@@ -256,7 +265,8 @@ class ActionDialog(QDialog):
             
     def play_video(self):
         # WHY: Play the video externally using os.startfile, identically to GameCard's logic.
-        vid_path = self.updated_data.get('Path_Video') or self.original_data.get('Path_Video', '')
+        vid_name = self.updated_data.get('Path_Video') or self.original_data.get('Path_Video', '')
+        vid_path = os.path.join(get_video_path(), os.path.basename(vid_name)) if vid_name else ''
         if vid_path and os.path.exists(vid_path):
             try:
                 os.startfile(vid_path)
@@ -266,7 +276,8 @@ class ActionDialog(QDialog):
 
     def view_full_image(self):
         # WHY: View the image externally using os.startfile.
-        img_path = self.updated_data.get('Image_Link') or self.original_data.get('Image_Link', '')
+        img_name = self.updated_data.get('Image_Link') or self.original_data.get('Image_Link', '')
+        img_path = os.path.join(get_image_path(), os.path.basename(img_name)) if img_name else ''
         if img_path and os.path.exists(img_path):
             try:
                 os.startfile(img_path)
@@ -522,16 +533,20 @@ class ConflictDialog(QDialog):
         layout.addLayout(btn_box)
 
     def create_widget(self, field, val):
-        """Creates the appropriate display widget based on the field type."""
-        if field == 'Image_Link' and os.path.exists(val):
-            lbl = QLabel()
-            lbl.setPixmap(QPixmap(val).scaled(150, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-            lbl.setAlignment(Qt.AlignCenter)
-            return lbl
-        elif field == 'Path_Video' and os.path.exists(val):
-            btn = QPushButton(translator.tr("dialog_conflict_btn_play"))
-            btn.clicked.connect(lambda _, v=val: os.startfile(v))
-            return btn
+        """Creates the appropriate display widget based on the field type, resolving relative paths."""
+        if field == 'Image_Link' and val:
+            full_path = os.path.join(get_image_path(), os.path.basename(val))
+            if os.path.exists(full_path):
+                lbl = QLabel()
+                lbl.setPixmap(QPixmap(full_path).scaled(150, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                lbl.setAlignment(Qt.AlignCenter)
+                return lbl
+        elif field == 'Path_Video' and val:
+            full_path = os.path.join(get_video_path(), os.path.basename(val))
+            if os.path.exists(full_path):
+                btn = QPushButton(translator.tr("dialog_conflict_btn_play"))
+                btn.clicked.connect(lambda _, v=full_path: os.startfile(v))
+                return btn
         elif field == 'Summary':
             txt = QTextEdit(val)
             txt.setReadOnly(True)
@@ -873,16 +888,26 @@ class SettingsDialog(QDialog):
         
         self.chk_download_videos = QCheckBox(translator.tr("settings_data_media_download_videos"))
         
+        self.image_path_input = QLineEdit()
+        self.btn_browse_image = QPushButton("...")
+        self.btn_browse_image.setFixedWidth(40)
+        self.btn_browse_image.clicked.connect(self.browse_image_path)
+        
         self.video_path_input = QLineEdit()
         self.btn_browse_video = QPushButton("...")
         self.btn_browse_video.setFixedWidth(40)
         self.btn_browse_video.clicked.connect(self.browse_video_path)
         
-        # Layout: All on one line
-        layout_media.addWidget(self.chk_download_videos, 0, 0)
-        layout_media.addWidget(QLabel(translator.tr("settings_data_media_videos_path")), 0, 1)
-        layout_media.addWidget(self.video_path_input, 0, 2)
-        layout_media.addWidget(self.btn_browse_video, 0, 3)
+        # Layout: Download checkbox on top, then paths below
+        layout_media.addWidget(self.chk_download_videos, 0, 0, 1, 4)
+        
+        layout_media.addWidget(QLabel(translator.tr("settings_data_media_images_path")), 1, 0)
+        layout_media.addWidget(self.image_path_input, 1, 1, 1, 2)
+        layout_media.addWidget(self.btn_browse_image, 1, 3)
+        
+        layout_media.addWidget(QLabel(translator.tr("settings_data_media_videos_path")), 2, 0)
+        layout_media.addWidget(self.video_path_input, 2, 1, 1, 2)
+        layout_media.addWidget(self.btn_browse_video, 2, 3)
         
         layout.addWidget(grp_media)
         
@@ -897,6 +922,11 @@ class SettingsDialog(QDialog):
         file_path, _ = QFileDialog.getOpenFileName(self, "Select GOG Database", self.gog_db_input.text(), "SQLite DB (*.db);;All Files (*.*)")
         if file_path:
             self.gog_db_input.setText(file_path)
+
+    def browse_image_path(self):
+        dir_path = QFileDialog.getExistingDirectory(self, "Select Images Folder", self.image_path_input.text())
+        if dir_path:
+            self.image_path_input.setText(os.path.normpath(dir_path))
 
     def browse_video_path(self):
         dir_path = QFileDialog.getExistingDirectory(self, "Select Videos Folder", self.video_path_input.text())
@@ -974,6 +1004,10 @@ class SettingsDialog(QDialog):
         self.gog_db_input.setText(lib_settings.get("gog_db_path", self.gog_db_input.text()))
         self.toggle_gog_input(self.chk_enable_gog.isChecked())
         
+        default_image_path = os.path.join(os.getcwd(), "images")
+        self.image_path_input.setText(lib_settings.get("image_path", default_image_path))
+        self.original_image_path = self.image_path_input.text()
+        
         self.chk_download_videos.setChecked(lib_settings.get("download_videos", False))
         default_video_path = os.path.join(os.getcwd(), "videos")
         self.video_path_input.setText(lib_settings.get("video_path", default_video_path))
@@ -1040,6 +1074,22 @@ class SettingsDialog(QDialog):
         lib_settings["gog_db_path"] = self.gog_db_input.text()
         lib_settings["download_videos"] = self.chk_download_videos.isChecked()
         
+        # Handle Image Path Change
+        new_image_path = self.image_path_input.text()
+        lib_settings["image_path"] = new_image_path
+        
+        if new_image_path != self.original_image_path and os.path.exists(self.original_image_path):
+            reply = QMessageBox.question(self, "Move Image Files?",
+                f"The image folder has changed from:\n{self.original_image_path}\nto:\n{new_image_path}\n\n"
+                "Do you want to move existing image files to the new location?\n\n"
+                "YES: Moves files to the new location.\n"
+                "NO: Does NOT move files (Links may break until you move files manually).",
+                QMessageBox.Yes | QMessageBox.No)
+            
+            if reply == QMessageBox.Yes:
+                self.move_media_files(self.original_image_path, new_image_path, "image")
+        self.original_image_path = new_image_path
+        
         # Handle Video Path Change
         new_video_path = self.video_path_input.text()
         lib_settings["video_path"] = new_video_path
@@ -1048,15 +1098,12 @@ class SettingsDialog(QDialog):
             reply = QMessageBox.question(self, "Move Video Files?",
                 f"The video folder has changed from:\n{self.original_video_path}\nto:\n{new_video_path}\n\n"
                 "Do you want to move existing video files to the new location?\n\n"
-                "YES: Moves files and updates the database.\n"
-                "NO: Does NOT move files, but updates the database paths (Links may break until you move files manually).",
+                "YES: Moves files to the new location.\n"
+                "NO: Does NOT move files (Links may break until you move files manually).",
                 QMessageBox.Yes | QMessageBox.No)
             
             if reply == QMessageBox.Yes:
-                self.move_video_files(self.original_video_path, new_video_path)
-                self.update_db_video_paths(self.original_video_path, new_video_path)
-            else:
-                self.update_db_video_paths(self.original_video_path, new_video_path)
+                self.move_media_files(self.original_video_path, new_video_path, "video")
         
         # Update original path for next save if dialog stays open (though accept closes it)
         self.original_video_path = new_video_path
@@ -1073,7 +1120,8 @@ class SettingsDialog(QDialog):
             self.parent_window.display_settings['button'] = self.BTN_SIZES[self.slider_btn_size.value()]
             self.parent_window.display_settings['text'] = self.TXT_SIZES[self.slider_text_size.value()]
 
-    def move_video_files(self, old_path, new_path):
+    def move_media_files(self, old_path, new_path, media_type):
+        # WHY: DRY approach - handles moving both images and videos generically
         try:
             os.makedirs(new_path, exist_ok=True)
             files = [f for f in os.listdir(old_path) if os.path.isfile(os.path.join(old_path, f))]
@@ -1083,31 +1131,9 @@ class SettingsDialog(QDialog):
                 dst = os.path.join(new_path, f)
                 shutil.move(src, dst)
                 count += 1
-            QMessageBox.information(self, "Success", f"Moved {count} files to new video folder.")
+            QMessageBox.information(self, "Success", f"Moved {count} files to new {media_type} folder.")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to move files: {e}")
-
-    def update_db_video_paths(self, old_path, new_path):
-        if self.parent_window and hasattr(self.parent_window, 'master_df'):
-            df = self.parent_window.master_df
-            # Normalize paths for comparison
-            abs_old = os.path.abspath(old_path)
-            abs_new = os.path.abspath(new_path)
-            
-            count = 0
-            for idx, row in df.iterrows():
-                current_vid = str(row['Path_Video'])
-                if current_vid:
-                    # Check if file is in old path
-                    if os.path.abspath(os.path.dirname(current_vid)) == abs_old:
-                        filename = os.path.basename(current_vid)
-                        new_vid_full = os.path.join(abs_new, filename)
-                        df.at[idx, 'Path_Video'] = new_vid_full
-                        count += 1
-            
-            if count > 0:
-                self.parent_window.save_database()
-                logging.info(f"Updated {count} video paths in database.")
 
     def apply_settings(self):
         self.save_settings()
@@ -1792,7 +1818,7 @@ class MediaManagerDialog(QDialog):
             if use_local:
                 ext = os.path.splitext(use_local)[1].lower()
                 is_img = ext in img_exts
-                dest_dir = os.path.join(BASE_DIR, "images") if is_img else self.manager.config.get('video_path', os.path.join(BASE_DIR, 'videos'))
+                dest_dir = self.manager.config.get('image_path', os.path.join(BASE_DIR, 'images')) if is_img else self.manager.config.get('video_path', os.path.join(BASE_DIR, 'videos'))
                 os.makedirs(dest_dir, exist_ok=True)
                 dest_path = os.path.join(dest_dir, f"{safe_filename}{ext}")
                 
@@ -1818,7 +1844,7 @@ class MediaManagerDialog(QDialog):
                     match = re.search(r'\.(jpg|jpeg|png|webp|mp4|mkv|avi|wmv|webm)\b', use_url, re.IGNORECASE)
                     ext = match.group(0).lower()
                     is_img = ext in img_exts
-                    dest_dir = os.path.join(BASE_DIR, "images") if is_img else self.manager.config.get('video_path', os.path.join(BASE_DIR, 'videos'))
+                    dest_dir = self.manager.config.get('image_path', os.path.join(BASE_DIR, 'images')) if is_img else self.manager.config.get('video_path', os.path.join(BASE_DIR, 'videos'))
                     os.makedirs(dest_dir, exist_ok=True)
                     dest_path = os.path.join(dest_dir, f"{safe_filename}{ext}")
                     
@@ -1828,11 +1854,12 @@ class MediaManagerDialog(QDialog):
                     if response.status_code == 200:
                         with open(dest_path, 'wb') as f:
                             shutil.copyfileobj(response.raw, f)
+                        # WHY: Store pure basenames to ensure absolute DB portability
                         if is_img: 
-                            game.data['Image_Link'] = dest_path
+                            game.data['Image_Link'] = f"{safe_filename}{ext}"
                             game.data['Has_Image'] = True
                         else: 
-                            game.data['Path_Video'] = dest_path
+                            game.data['Path_Video'] = f"{safe_filename}{ext}"
                             game.data['Has_Video'] = True
                         changes_made = True
                     else:

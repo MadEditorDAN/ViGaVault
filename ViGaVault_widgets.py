@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, Q
 from PySide6.QtCore import Qt, QSize, QEvent
 from PySide6.QtGui import QIcon, QPixmap, QFont, QPalette
 
-from ViGaVault_utils import translator
+from ViGaVault_utils import translator, get_image_path, get_video_path
 from ViGaVault_dialogs import ActionDialog
 from ViGaVault_workers import ImageLoader
 
@@ -360,10 +360,11 @@ class GameCard(QWidget):
         self.img_label = QLabel()
         self.img_label.setFixedSize(img_w, img_h)
         self.img_label.setAlignment(Qt.AlignCenter)
-        img_path = game_data.get('Image_Link', '')
-        if img_path:
+        img_name = game_data.get('Image_Link', '')
+        self.image_path = os.path.join(get_image_path(), os.path.basename(img_name)) if img_name else ''
+        if self.image_path:
             self.img_label.setText("Loading...")
-            self.start_image_load(img_path)
+            self.start_image_load(self.image_path)
         else:
             self.img_label.setText("No Image")
             self.img_label.setStyleSheet("border: 1px solid #555;")
@@ -407,7 +408,8 @@ class GameCard(QWidget):
         header_layout.addLayout(title_layout, 1) # Give title stretch priority
         
         # Buttons
-        self.video_path = str(game_data.get('Path_Video', '')).strip()
+        vid_name = str(game_data.get('Path_Video', '')).strip()
+        self.video_path = os.path.join(get_video_path(), os.path.basename(vid_name)) if vid_name else ''
         self.trailer_link = game_data.get('Trailer_Link', '')
 
         # WHY: Database driven truth mechanism. Using string match parsing because CSV loading

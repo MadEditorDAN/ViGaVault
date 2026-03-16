@@ -167,29 +167,35 @@ class Game:
             
             new_safe_name = get_safe_filename(base_filename)
             
-            # Rename Image
-            old_img_path = self.data.get('Image_Link', '')
-            if old_img_path and os.path.exists(old_img_path):
-                dir_name = os.path.dirname(old_img_path)
-                ext = os.path.splitext(old_img_path)[1]
-                new_img_path = os.path.join(dir_name, f"{new_safe_name}{ext}")
-                if new_img_path != old_img_path:
+            # Rename Image dynamically extracting from configured path
+            old_img_name = self.data.get('Image_Link', '')
+            if old_img_name:
+                img_dir = self.config.get('image_path', os.path.join(BASE_DIR, 'images'))
+                old_img_path = os.path.join(img_dir, os.path.basename(old_img_name))
+                if os.path.exists(old_img_path):
+                    ext = os.path.splitext(old_img_name)[1]
+                    new_img_name = f"{new_safe_name}{ext}"
+                    new_img_path = os.path.join(img_dir, new_img_name)
                     try:
-                        os.rename(old_img_path, new_img_path)
-                        self.data['Image_Link'] = new_img_path
+                        if new_img_path != old_img_path:
+                            os.rename(old_img_path, new_img_path)
+                            self.data['Image_Link'] = new_img_name
                     except Exception as e:
                         logging.error(f"Failed to rename image: {e}")
 
-            # Rename Video
-            old_vid_path = self.data.get('Path_Video', '')
-            if old_vid_path and os.path.exists(old_vid_path):
-                dir_name = os.path.dirname(old_vid_path)
-                ext = os.path.splitext(old_vid_path)[1]
-                new_vid_path = os.path.join(dir_name, f"{new_safe_name}{ext}")
-                if new_vid_path != old_vid_path:
+            # Rename Video dynamically extracting from configured path
+            old_vid_name = self.data.get('Path_Video', '')
+            if old_vid_name:
+                vid_dir = self.config.get('video_path', os.path.join(BASE_DIR, 'videos'))
+                old_vid_path = os.path.join(vid_dir, os.path.basename(old_vid_name))
+                if os.path.exists(old_vid_path):
+                    ext = os.path.splitext(old_vid_name)[1]
+                    new_vid_name = f"{new_safe_name}{ext}"
+                    new_vid_path = os.path.join(vid_dir, new_vid_name)
                     try:
-                        os.rename(old_vid_path, new_vid_path)
-                        self.data['Path_Video'] = new_vid_path
+                        if new_vid_path != old_vid_path:
+                            os.rename(old_vid_path, new_vid_path)
+                            self.data['Path_Video'] = new_vid_name
                     except Exception as e:
                         logging.error(f"Failed to rename video: {e}")
 
@@ -239,47 +245,52 @@ class Game:
 
     def _find_video(self):
         # If a valid video path already exists, do nothing.
-        current_path = self.data.get('Path_Video', '')
-        if current_path and os.path.exists(current_path):
-            return
-
-        # Only look for videos in the centralized 'videos' folder
-        # We ignore any video files that might exist in the game's own folder
         video_dir = self.config.get('video_path', os.path.join(BASE_DIR, 'videos'))
+        current_name = self.data.get('Path_Video', '')
+        if current_name:
+            full_check = os.path.join(video_dir, os.path.basename(current_name))
+            if os.path.exists(full_check):
+                self.data['Path_Video'] = os.path.basename(current_name)
+                return
+
         safe_name = get_safe_filename(self.data.get('Clean_Title') or self.data.get('Folder_Name', ''))
         
         for ext in VIDEO_EXTS:
             potential_path = os.path.join(video_dir, f"{safe_name}{ext}")
             if os.path.exists(potential_path):
-                self.data['Path_Video'] = potential_path
+                self.data['Path_Video'] = f"{safe_name}{ext}"
                 logging.info(f"    [VIDEO] Found locally in videos folder: {safe_name}{ext}")
                 return
 
     def _find_image(self):
-        # If the link already exists and is valid, do nothing
-        current_path = self.data.get('Image_Link', '')
-        if current_path and os.path.exists(current_path):
-            return
-
-        # Otherwise, check if an image already exists in the images folder
+        images_dir = self.config.get('image_path', os.path.join(BASE_DIR, 'images'))
+        current_name = self.data.get('Image_Link', '')
+        if current_name:
+            full_check = os.path.join(images_dir, os.path.basename(current_name))
+            if os.path.exists(full_check):
+                self.data['Image_Link'] = os.path.basename(current_name)
+                return
+                
         safe_name = get_safe_filename(self.data.get('Folder_Name', ''))
         for ext in ['.jpg', '.png', '.jpeg', '.webp']:
-            potential_path = os.path.join(BASE_DIR, "images", f"{safe_name}{ext}")
+            potential_path = os.path.join(images_dir, f"{safe_name}{ext}")
             if os.path.exists(potential_path):
-                self.data['Image_Link'] = potential_path
+                self.data['Image_Link'] = f"{safe_name}{ext}"
                 logging.info(f"    [IMAGE] Found locally: {safe_name}{ext}")
                 return
 
     def _ensure_cover(self, game_info, force_download=False, silent=False):
-        existing_path = self.data.get('Image_Link', '')
+        existing_name = self.data.get('Image_Link', '')
+        images_dir = self.config.get('image_path', os.path.join(BASE_DIR, 'images'))
+        
+        existing_path = os.path.join(images_dir, os.path.basename(existing_name)) if existing_name else ''
         
         # If not forcing, check for existence as before
         if not force_download and existing_path and os.path.exists(existing_path):
-            return existing_path
+            return os.path.basename(existing_name)
 
         # If we get here, it means we must (re)download
         if 'cover' in game_info:
-            images_dir = os.path.join(BASE_DIR, "images")
             os.makedirs(images_dir, exist_ok=True)
             # IGDB provides a relative URL starting with //, we add https:
             cover_url = "https:" + game_info['cover']['url'].replace('t_thumb', 't_cover_big')
@@ -303,7 +314,7 @@ class Game:
                     with open(save_path, 'wb') as f: shutil.copyfileobj(response.raw, f)
                     if not silent:
                         logging.info(f"    [IMAGE OK] Downloaded (forced={force_download}): {save_path}")
-                    return save_path
+                    return f"{safe_filename}{ext}"
             except Exception as e:
                 if not silent:
                     logging.error(f"    [IMAGE ERROR] {e}")
@@ -576,7 +587,7 @@ class LibraryManager:
             if 'con' in locals() and con: con.close()
             return
 
-        images_dir = os.path.join(BASE_DIR, "images")
+        images_dir = self.config.get('image_path', os.path.join(BASE_DIR, 'images'))
         os.makedirs(images_dir, exist_ok=True)
         video_dir = self.config.get('video_path', os.path.join(BASE_DIR, 'videos'))
         os.makedirs(video_dir, exist_ok=True)
@@ -994,8 +1005,10 @@ class LibraryManager:
                     game_obj.data['Trailer_Link'] = video_url
 
                 # --- C. Video Download (yt-dlp) & Physical Check ---
-                existing_video_path = game_obj.data.get('Path_Video')
-                video_exists_on_disk = existing_video_path and os.path.exists(existing_video_path)
+                existing_video_name = game_obj.data.get('Path_Video')
+                existing_video_path = os.path.join(video_dir, os.path.basename(existing_video_name)) if existing_video_name else ''
+                
+                video_exists_on_disk = bool(existing_video_name and os.path.exists(existing_video_path))
                 
                 if video_exists_on_disk:
                     stats['videos_found_existing'] += 1
@@ -1005,7 +1018,7 @@ class LibraryManager:
                     for ext in VIDEO_EXTS:
                         potential_path = os.path.join(video_dir, f"{safe_filename}{ext}")
                         if os.path.exists(potential_path):
-                            game_obj.data['Path_Video'] = potential_path
+                            game_obj.data['Path_Video'] = f"{safe_filename}{ext}"
                             video_exists_on_disk = True
                             logging.info(f"    [VIDEO] Found existing local video: {potential_path}")
                             stats['videos_found_existing'] += 1
@@ -1044,7 +1057,7 @@ class LibraryManager:
                                 info = ydl.extract_info(video_url, download=True)
                                 filename = ydl.prepare_filename(info)
                                 if os.path.exists(filename):
-                                    game_obj.data['Path_Video'] = filename
+                                    game_obj.data['Path_Video'] = os.path.basename(filename)
                                     logging.info(f"    [VIDEO] Download finished successfully.")
                                     stats['videos_downloaded'] += 1
                         except Exception as e:
@@ -1081,8 +1094,9 @@ class LibraryManager:
                     if cover_url.startswith('//'): cover_url = "https:" + cover_url
                     
                     # Check if a valid image already exists for this game
-                    existing_image_path = game_obj.data.get('Image_Link')
-                    image_exists_on_disk = existing_image_path and os.path.exists(existing_image_path)
+                    existing_image_name = game_obj.data.get('Image_Link')
+                    existing_image_path = os.path.join(images_dir, os.path.basename(existing_image_name)) if existing_image_name else ''
+                    image_exists_on_disk = bool(existing_image_name and os.path.exists(existing_image_path))
 
                     if image_exists_on_disk:
                         stats['images_found_existing'] += 1
@@ -1092,7 +1106,7 @@ class LibraryManager:
                         for check_ext in ['.jpg', '.png', '.jpeg', '.webp']:
                             check_path = os.path.join(images_dir, f"{safe_filename}{check_ext}")
                             if os.path.exists(check_path):
-                                game_obj.data['Image_Link'] = check_path
+                                game_obj.data['Image_Link'] = f"{safe_filename}{check_ext}"
                                 image_exists_on_disk = True
                                 logging.info(f"    [IMAGE] Found existing image on disk: {check_path}")
                                 stats['images_found_existing'] += 1
@@ -1115,7 +1129,7 @@ class LibraryManager:
                             response = requests.get(cover_url, timeout=5)
                             if response.status_code == 200:
                                 with open(save_path, 'wb') as f: f.write(response.content)
-                                game_obj.data['Image_Link'] = save_path
+                                game_obj.data['Image_Link'] = f"{safe_filename}{ext}"
                                 logging.info(f"    [IMAGE] Downloaded missing image: {safe_filename}{ext}")
                                 stats['images_downloaded'] += 1
                         except Exception as e: logging.error(f"    [IMAGE ERROR] {e}")
@@ -1479,21 +1493,23 @@ class LibraryManager:
                     game_to_delete = game_to_check
                     
                     # Delete associated media files before deleting the entry
-                    # Deleting image
-                    image_path = game_to_delete.data.get('Image_Link')
-                    if image_path and os.path.exists(image_path):
+                    image_name = game_to_delete.data.get('Image_Link')
+                    if image_name:
+                        image_path = os.path.join(self.config.get('image_path', os.path.join(BASE_DIR, 'images')), os.path.basename(image_name))
                         try:
-                            os.remove(image_path)
-                            logging.info(f"        -> Orphan image file deleted: {image_path}")
+                            if os.path.exists(image_path):
+                                os.remove(image_path)
+                                logging.info(f"        -> Orphan image file deleted: {image_path}")
                         except Exception as e:
                             logging.error(f"        -> [DELETE ERROR] Could not delete image {image_path}: {e}")
                     
-                    # Deleting video
-                    video_path = game_to_delete.data.get('Path_Video')
-                    if video_path and os.path.exists(video_path):
+                    video_name = game_to_delete.data.get('Path_Video')
+                    if video_name:
+                        video_path = os.path.join(self.config.get('video_path', os.path.join(BASE_DIR, 'videos')), os.path.basename(video_name))
                         try:
-                            os.remove(video_path)
-                            logging.info(f"        -> Orphan video file deleted: {video_path}")
+                            if os.path.exists(video_path):
+                                os.remove(video_path)
+                                logging.info(f"        -> Orphan video file deleted: {video_path}")
                         except Exception as e:
                             logging.error(f"        -> [DELETE ERROR] Could not delete video {video_path}: {e}")
 
@@ -1621,7 +1637,7 @@ class LibraryManager:
         """
         changes_made = False
         
-        images_dir = os.path.join(BASE_DIR, "images")
+        images_dir = self.config.get('image_path', os.path.join(BASE_DIR, 'images'))
         videos_dir = self.config.get('video_path', os.path.join(BASE_DIR, 'videos'))
         root_path = self.config.get('root_path', '')
 

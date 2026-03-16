@@ -41,6 +41,18 @@ def get_video_path():
         except: pass
     return default_path
 
+def get_image_path():
+    """Returns the configured image path or default 'images' folder."""
+    settings_path = get_library_settings_file()
+    default_path = os.path.join(BASE_DIR, "images")
+    if os.path.exists(settings_path):
+        try:
+            with open(settings_path, "r", encoding='utf-8') as f:
+                settings = json.load(f)
+                return settings.get("image_path", default_path)
+        except: pass
+    return default_path
+
 def get_root_path():
     """Returns the configured root path from the library's settings."""
     settings_path = get_library_settings_file()
@@ -118,6 +130,7 @@ def build_scanner_config():
     return {
         'db_file': get_db_path(),
         'root_path': get_root_path(),
+        'image_path': get_image_path(),
         'video_path': get_video_path(),
         'platform_map': p_map,
         'ignored_prefixes': p_ignore,
