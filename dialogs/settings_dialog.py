@@ -16,9 +16,10 @@ class SettingsDialog(QDialog):
         self.parent_window = parent
         self.setWindowTitle(translator.tr("settings_title"))
 
-        self.IMG_SIZES = [120, 140, 160, 180, 200, 225, 250, 275, 300, 325]
-        self.BTN_SIZES = [25, 30, 35, 40, 45, 50, 55, 60, 65, 70]
-        self.TXT_SIZES = [14, 16, 18, 20, 22, 24, 26, 28, 30, 32]
+        # WHY: Apply user-requested size limits.
+        self.IMG_SIZES = [150, 175, 200, 225, 250, 275, 300]
+        self.BTN_SIZES = [30, 35, 40, 45, 50, 55, 60]
+        self.TXT_SIZES = [14, 16, 18, 20, 22, 24, 26]
 
         self.resize(700, 500)
         
@@ -66,7 +67,8 @@ class SettingsDialog(QDialog):
         
         img_layout = QHBoxLayout()
         self.slider_img_size = QSlider(Qt.Horizontal)
-        self.slider_img_size.setRange(0, 9)
+        # WHY: DRY Principle - Dynamically size the slider based on the length of the array.
+        self.slider_img_size.setRange(0, len(self.IMG_SIZES) - 1)
         self.slider_img_size.setPageStep(1)
         self.slider_img_size.setTickInterval(1)
         self.slider_img_size.setTickPosition(QSlider.TicksBelow)
@@ -78,7 +80,7 @@ class SettingsDialog(QDialog):
 
         btn_layout = QHBoxLayout()
         self.slider_btn_size = QSlider(Qt.Horizontal)
-        self.slider_btn_size.setRange(0, 9)
+        self.slider_btn_size.setRange(0, len(self.BTN_SIZES) - 1)
         self.slider_btn_size.setPageStep(1)
         self.slider_btn_size.setTickInterval(1)
         self.slider_btn_size.setTickPosition(QSlider.TicksBelow)
@@ -90,7 +92,7 @@ class SettingsDialog(QDialog):
 
         txt_layout = QHBoxLayout()
         self.slider_text_size = QSlider(Qt.Horizontal)
-        self.slider_text_size.setRange(0, 9)
+        self.slider_text_size.setRange(0, len(self.TXT_SIZES) - 1)
         self.slider_text_size.setPageStep(1)
         self.slider_text_size.setTickInterval(1)
         self.slider_text_size.setTickPosition(QSlider.TicksBelow)
