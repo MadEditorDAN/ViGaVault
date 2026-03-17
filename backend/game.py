@@ -168,6 +168,10 @@ class Game:
         if 'cover' in game_info:
             os.makedirs(images_dir, exist_ok=True)
             cover_url = "https:" + game_info['cover']['url'].replace('t_thumb', 't_cover_big')
+
+            # WHY: Always save the URL to the DB for asynchronous backfilling.
+            self.data['Cover_URL'] = cover_url
+
             safe_filename = get_safe_filename(self.data.get('Folder_Name', ''))
 
             try:

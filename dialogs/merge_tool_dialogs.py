@@ -13,7 +13,7 @@ class MergeSelectionDialog(QDialog):
     def __init__(self, current_data, master_df, parent=None):
         super().__init__(parent)
         self.setWindowTitle(translator.tr("dialog_merge_title"))
-        self.resize(850, 500)
+        self.resize(1150, 500) # WHY: Expanded to provide adequate room for the separated columns
         self.current_title = current_data.get('Clean_Title', '')
         self.current_folder = current_data.get('Folder_Name', '')
         self.master_df = master_df
@@ -26,13 +26,20 @@ class MergeSelectionDialog(QDialog):
         layout.addWidget(self.chk_show_all)
         
         self.table_widget = QTableWidget()
-        self.table_widget.setColumnCount(3)
+        self.table_widget.setColumnCount(5)
         self.table_widget.setHorizontalHeaderLabels([
             translator.tr("dialog_merge_col_date"), 
             translator.tr("dialog_merge_col_name"), 
+            translator.tr("dialog_merge_col_platform"), 
+            translator.tr("dialog_merge_col_match"), 
             translator.tr("dialog_merge_col_path")
         ])
+        # WHY: Force short text to fit perfectly while allocating all remaining stretch space purely to Title and Path.
+        self.table_widget.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.table_widget.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.table_widget.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.table_widget.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.table_widget.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
         self.table_widget.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table_widget.setSelectionMode(QAbstractItemView.SingleSelection)
         self.table_widget.verticalHeader().setVisible(False)
@@ -79,11 +86,10 @@ class MergeSelectionDialog(QDialog):
             self.table_widget.insertRow(row)
             
             date_val = str(g.get('Original_Release_Date') or g.get('Year_Folder', ''))
-            name_val = f"{g.get('Clean_Title')} ({g.get('Platforms')})"
+            name_val = str(g.get('Clean_Title', ''))
+            plat_val = str(g.get('Platforms', ''))
             path_val = str(g.get('Path_Root', ''))
-            
-            if ratio is not None:
-                name_val += f" [Match: {int(ratio*100)}%]"
+            match_val = f"{int(ratio*100)}%" if ratio is not None else ""
                 
             if g.get('Folder_Name') == self.current_folder:
                 name_val = f">>> {name_val} <<<"
@@ -94,7 +100,15 @@ class MergeSelectionDialog(QDialog):
             
             self.table_widget.setItem(row, 0, item_date)
             self.table_widget.setItem(row, 1, QTableWidgetItem(name_val))
-            self.table_widget.setItem(row, 2, QTableWidgetItem(path_val))
+            self.table_widget.setItem(row, 2, QTableWidgetItem(plat_val))
+            
+            item_match = QTableWidgetItem(match_val)
+            item_match.setTextAlignment(Qt.AlignCenter)
+            self.table_widget.setItem(row, 3, item_match)
+            
+            path_item = QTableWidgetItem(path_val)
+            path_item.setToolTip(path_val) # WHY: Ensures the path is always viewable on hover, even if the user resizes the window down.
+            self.table_widget.setItem(row, 4, path_item)
             
         if target_row >= 0:
             self.table_widget.selectRow(target_row)

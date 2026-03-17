@@ -187,7 +187,7 @@ class LibraryController(QObject):
         if c_idx:
             for k, v in final_data.items(): self.mw.current_df.at[c_idx[0], k] = v
             
-        self.mw.list_controller.update_single_card(folder_name)
+        self.mw.list_controller.update_single_card(folder_name, force_media_reload=True)
         self.save_settings()
 
     def execute_merge(self, folder_a, folder_b):
@@ -235,7 +235,7 @@ class LibraryController(QObject):
         self.mw.master_df = self.mw.master_df[self.mw.master_df['Folder_Name'] != folder_b]
         self.mw.current_df = self.mw.current_df[self.mw.current_df['Folder_Name'] != folder_b]
 
-        self.mw.list_controller.update_single_card(folder_a)
+        self.mw.list_controller.update_single_card(folder_a, force_media_reload=True)
         self.mw.list_controller.remove_single_card(folder_b)
         self.save_settings()
         return True

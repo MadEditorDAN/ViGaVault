@@ -216,7 +216,7 @@ class ScanController(QObject):
             if c_idx:
                 for k, v in new_data.items(): self.mw.current_df.at[c_idx[0], k] = v
                 
-            self.mw.list_controller.update_single_card(folder_name)
+            self.mw.list_controller.update_single_card(folder_name, force_media_reload=True)
             
             self.mw.sidebar.scan_results.clear()
             item = QListWidgetItem(translator.tr("sidebar_log_update_complete"))

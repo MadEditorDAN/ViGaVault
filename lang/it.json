@@ -87,6 +87,8 @@
     "dialog_conflict_btn_play": "Riproduci Video",
     "dialog_merge_col_date": "Data / Anno",
     "dialog_merge_col_name": "Nome",
+    "dialog_merge_col_platform": "Piattaforma",
+    "dialog_merge_col_match": "Corrispondenza %",
     "dialog_merge_col_path": "Percorso",
     "dialog_select_title": "Scegli il gioco corretto",
     "dialog_select_desc": "Trovati risultati multipli. Seleziona quello corretto:",

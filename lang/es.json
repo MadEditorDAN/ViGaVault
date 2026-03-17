@@ -87,6 +87,8 @@
     "dialog_conflict_btn_play": "Reproducir Vídeo",
     "dialog_merge_col_date": "Fecha / Año",
     "dialog_merge_col_name": "Nombre",
+    "dialog_merge_col_platform": "Plataforma",
+    "dialog_merge_col_match": "Coincidencia %",
     "dialog_merge_col_path": "Ruta",
     "dialog_select_title": "Elija el juego correcto",
     "dialog_select_desc": "Se encontraron múltiples resultados. Seleccione el correcto:",

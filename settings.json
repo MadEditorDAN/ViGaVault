@@ -1,5 +1,5 @@
 {
-    "geometry": "AdnQywADAAAAABQAAAAAegAAG38AAASJAAAUAQAAASgAABiwAAAERwAAAAICAAAAB4AAABQAAAAAmQAAG38AAASJ",
+    "geometry": "AdnQywADAAAAABQAAAAAegAAG38AAASJAAAUAQAAAJsAABt+AAAEiAAAAAICAAAAB4AAABQAAAAAmQAAG38AAASJ",
     "sort_desc": true,
     "sort_index": 1,
     "checked_platforms": [
@@ -304,7 +304,7 @@
         ]
     },
     "db_path": "C:/Users/mad_e/OneDrive/Batch Collection/ViGaVault/VGVDB.csv",
-    "card_image_size": 160,
+    "card_image_size": 180,
     "card_button_size": 50,
-    "card_text_size": 18
+    "card_text_size": 20
 }

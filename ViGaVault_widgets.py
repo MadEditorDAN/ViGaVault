@@ -526,7 +526,7 @@ class GameCard(QWidget):
         details_layout.addWidget(self.summary_content)
         main_layout.addLayout(details_layout)
 
-    def refresh_ui_from_data(self):
+    def refresh_ui_from_data(self, force_media_reload=False):
         """WHY: Allows surgical updates of the UI instantly without reloading the widget or the list."""
         # Update Texts
         self.title_lbl.setText(self.data.get('Clean_Title', 'Unknown'))
@@ -549,7 +549,8 @@ class GameCard(QWidget):
         # Update Image (Only reload if path actually changed to save IO)
         img_name = self.data.get('Image_Link', '')
         new_image_path = os.path.join(get_image_path(), os.path.basename(img_name)) if img_name else ''
-        if new_image_path != self.image_path:
+        # WHY: force_media_reload bypasses the path string check to physically reload the image from disk if it was overwritten.
+        if new_image_path != self.image_path or force_media_reload:
             self.image_path = new_image_path
             if self.image_path:
                 self.start_image_load(self.image_path)

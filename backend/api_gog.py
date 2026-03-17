@@ -348,6 +348,7 @@ def sync_gog_database(config, games_dict, worker_thread=None):
                                 filename = ydl.prepare_filename(info)
                                 if os.path.exists(filename):
                                     game_obj.data['Path_Video'] = os.path.basename(filename)
+                                    game_obj.data['Has_Video'] = True
                                     stats['videos_downloaded'] += 1
                         except Exception as e:
                             if "Download interrupted" in str(e): break
@@ -374,6 +375,9 @@ def sync_gog_database(config, games_dict, worker_thread=None):
             
             if cover_url:
                 if cover_url.startswith('//'): cover_url = "https:" + cover_url
+                
+                # WHY: Always save the URL to the DB for asynchronous backfilling.
+                game_obj.data['Cover_URL'] = cover_url
                 
                 existing_image_name = game_obj.data.get('Image_Link')
                 existing_image_path = os.path.join(images_dir, os.path.basename(existing_image_name)) if existing_image_name else ''
@@ -407,6 +411,7 @@ def sync_gog_database(config, games_dict, worker_thread=None):
                             if response.status_code == 200:
                                 with open(save_path, 'wb') as f: f.write(response.content)
                                 game_obj.data['Image_Link'] = f"{safe_filename}{ext}"
+                                game_obj.data['Has_Image'] = True
                                 logging.info(f"    [IMAGE] Downloaded missing image: {safe_filename}{ext}")
                                 stats['images_downloaded'] += 1
                         except Exception as e: pass

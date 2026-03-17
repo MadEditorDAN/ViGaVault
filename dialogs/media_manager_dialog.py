@@ -330,7 +330,7 @@ class MediaManagerDialog(QDialog):
                 for k, v in new_data.items(): self.parent_window.current_df.at[c_idx[0], k] = v
                 
             if hasattr(self.parent_window, 'list_controller'):
-                self.parent_window.list_controller.update_single_card(folder_name)
+                self.parent_window.list_controller.update_single_card(folder_name, force_media_reload=True)
             
             has_img = str(game.data.get('Has_Image')).lower() in ['true', '1']
             has_vid = str(game.data.get('Has_Video')).lower() in ['true', '1']

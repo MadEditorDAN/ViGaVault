@@ -3,7 +3,7 @@ import pandas as pd
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QScrollArea, QFrame, QWidget, QLabel, 
                                QPushButton, QFormLayout, QSizePolicy, QTableWidget, QTableWidgetItem, 
                                QHeaderView, QAbstractItemView, QStyledItemDelegate, QStyleOptionProgressBar, 
-                               QApplication, QStyle)
+                               QApplication, QStyle, QTextBrowser)
 from PySide6.QtCore import Qt
 
 from ViGaVault_utils import translator
@@ -39,8 +39,14 @@ class StatisticsDialog(QDialog):
     def __init__(self, df, parent=None):
         super().__init__(parent)
         self.setWindowTitle(translator.tr("tools_stats_title"))
-        self.resize(1300, 800)
+        # WHY: Increased vertical starting height to 900 to comfortably fit the new HTML QLabel and bottom graphs.
+        self.resize(1300, 900)
         self.df = df
+        
+        # WHY: Shift the dialog background to the darker 'Base' color (matching the GameCard list)
+        # to guarantee the 'Highlight' text selection color is vividly visible against it.
+        self.setObjectName("stats_window")
+        self.setStyleSheet("QDialog#stats_window, QScrollArea, QWidget#stats_container { background-color: palette(base); }")
         
         layout = QVBoxLayout(self)
         
@@ -49,6 +55,7 @@ class StatisticsDialog(QDialog):
         scroll.setFrameShape(QFrame.NoFrame)
         
         container = QWidget()
+        container.setObjectName("stats_container")
         dashboard_layout = QVBoxLayout(container)
         
         lbl_overview = QLabel(translator.tr("tools_stats_overview"))
@@ -89,9 +96,11 @@ class StatisticsDialog(QDialog):
             lbl_val = QLabel(str(value))
             lbl_val.setStyleSheet("font-size: 36px; font-weight: bold;")
             lbl_val.setAlignment(Qt.AlignCenter)
+            lbl_val.setTextInteractionFlags(Qt.TextSelectableByMouse)
             lbl_title = QLabel(title)
             lbl_title.setStyleSheet("font-size: 14px;")
             lbl_title.setAlignment(Qt.AlignCenter)
+            lbl_title.setTextInteractionFlags(Qt.TextSelectableByMouse)
             fl.addWidget(lbl_val)
             fl.addWidget(lbl_title)
             boxes_layout.addWidget(frame, 1)
@@ -188,32 +197,39 @@ class StatisticsDialog(QDialog):
             local_copy_pct = round((local_copy_count / total_games * 100) if total_games else 0, 1)
             stats_data.append(("tools_stats_local_copy_ratio", f"{local_copy_pct}% ({local_copy_count})"))
 
-        text_container = QWidget()
-        text_container.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
-        h_layout = QHBoxLayout(text_container)
-        h_layout.setContentsMargins(0, 10, 0, 0)
-        h_layout.setSpacing(20)
-
-        forms = [QFormLayout(), QFormLayout(), QFormLayout()]
-        for f in forms:
-            f.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            h_layout.addLayout(f, 1)
-
         num_items = len(stats_data)
         items_per_col = (num_items + 2) // 3
 
-        for i, (key, val) in enumerate(stats_data):
-            form_idx = i // items_per_col
-            if key == "tools_stats_common_word" and val != "N/A":
-                val = f"'{val}'"
-                
-            lbl_title = QLabel(translator.tr(key) + " :")
-            lbl_val = QLabel(str(val))
-            lbl_val.setWordWrap(True)
-            lbl_val.setStyleSheet("font-weight: bold;")
-            forms[form_idx].addRow(lbl_title, lbl_val)
+        # WHY: Replaced isolated QLabels with a single unified QTextBrowser using an HTML table.
+        # This allows fluid, native block-text selection across all columns and rows simultaneously.
+        html = "<table width='100%' cellspacing='10'><tr>"
+        
+        for col_idx in range(3):
+            start_idx = col_idx * items_per_col
+            end_idx = min(start_idx + items_per_col, num_items)
+            col_data = stats_data[start_idx:end_idx]
             
-        layout.addWidget(text_container)
+            html += "<td valign='top'><table width='100%' cellspacing='8'>"
+            for key, val in col_data:
+                if key == "tools_stats_common_word" and val != "N/A":
+                    val = f"'{val}'"
+                title_str = translator.tr(key)
+                html += f"<tr><td align='right' width='50%'>{title_str} :</td><td align='left' width='50%'><b>{val}</b></td></tr>"
+            html += "</table></td>"
+            
+        html += "</tr></table>"
+        
+        # WHY: Switched from QTextBrowser to a single rich-text QLabel. 
+        # QLabel intrinsically understands HTML layout math (fixing the massive gap), 
+        # and natively uses OS-level selection colors (fixing the invisible highlight).
+        lbl_stats = QLabel()
+        lbl_stats.setTextFormat(Qt.RichText)
+        lbl_stats.setText(html)
+        lbl_stats.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        lbl_stats.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        lbl_stats.setWordWrap(True)
+        
+        layout.addWidget(lbl_stats)
         return widget
 
     def create_distribution_section(self, col_name, title):

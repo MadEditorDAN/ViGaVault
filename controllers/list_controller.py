@@ -67,7 +67,7 @@ class ListController(QObject):
         if top_item:
             self.mw.list_widget.scrollToItem(top_item, QAbstractItemView.PositionAtTop)
 
-    def update_single_card(self, folder_name):
+    def update_single_card(self, folder_name, force_media_reload=False):
         """WHY: Finds a specific GameCard and forces it to redraw using updated memory data."""
         row_data = self.mw.master_df[self.mw.master_df['Folder_Name'] == folder_name]
         if row_data.empty: return
@@ -79,7 +79,7 @@ class ListController(QObject):
                 card = self.mw.list_widget.itemWidget(item)
                 if card:
                     card.data = game_dict
-                    card.refresh_ui_from_data()
+                    card.refresh_ui_from_data(force_media_reload=force_media_reload)
                     item.setSizeHint(card.calculate_size_hint(card.width()))
                 break
 

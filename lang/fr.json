@@ -87,6 +87,8 @@
     "dialog_conflict_btn_play": "Lire la Vidéo",
     "dialog_merge_col_date": "Date / Année",
     "dialog_merge_col_name": "Nom",
+    "dialog_merge_col_platform": "Plateforme",
+    "dialog_merge_col_match": "Match %",
     "dialog_merge_col_path": "Chemin",
     "dialog_select_title": "Choisissez le bon jeu",
     "dialog_select_desc": "Plusieurs résultats trouvés. Veuillez sélectionner le bon :",

@@ -16,9 +16,12 @@ Remember to always :
 Let's discuss, no code.
 
 
-
+When selecting text in the gamecard, we can barely see the 
 
 
 
 Games to fix :
 Doom project
+
+
+

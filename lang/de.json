@@ -87,6 +87,8 @@
     "dialog_conflict_btn_play": "Video abspielen",
     "dialog_merge_col_date": "Datum / Jahr",
     "dialog_merge_col_name": "Name",
+    "dialog_merge_col_platform": "Plattform",
+    "dialog_merge_col_match": "Übereinstimmung %",
     "dialog_merge_col_path": "Pfad",
     "dialog_select_title": "Wählen Sie das richtige Spiel",
     "dialog_select_desc": "Mehrere Ergebnisse gefunden. Bitte wählen Sie das richtige aus:",
