@@ -50,6 +50,14 @@ class MainWindow(QMainWindow):
         self.list_widget.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
         self.list_widget.verticalScrollBar().setSingleStep(25)
         
+        # WHY: Swap the native selection background fill for a subtle 5px inside border.
+        # Pre-defining a transparent border prevents layout shifting, and setting background-color
+        # to transparent ensures the native text selection color remains perfectly visible.
+        self.list_widget.setStyleSheet("""
+            QListWidget::item { border: 10px solid transparent; }
+            QListWidget::item:selected { background-color: transparent; border: 10px solid palette(highlight); }
+        """)
+        
         main_layout.addWidget(self.list_widget, stretch=3)
         
         # 3. Sidebar (right, takes 1/4 of the space)

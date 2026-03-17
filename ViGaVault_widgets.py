@@ -406,6 +406,8 @@ class GameCard(QWidget):
         # SizePolicy ignored to allow text to shrink/wrap correctly in tight spaces
         self.title_lbl.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.title_lbl.setMinimumWidth(0)
+        # WHY: Intercept click to trigger card selection before text-highlighting consumes it.
+        self.title_lbl.installEventFilter(self)
         title_layout.addWidget(self.title_lbl)
 
         path_root = game_data.get('Path_Root', '')
@@ -416,6 +418,7 @@ class GameCard(QWidget):
         self.path_lbl.setWordWrap(True)
         self.path_lbl.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.path_lbl.setMinimumWidth(0)
+        self.path_lbl.installEventFilter(self)
         title_layout.addWidget(self.path_lbl)
         
         header_layout.addLayout(title_layout, 1) # Give title stretch priority
@@ -506,6 +509,7 @@ class GameCard(QWidget):
             # Policy and MinimumWidth are crucial to prevent "disappearing buttons" bug
             label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
             label.setMinimumWidth(0)
+            label.installEventFilter(self)
             details_layout.addWidget(label)
             self.info_labels.append(label)
             
@@ -514,6 +518,7 @@ class GameCard(QWidget):
         
         self.summary_title = QLabel(translator.tr("gamecard_summary_title"))
         self.summary_title.setStyleSheet(f"font-weight: bold; font-size: {info_font_size}px;")
+        self.summary_title.installEventFilter(self)
         details_layout.addWidget(self.summary_title)
 
         summary_font_size = max(10, settings.get('text', 22) - 8)
@@ -523,6 +528,7 @@ class GameCard(QWidget):
         self.summary_content.setTextInteractionFlags(Qt.TextSelectableByMouse)
         # Vertical Policy Minimum prevents the summary from forcing the card to be too tall
         self.summary_content.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        self.summary_content.installEventFilter(self)
         details_layout.addWidget(self.summary_content)
         main_layout.addLayout(details_layout)
 
