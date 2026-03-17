@@ -1,5 +1,5 @@
 # WHY: Single Responsibility Principle - A place for minor, utility-level popups and informational dialogs.
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QListWidget, QListWidgetItem
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QListWidget, QListWidgetItem, QTextBrowser, QFrame
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
@@ -56,3 +56,28 @@ class SelectionDialog(QDialog):
         if item:
             return item.data(Qt.UserRole)
         return None
+
+class DocumentationDialog(QDialog):
+    def __init__(self, html_content, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(translator.tr("menu_help_docs"))
+        self.resize(1000, 700)
+        
+        # WHY: Use a dedicated QTextBrowser to provide a comfortable, scrollable reading experience 
+        # that fully supports rich HTML table structures.
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        browser = QTextBrowser()
+        browser.setHtml(html_content)
+        browser.setOpenExternalLinks(True)
+        browser.setFrameShape(QFrame.NoFrame)
+        layout.addWidget(browser)
+        
+        btn_layout = QHBoxLayout()
+        btn_layout.setContentsMargins(10, 10, 10, 10)
+        btn_close = QPushButton(translator.tr("btn_close"))
+        btn_close.clicked.connect(self.accept)
+        btn_layout.addStretch()
+        btn_layout.addWidget(btn_close)
+        layout.addLayout(btn_layout)

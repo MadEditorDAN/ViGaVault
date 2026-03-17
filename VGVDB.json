@@ -1,5 +1,4 @@
 {
-    "geometry": "AdnQywADAAAAABQAAAAAegAAG38AAASJAAAUAQAAAKIAABj+AAAEiAAAAAICAAAAB4AAABQAAAAAmQAAG38AAASJ",
     "sort_desc": true,
     "sort_index": 1,
     "checked_platforms": [
@@ -62,8 +61,6 @@
         "playfire",
         "weplay"
     ],
-    "theme": "System",
-    "language": "English",
     "card_size": 200,
     "root_path": "\\\\madhdd02\\Software\\GAMES",
     "local_scan_config": {
@@ -76,27 +73,42 @@
             "GAMES": {
                 "type": "Genre",
                 "filter": true,
-                "scan": true
+                "scan": true,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
             },
             "GAMES COMPIL": {
                 "type": "Collection",
                 "filter": true,
-                "scan": true
+                "scan": true,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
             },
             "GAMES VR": {
                 "type": "Genre",
                 "filter": true,
-                "scan": true
+                "scan": true,
+                "inject_enabled": true,
+                "inject_field": "Genre",
+                "inject_value": "V.R."
             },
             "GOG REPO": {
                 "type": "None",
                 "filter": false,
-                "scan": false
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
             },
             "_TEMP": {
                 "type": "None",
                 "filter": false,
-                "scan": true
+                "scan": true,
+                "inject_enabled": true,
+                "inject_field": "Genre",
+                "inject_value": "_Not Tested Yet"
             }
         }
     },
@@ -104,12 +116,11 @@
     "download_videos": true,
     "scan_new": true,
     "filter_states": {},
-    "db_path": "C:/Users/mad_e/OneDrive/Batch Collection/ViGaVault/VGVDB.csv",
     "enable_gog_db": true,
     "video_path": "D:\\ViGaVault\\Videos",
     "filter_expansion": {
-        "Platforms": false,
-        "Genre": false,
+        "Platforms": true,
+        "Genre": true,
         "Collection": false
     },
     "image_path": "D:\\ViGaVault\\Images",

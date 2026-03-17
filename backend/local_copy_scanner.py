@@ -89,6 +89,23 @@ def scan_local_system(config, games_dict, token, worker_thread=None):
                         elif content_type in ["Collection", "Publisher", "Developer"]: game.data[content_type] = content_value
                         elif content_type == "Year": game.data['Year_Folder'] = content_value
                     
+                    # WHY: Apply user-defined batch tags (Custom Injection)
+                    if rule.get("inject_enabled", False):
+                        inj_field = rule.get("inject_field")
+                        inj_val = rule.get("inject_value", "").strip()
+                        if inj_field and inj_val:
+                            if inj_field == "Genre":
+                                game.data['Genre'] = normalize_genre(f"{inj_val}, {game.data.get('Genre', '')}")
+                            elif inj_field in ["Collection", "Publisher", "Developer"]:
+                                # WHY: Safely append the injected text without overwriting existing DB/IGDB metadata
+                                existing = game.data.get(inj_field, "")
+                                if not existing:
+                                    game.data[inj_field] = inj_val
+                                elif inj_val.lower() not in existing.lower():
+                                    game.data[inj_field] = f"{existing}, {inj_val}"
+                            elif inj_field == "Year":
+                                if not game.data.get('Year_Folder'): game.data['Year_Folder'] = inj_val
+
                     p_set = set(x.strip() for x in game.data.get('Platforms', '').split(',') if x.strip())
                     # WHY: Ensure "Local Copy" tag is removed if real platforms exist.
                     if 'Local Copy' in p_set and len(p_set) > 1: p_set.remove('Local Copy')

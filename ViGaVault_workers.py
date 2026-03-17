@@ -51,12 +51,20 @@ class FilterWorker(QThread):
 
         # 1. Text Filter (Search Bar)
         search = self.params['search_text'].lower()
+        search_target = self.params.get('search_target', 'Name')
+        
         if search:
-            # WHY: Extended the search to evaluate across Title, Folder Name, and Search Title simultaneously.
-            mask_title = df['Clean_Title'].fillna('').str.lower().str.contains(search)
-            mask_folder = df['Folder_Name'].fillna('').str.lower().str.contains(search)
-            mask_search = df['Search_Title'].fillna('').str.lower().str.contains(search) if 'Search_Title' in df.columns else False
-            df = df[mask_title | mask_folder | mask_search]
+            if search_target == 'Name':
+                mask_title = df['Clean_Title'].fillna('').str.lower().str.contains(search)
+                mask_folder = df['Folder_Name'].fillna('').str.lower().str.contains(search)
+                mask_search = df['Search_Title'].fillna('').str.lower().str.contains(search) if 'Search_Title' in df.columns else False
+                df = df[mask_title | mask_folder | mask_search]
+            elif search_target == 'Developer':
+                df = df[df['Developer'].fillna('').str.lower().str.contains(search)]
+            elif search_target == 'Publisher':
+                df = df[df['Publisher'].fillna('').str.lower().str.contains(search)]
+            elif search_target == 'Summary':
+                df = df[df['Summary'].fillna('').str.lower().str.contains(search)]
             
         is_scan_new = self.params.get('scan_new', False)
 
@@ -105,6 +113,8 @@ class DbLoaderWorker(QThread):
                 # Pre-calculate columns for faster sorting
                 df['temp_sort_date'] = pd.to_datetime(df['Original_Release_Date'], errors='coerce', dayfirst=True)
                 df['temp_sort_title'] = df['Clean_Title'].str.lower()
+                # WHY: Store the physical CSV row number to allow sorting by "Date Added".
+                df['temp_sort_index'] = df.index
             except Exception as e:
                 logging.error(f"Error loading DB: {e}")
                 df = pd.DataFrame()
@@ -112,6 +122,7 @@ class DbLoaderWorker(QThread):
             df = pd.DataFrame(columns=['Clean_Title', 'Platforms', 'Original_Release_Date', 'Status_Flag', 'Path_Root', 'Folder_Name'])
             df['temp_sort_date'] = pd.to_datetime([])
             df['temp_sort_title'] = []
+            df['temp_sort_index'] = []
         self.finished.emit(df)
 
 class ImageSignals(QObject):

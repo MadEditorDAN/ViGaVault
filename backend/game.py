@@ -199,11 +199,27 @@ class Game:
         local_year = self.data.get('Year_Folder', '')
         results = query_igdb_api(token, search_term=search_term, limit=5)
         
+        # WHY: "Smart Exception" keyword detector. If the folder implies a special edition,
+        # we disable the standard penalty against bundles and remasters to ensure it matches accurately.
+        folder_lower = self.data.get('Folder_Name', '').lower()
+        edition_keywords = ['goty', 'remaster', 'definitive', 'complete', 'edition', 'director', 'redux', 'anniversary']
+        has_edition_keyword = any(kw in folder_lower for kw in edition_keywords)
+        
         if results:
             best_match, best_score = None, -1
             for g in results:
                 score = 0
-                if search_term.lower() in g.get('name', '').lower(): score += 10
+                
+                # WHY: Exact match supremacy. Base the score heavily on text comparison (up to 100 points).
+                ratio = difflib.SequenceMatcher(None, search_term.lower(), g.get('name', '').lower()).ratio()
+                score += int(ratio * 100)
+                
+                # WHY: Category Multiplier logic acts as an intelligent tie-breaker.
+                cat = g.get('category', 0)
+                if cat == 0: score += 15 # Main Game boost
+                elif cat in [1, 2]: score -= 30 # Heavy penalty for DLCs and Expansions
+                elif cat in [3, 8, 9] and not has_edition_keyword: score -= 20 # Penalty for Bundles/Remasters unless requested
+                
                 api_year = None
                 dates = g.get('release_dates', [])
                 if dates:
@@ -261,13 +277,27 @@ class Game:
         search_term = search_override or self.data.get('Search_Title') or self.data.get('Folder_Name')
         local_dev = self.data.get('Developer', '').lower()
         local_year = self.data.get('Year_Folder', '')
+        
+        folder_lower = self.data.get('Folder_Name', '').lower()
+        edition_keywords = ['goty', 'remaster', 'definitive', 'complete', 'edition', 'director', 'redux', 'anniversary']
+        has_edition_keyword = any(kw in folder_lower for kw in edition_keywords)
+        
         results = query_igdb_api(token, search_term=search_term, limit=5)
         
         if results:
             best_match, best_score = None, -1
             for g in results:
                 score = 0
-                if search_term.lower() in g.get('name', '').lower(): score += 10
+                
+                # WHY: Exact match supremacy weighting.
+                ratio = difflib.SequenceMatcher(None, search_term.lower(), g.get('name', '').lower()).ratio()
+                score += int(ratio * 100)
+                
+                cat = g.get('category', 0)
+                if cat == 0: score += 15
+                elif cat in [1, 2]: score -= 30
+                elif cat in [3, 8, 9] and not has_edition_keyword: score -= 20
+                
                 devs = [c['company']['name'].lower() for c in g.get('involved_companies', []) if c.get('developer')]
                 if local_dev and any(local_dev in d for d in devs): score += 5
                 dates = g.get('release_dates', [])

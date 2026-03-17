@@ -24,7 +24,7 @@ def query_igdb_api(token, search_term=None, limit=5, by_id=False, custom_query=N
     else:
         fields = ('id, name, summary, genres.name, involved_companies.company.name, '
                   'involved_companies.developer, involved_companies.publisher, '
-                  'videos.video_id, release_dates.date, cover.url')
+                  'videos.video_id, release_dates.date, cover.url, category')
         if by_id: query = f'fields {fields}; where id = {search_term};'
         else: query = f'search "{search_term}"; fields {fields}; where platforms = (3, 6, 13, 14, 161, 162, 163); limit {limit};'
             

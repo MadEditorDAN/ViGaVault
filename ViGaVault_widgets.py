@@ -8,7 +8,7 @@ import logging
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, 
                              QPushButton, QScrollArea, QFrame, QSizePolicy, QCheckBox, 
                              QLineEdit, QComboBox, QListWidget, QListWidgetItem, 
-                             QMessageBox, QGroupBox, QApplication, QAbstractItemView)
+                             QMessageBox, QGroupBox, QApplication, QAbstractItemView, QMenu, QToolButton)
 from PySide6.QtCore import Qt, QSize, QEvent
 from PySide6.QtGui import QIcon, QPixmap, QFont, QPalette
 
@@ -163,9 +163,29 @@ class Sidebar(QWidget):
         search_layout.addWidget(lbl_search)
 
         self.search_bar = QLineEdit()
-        self.search_bar.setPlaceholderText(translator.tr("sidebar_search_placeholder"))
+        
+        # WHY: "Name" is hardcoded as the default target so there is no state persistence across app restarts.
+        self.search_target = "Name"
+        self.search_ph_key = "search_ph_name"
+        self.search_bar.setPlaceholderText(translator.tr(self.search_ph_key))
         self.search_bar.setClearButtonEnabled(True)
         search_layout.addWidget(self.search_bar, 1) # Stretch 1 pour prendre l'espace disponible
+        
+        self.search_btn = QToolButton()
+        self.search_btn.setText("▼")
+        self.search_btn.setPopupMode(QToolButton.InstantPopup)
+        self.search_btn.setCursor(Qt.PointingHandCursor)
+        self.search_btn.setStyleSheet("QToolButton { border: none; padding: 2px 5px; } QToolButton::menu-indicator { image: none; }")
+        
+        self.search_menu = QMenu(self.search_btn)
+        self.act_search_name = self.search_menu.addAction(translator.tr("search_target_name"))
+        self.act_search_dev = self.search_menu.addAction(translator.tr("search_target_developer"))
+        self.act_search_pub = self.search_menu.addAction(translator.tr("search_target_publisher"))
+        self.act_search_sum = self.search_menu.addAction(translator.tr("search_target_summary"))
+        self.search_btn.setMenu(self.search_menu)
+        
+        # WHY: Appending the invisible tool button natively inside the search frame creates the illusion of a composite widget.
+        search_layout.addWidget(self.search_btn)
         
         self.top_layout.addWidget(self.frame_search)
         
@@ -182,7 +202,11 @@ class Sidebar(QWidget):
         sort_layout.addWidget(lbl_sort)
 
         self.combo_sort = QComboBox()
-        self.combo_sort.addItems([translator.tr("sidebar_sort_name"), translator.tr("sidebar_sort_release_date"), translator.tr("sidebar_sort_developer")])
+        self.combo_sort.addItems([
+            translator.tr("sidebar_sort_name"), 
+            translator.tr("sidebar_sort_release_date"), 
+            translator.tr("sidebar_sort_date_added")
+        ])
         sort_layout.addWidget(self.combo_sort, 1) # Stretch 1 pour prendre l'espace disponible
         
         self.btn_toggle_sort = QPushButton()
@@ -312,6 +336,18 @@ class Sidebar(QWidget):
         self.btn_cancel.clicked.connect(self.parent.cancel_inline_scan)
         self.scan_results.itemDoubleClicked.connect(self.parent.apply_inline_selection)
 
+        self.act_search_name.triggered.connect(lambda: self.set_search_target("Name", "search_ph_name"))
+        self.act_search_dev.triggered.connect(lambda: self.set_search_target("Developer", "search_ph_developer"))
+        self.act_search_pub.triggered.connect(lambda: self.set_search_target("Publisher", "search_ph_publisher"))
+        self.act_search_sum.triggered.connect(lambda: self.set_search_target("Summary", "search_ph_summary"))
+
+    def set_search_target(self, target, ph_key):
+        """Dynamically swaps the placeholder text and triggers an instant refilter."""
+        self.search_target = target
+        self.search_ph_key = ph_key
+        self.search_bar.setPlaceholderText(translator.tr(ph_key))
+        if self.search_bar.text(): self.parent.request_filter_update()
+
     def update_sort_button(self, is_desc):
         # Updates label between UP (Ascending) and DOWN (Descending)
         key = "sidebar_sort_descending" if is_desc else "sidebar_sort_ascending"
@@ -334,11 +370,15 @@ class Sidebar(QWidget):
 
     def retranslate_ui(self):
         self.findChild(QLabel, "sidebar_search_label").setText(translator.tr("sidebar_search_label"))
-        self.search_bar.setPlaceholderText(translator.tr("sidebar_search_placeholder"))
+        self.search_bar.setPlaceholderText(translator.tr(self.search_ph_key))
+        self.act_search_name.setText(translator.tr("search_target_name"))
+        self.act_search_dev.setText(translator.tr("search_target_developer"))
+        self.act_search_pub.setText(translator.tr("search_target_publisher"))
+        self.act_search_sum.setText(translator.tr("search_target_summary"))
         self.findChild(QLabel, "sidebar_sort_label").setText(translator.tr("sidebar_sort_label"))
         self.combo_sort.setItemText(0, translator.tr("sidebar_sort_name"))
         self.combo_sort.setItemText(1, translator.tr("sidebar_sort_release_date"))
-        self.combo_sort.setItemText(2, translator.tr("sidebar_sort_developer"))
+        self.combo_sort.setItemText(2, translator.tr("sidebar_sort_date_added"))
         self.update_sort_button(self.parent.sort_desc)
         self.findChild(QLabel, "sidebar_filters_label").setText(translator.tr("sidebar_filters_label"))
         self.chk_show_new.setText(translator.tr("sidebar_chk_show_new"))

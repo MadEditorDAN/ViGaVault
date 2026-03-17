@@ -340,6 +340,11 @@ class LibraryController(QObject):
             except: pass
 
         global_settings.update({"geometry": self.mw.saveGeometry().toBase64().data().decode()})
+        
+        # WHY: Targeted Cleanup - Scrub local library data out of the global settings file to fix legacy data bleed.
+        local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "scan_new", "filter_states", "filter_expansion", "sidebar_chk_gog", "sidebar_chk_local", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_gog_db", "gog_db_path", "download_images", "download_videos", "image_path", "video_path"]
+        for k in local_keys: global_settings.pop(k, None)
+        
         try:
             with open("settings.json", "w", encoding='utf-8') as f:
                 json.dump(global_settings, f, indent=4)
@@ -352,8 +357,10 @@ class LibraryController(QObject):
                 with open(lib_settings_file, "r", encoding='utf-8') as f:
                     lib_settings = json.load(f)
              except: pass
-        elif os.path.exists("settings.json"):
-             lib_settings.update(global_settings)
+
+        # WHY: Targeted Cleanup - Scrub global OS data out of the local library settings file.
+        global_keys = ["geometry", "theme", "language", "card_image_size", "card_button_size", "card_text_size", "db_path"]
+        for k in global_keys: lib_settings.pop(k, None)
 
         filter_states = {}
         if hasattr(self.mw.filter_controller, 'dynamic_filters'):
@@ -406,8 +413,6 @@ class LibraryController(QObject):
                 with open(lib_settings_file, "r", encoding='utf-8') as f:
                     lib_settings = json.load(f)
             except: pass
-        else:
-            lib_settings = global_settings
 
         try:
             if "geometry" in global_settings:

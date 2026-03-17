@@ -220,6 +220,9 @@ class SettingsDialog(QDialog):
         self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_content_type")), 0, 1)
         self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_filter")), 0, 2)
         self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_scan")), 0, 3)
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_inject")), 0, 5)
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_inject_field")), 0, 6)
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_inject_value")), 0, 7)
 
         root = self.root_path_input.text().strip()
         disk_folders = set()
@@ -228,6 +231,14 @@ class SettingsDialog(QDialog):
             except: pass
         
         all_folders = sorted(list(disk_folders.union(saved_rules.keys())))
+        
+        # WHY: Add a vertical separator with padding to visually group the Inject settings apart from the Scan settings.
+        vline = QFrame()
+        vline.setFrameShape(QFrame.VLine)
+        vline.setFrameShadow(QFrame.Sunken)
+        self.folders_grid.addWidget(vline, 0, 4, len(all_folders) + 1, 1)
+        self.folders_grid.setColumnMinimumWidth(4, 20)
+        
         self.folder_widgets = {}
         
         row = 1
@@ -242,25 +253,48 @@ class SettingsDialog(QDialog):
             chk_filter = QCheckBox()
             chk_scan = QCheckBox()
             
+            chk_inject = QCheckBox()
+            combo_inject = QComboBox()
+            # WHY: Align the target fields with the content type fields, excluding "None".
+            combo_inject.addItems(["Genre", "Collection", "Publisher", "Developer", "Year", "Other"])
+            txt_inject = QLineEdit()
+            
             if folder in saved_rules:
                 rule = saved_rules[folder]
                 combo.setCurrentText(rule.get("type", "None"))
                 chk_filter.setChecked(rule.get("filter", False))
                 chk_scan.setChecked(rule.get("scan", True))
+                
+                chk_inject.setChecked(rule.get("inject_enabled", False))
+                combo_inject.setCurrentText(rule.get("inject_field", "Genre"))
+                txt_inject.setText(rule.get("inject_value", ""))
             else:
                 chk_scan.setChecked(False)
             
+            # WHY: Establish cascading UI logic. Inject controls are greyed out unless both Scan and Inject are ticked.
             combo.setEnabled(chk_scan.isChecked())
             chk_filter.setEnabled(chk_scan.isChecked())
+            chk_inject.setEnabled(chk_scan.isChecked())
+            combo_inject.setEnabled(chk_scan.isChecked() and chk_inject.isChecked())
+            txt_inject.setEnabled(chk_scan.isChecked() and chk_inject.isChecked())
             
-            chk_scan.stateChanged.connect(lambda state, c=combo, f=chk_filter: (c.setEnabled(state), f.setEnabled(state)))
+            chk_scan.stateChanged.connect(lambda state, c=combo, f=chk_filter, i=chk_inject, ci=combo_inject, ti=txt_inject: 
+                                          (c.setEnabled(state), f.setEnabled(state), i.setEnabled(state), ci.setEnabled(state and i.isChecked()), ti.setEnabled(state and i.isChecked())))
+            chk_inject.stateChanged.connect(lambda state, ci=combo_inject, ti=txt_inject: 
+                                            (ci.setEnabled(state), ti.setEnabled(state)))
             
             self.folders_grid.addWidget(lbl, row, 0)
             self.folders_grid.addWidget(combo, row, 1)
             self.folders_grid.addWidget(chk_filter, row, 2)
             self.folders_grid.addWidget(chk_scan, row, 3)
+            self.folders_grid.addWidget(chk_inject, row, 5)
+            self.folders_grid.addWidget(combo_inject, row, 6)
+            self.folders_grid.addWidget(txt_inject, row, 7)
             
-            self.folder_widgets[folder] = {"combo": combo, "filter": chk_filter, "scan": chk_scan}
+            self.folder_widgets[folder] = {
+                "combo": combo, "filter": chk_filter, "scan": chk_scan, 
+                "inject_enabled": chk_inject, "inject_field": combo_inject, "inject_value": txt_inject
+            }
             row += 1
 
     def setup_data_tab(self):
@@ -351,8 +385,6 @@ class SettingsDialog(QDialog):
                 with open(lib_settings_file, "r", encoding='utf-8') as f:
                     lib_settings = json.load(f)
             except: pass
-        else:
-            lib_settings = global_settings
                 
         theme_map = {
             "System": translator.tr("theme_system"),
@@ -435,6 +467,10 @@ class SettingsDialog(QDialog):
         global_settings["card_button_size"] = self.BTN_SIZES[self.slider_btn_size.value()]
         global_settings["card_text_size"] = self.TXT_SIZES[self.slider_text_size.value()]
         
+        # WHY: Targeted Cleanup - Scrub local library data out of the global settings file.
+        local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "scan_new", "filter_states", "filter_expansion", "sidebar_chk_gog", "sidebar_chk_local", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_gog_db", "gog_db_path", "download_images", "download_videos", "image_path", "video_path"]
+        for k in local_keys: global_settings.pop(k, None)
+        
         try:
             with open("settings.json", "w", encoding='utf-8') as f:
                 json.dump(global_settings, f, indent=4)
@@ -447,8 +483,10 @@ class SettingsDialog(QDialog):
                 with open(lib_settings_file, "r", encoding='utf-8') as f:
                     lib_settings = json.load(f)
             except: pass
-        elif os.path.exists("settings.json"):
-             lib_settings.update(global_settings)
+
+        # WHY: Targeted Cleanup - Scrub global OS data out of the local library settings file.
+        global_keys = ["geometry", "theme", "language", "card_image_size", "card_button_size", "card_text_size", "db_path"]
+        for k in global_keys: lib_settings.pop(k, None)
 
         lib_settings["root_path"] = self.root_path_input.text()
         
@@ -457,7 +495,10 @@ class SettingsDialog(QDialog):
             folder_rules[folder] = {
                 "type": widgets["combo"].currentText(),
                 "filter": widgets["filter"].isChecked(),
-                "scan": widgets["scan"].isChecked()
+                "scan": widgets["scan"].isChecked(),
+                "inject_enabled": widgets["inject_enabled"].isChecked(),
+                "inject_field": widgets["inject_field"].currentText(),
+                "inject_value": widgets["inject_value"].text().strip()
             }
         
         lib_settings["local_scan_config"] = {

@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QMessageBox, QApplication
 from PySide6.QtGui import QAction, QPalette
 
 from ViGaVault_utils import translator
-from dialogs import PlatformManagerDialog, MediaManagerDialog, StatisticsDialog, SettingsDialog
+from dialogs import PlatformManagerDialog, MediaManagerDialog, StatisticsDialog, SettingsDialog, DocumentationDialog
 
 class MenuController(QObject):
     def __init__(self, main_window):
@@ -107,9 +107,11 @@ class MenuController(QObject):
         return f"<p>Content not found: {filename}</p>"
 
     def show_documentation(self):
-        title = translator.tr("menu_help_docs")
-        text = self.load_html_asset("doc.html")
-        QMessageBox(QMessageBox.NoIcon, title, text, QMessageBox.Ok, self.mw).exec()
+        # WHY: Dynamically route to the correct localized HTML asset based on the current UI language.
+        lang_map = {"English": "en", "French": "fr", "German": "de", "Spanish": "es", "Italian": "it"}
+        lang_code = lang_map.get(translator.language, "en")
+        text = self.load_html_asset(f"doc_{lang_code}.html")
+        DocumentationDialog(text, self.mw).exec()
 
     def show_about(self):
         title = translator.tr("menu_help_about")

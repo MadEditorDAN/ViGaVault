@@ -154,7 +154,8 @@ class FilterController(QObject):
         self.mw.list_widget.setEnabled(False)
         QApplication.setOverrideCursor(Qt.WaitCursor)
 
-        sort_col_map = ["temp_sort_title", "temp_sort_date", "Developer"]
+        # WHY: Removed Developer. Mapped the 3rd dropdown option to the internal CSV index tracker.
+        sort_col_map = ["temp_sort_title", "temp_sort_date", "temp_sort_index"]
         
         active_filters = {}
         for col, checkboxes in self.dynamic_filters.items():
@@ -162,6 +163,7 @@ class FilterController(QObject):
                 active_filters[col] = [chk.text() for chk in checkboxes if chk.isChecked()]
 
         params = {
+            'search_target': getattr(self.mw.sidebar, 'search_target', 'Name'),
             'search_text': self.mw.sidebar.search_bar.text(),
             'active_filters': active_filters,
             'sort_col': sort_col_map[self.mw.sidebar.combo_sort.currentIndex()],
