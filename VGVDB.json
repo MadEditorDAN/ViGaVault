@@ -102,7 +102,7 @@
     },
     "gog_db_path": "C:\\ProgramData\\GOG.com\\Galaxy\\storage\\galaxy-2.0.db",
     "download_videos": true,
-    "scan_new": false,
+    "scan_new": true,
     "filter_states": {},
     "db_path": "C:/Users/mad_e/OneDrive/Batch Collection/ViGaVault/VGVDB.csv",
     "enable_gog_db": true,
@@ -114,7 +114,7 @@
     },
     "image_path": "D:\\ViGaVault\\Images",
     "download_images": true,
-    "anchor_folder": "Planet of Lana II",
+    "anchor_folder": "2016 - Outcast Legacy of the Yods",
     "sidebar_chk_gog": true,
-    "sidebar_chk_local": false
+    "sidebar_chk_local": true
 }

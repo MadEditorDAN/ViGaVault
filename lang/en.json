@@ -181,6 +181,7 @@
     "msg_jit_video_missing": "Video file not found on disk. The database has been updated.",
     "msg_jit_folder_missing": "Game folder not found on disk. The database has been updated.",
     "msg_task_in_progress": "Another task is already in progress.",
+    "msg_wait_for_scan": "Please wait for the scan to finish.",
     "sidebar_btn_scanning": "Scanning...",
     "sidebar_scan_title_full": "Full Intelligent Scan",
     "sidebar_btn_stop": "Stop",

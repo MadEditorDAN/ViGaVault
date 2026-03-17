@@ -181,6 +181,7 @@
     "msg_jit_video_missing": "Fichier vidéo introuvable sur le disque. La base de données a été mise à jour.",
     "msg_jit_folder_missing": "Dossier du jeu introuvable sur le disque. La base de données a été mise à jour.",
     "msg_task_in_progress": "Une autre tâche est déjà en cours.",
+    "msg_wait_for_scan": "Veuillez patienter jusqu'à la fin du scan.",
     "sidebar_btn_scanning": "Analyse...",
     "sidebar_scan_title_full": "Scan Intelligent Complet",
     "sidebar_btn_stop": "Stop",

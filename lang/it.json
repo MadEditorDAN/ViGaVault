@@ -181,6 +181,7 @@
     "msg_jit_video_missing": "File video non trovato sul disco. Il database è stato aggiornato.",
     "msg_jit_folder_missing": "Cartella del gioco non trovata sul disco. Il database è stato aggiornato.",
     "msg_task_in_progress": "Un'altra attività è già in corso.",
+    "msg_wait_for_scan": "Si prega di attendere il completamento della scansione.",
     "sidebar_btn_scanning": "Scansione...",
     "sidebar_scan_title_full": "Scansione Intelligente Completa",
     "sidebar_btn_stop": "Stop",

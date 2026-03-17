@@ -98,6 +98,11 @@ class ScanController(QObject):
         self.mw.library_controller.refresh_data()
 
     def start_inline_scan(self, game_data):
+        # WHY: Prevent manual scan operations from corrupting database or UI state while a full background scan is writing data.
+        if self.mw.full_scan_in_progress:
+            QMessageBox.warning(self.mw, "Warning", translator.tr("msg_wait_for_scan"))
+            return
+            
         self.mw.current_scan_game = game_data
         self.mw.sidebar.scan_panel.show()
         self.mw.filter_controller.set_filters_ui_state(False)

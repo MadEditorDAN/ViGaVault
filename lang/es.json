@@ -181,6 +181,7 @@
     "msg_jit_video_missing": "Archivo de vídeo no encontrado en el disco. La base de datos ha sido actualizada.",
     "msg_jit_folder_missing": "Carpeta del juego no encontrada en el disco. La base de datos ha sido actualizada.",
     "msg_task_in_progress": "Ya hay otra tarea en curso.",
+    "msg_wait_for_scan": "Por favor, espere a que termine el escaneo.",
     "sidebar_btn_scanning": "Escaneando...",
     "sidebar_scan_title_full": "Escaneo Inteligente Total",
     "sidebar_btn_stop": "Detener",

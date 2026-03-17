@@ -62,14 +62,26 @@ class MenuController(QObject):
         help_menu.addAction(action_about)
 
     def open_settings(self):
+        # WHY: Block settings access during a full scan to prevent modifying paths or rules while the background thread is actively using them.
+        if self.mw.full_scan_in_progress:
+            QMessageBox.warning(self.mw, "Warning", translator.tr("msg_wait_for_scan"))
+            return
         dlg = SettingsDialog(self.mw)
         dlg.exec()
 
     def show_platform_manager(self):
+        # WHY: Block platform manager access during a full scan to prevent concurrent database modifications.
+        if self.mw.full_scan_in_progress:
+            QMessageBox.warning(self.mw, "Warning", translator.tr("msg_wait_for_scan"))
+            return
         dlg = PlatformManagerDialog(self.mw)
         dlg.exec()
 
     def show_media_manager(self):
+        # WHY: Block media manager access during a full scan to prevent race conditions on database saves and file moves.
+        if self.mw.full_scan_in_progress:
+            QMessageBox.warning(self.mw, "Warning", translator.tr("msg_wait_for_scan"))
+            return
         dlg = MediaManagerDialog(self.mw)
         dlg.exec()
 

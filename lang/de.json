@@ -181,6 +181,7 @@
     "msg_jit_video_missing": "Videodatei auf dem Datenträger nicht gefunden. Die Datenbank wurde aktualisiert.",
     "msg_jit_folder_missing": "Spieleordner auf dem Datenträger nicht gefunden. Die Datenbank wurde aktualisiert.",
     "msg_task_in_progress": "Eine andere Aufgabe ist bereits in Bearbeitung.",
+    "msg_wait_for_scan": "Bitte warten Sie, bis der Scan abgeschlossen ist.",
     "sidebar_btn_scanning": "Scannen...",
     "sidebar_scan_title_full": "Vollständiger intelligenter Scan",
     "sidebar_btn_stop": "Stopp",
