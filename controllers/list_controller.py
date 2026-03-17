@@ -1,131 +1,199 @@
 import pandas as pd
-from PySide6.QtCore import Qt, QTimer, QObject
-from PySide6.QtWidgets import QListWidgetItem, QAbstractItemView
+from PySide6.QtCore import Qt, QTimer, QObject, QAbstractListModel, QModelIndex, QSize
+from PySide6.QtWidgets import QStyledItemDelegate, QAbstractItemView
 from ViGaVault_widgets import GameCard
+
+class GameListModel(QAbstractListModel):
+    def __init__(self, df=pd.DataFrame()):
+        super().__init__()
+        self.df = df
+
+    def rowCount(self, parent=QModelIndex()):
+        return len(self.df)
+
+    def data(self, index, role=Qt.DisplayRole):
+        if not index.isValid(): return None
+        if role == Qt.UserRole: return self.df.iloc[index.row()].to_dict()
+        elif role == Qt.UserRole + 1: return self.df.iloc[index.row()]['Folder_Name']
+        return None
+
+class GameDelegate(QStyledItemDelegate):
+    def __init__(self, list_controller):
+        super().__init__()
+        self.lc = list_controller
+    def sizeHint(self, option, index):
+        row = index.row()
+        if row < len(self.lc.row_heights): return self.lc.row_heights[row]
+        return QSize(option.rect.width(), 200)
 
 class ListController(QObject):
     def __init__(self, main_window):
         super().__init__(main_window)
         self.mw = main_window
+        self.model = GameListModel()
+        self.mw.list_widget.setModel(self.model)
+        self.delegate = GameDelegate(self)
+        self.mw.list_widget.setItemDelegate(self.delegate)
+        
+        self.active_widgets = {}
+        self.row_heights = []
+        self.dummy_card = GameCard({}, self.mw, self.mw.list_widget)
+        self.dummy_card.hide()
+        
+        self.mw.list_widget.verticalScrollBar().valueChanged.connect(self.update_visible_widgets)
 
     def check_scroll_load(self, value):
-        maximum = self.mw.list_widget.verticalScrollBar().maximum()
-        if maximum > 0 and value >= maximum * 0.85:
-            self.load_more_items()
+        pass # WHY: Obsolete in virtualized architecture, but kept as an empty stub to prevent legacy connection crashes.
 
     def load_more_items(self):
-        if self.mw.loaded_count >= len(self.mw.current_df):
-            self.mw.background_loader.stop()
-            return
-            
-        end_index = min(self.mw.loaded_count + self.mw.batch_size, len(self.mw.current_df))
-        batch_df = self.mw.current_df.iloc[self.mw.loaded_count:end_index]
-        
+        """WHY: Virtualized Model-View Architecture. 
+        Calculates mathematics in memory instantly and defers widget creation purely to the scrolling viewport."""
         vp_width = self.mw.list_widget.viewport().width()
         current_width = vp_width if vp_width > 100 else 600
         
-        if self.mw.loaded_count > 0 and abs(current_width - self.mw.last_viewport_width) > 2:
-            self.update_item_sizes()
-            current_width = self.mw.list_widget.viewport().width()
+        # WHY: Clear tracking BEFORE resetting model. Qt inherently deletes old index widgets during a model reset.
+        self.active_widgets.clear()
+        
+        self.model.beginResetModel()
+        self.model.df = self.mw.current_df
+        
+        self.row_heights = []
+        for i in range(len(self.mw.current_df)):
+            game_dict = self.mw.current_df.iloc[i].to_dict()
+            self.dummy_card.set_data_for_height_calc(game_dict)
+            size = self.dummy_card.calculate_size_hint(current_width)
+            self.row_heights.append(size)
+            
+        self.model.endResetModel()
         
         self.mw.last_viewport_width = current_width
         
-        for _, row in batch_df.iterrows():
-            item = QListWidgetItem(self.mw.list_widget)
-            card = GameCard(row.to_dict(), self.mw, item)
+        
+        self.mw.loaded_count = len(self.mw.current_df) 
+        self.mw.background_loader.stop()
+        
+        self.update_visible_widgets()
+
+    def update_visible_widgets(self):
+        if self.model.rowCount() == 0: return
+        
+        viewport = self.mw.list_widget.viewport()
+        top_index = self.mw.list_widget.indexAt(viewport.rect().topLeft())
+        bottom_index = self.mw.list_widget.indexAt(viewport.rect().bottomRight())
+        
+        if not top_index.isValid(): start_row = self.mw.list_widget.verticalScrollBar().value() // 200
+        else: start_row = top_index.row()
             
-            card.setFixedWidth(current_width)
-            card.adjustSize()
-            item.setSizeHint(card.sizeHint())
-            card.setMinimumWidth(0)
-            card.setMaximumWidth(16777215)
+        if not bottom_index.isValid(): end_row = min(self.model.rowCount() - 1, start_row + 10)
+        else: end_row = bottom_index.row()
             
-            item.setData(Qt.UserRole, row['Folder_Name'])
-            self.mw.list_widget.addItem(item)
-            self.mw.list_widget.setItemWidget(item, card)
-            
-        self.mw.loaded_count = end_index
+        start_row = max(0, start_row - 2)
+        end_row = min(self.model.rowCount() - 1, end_row + 2)
+        
+        visible_rows = set(range(start_row, end_row + 1))
+        current_width = viewport.width() if viewport.width() > 100 else 600
+        
+        for row in list(self.active_widgets.keys()):
+            if row not in visible_rows:
+                card = self.active_widgets.pop(row)
+                # WHY: Setting index widget to None delegates C++ object deletion entirely to the Qt View.
+                self.mw.list_widget.setIndexWidget(self.model.index(row, 0), None)
+                
+        for row in visible_rows:
+            if row not in self.active_widgets:
+                # WHY: Instantiate fresh widgets since Qt inherently destroys removed index widgets. Fast since disk I/O is gone.
+                card = GameCard({}, self.mw, self.mw.list_widget)
+                game_dict = self.model.df.iloc[row].to_dict()
+                card.data = game_dict
+                card.current_row = row 
+                card.refresh_ui_from_data(force_media_reload=False)
+                card.setFixedWidth(current_width)
+                
+                self.active_widgets[row] = card
+                self.mw.list_widget.setIndexWidget(self.model.index(row, 0), card)
 
     def update_item_sizes(self):
         vp_width = self.mw.list_widget.viewport().width()
-        viewport_width = vp_width if vp_width > 100 else 600
+        current_width = vp_width if vp_width > 100 else 600
         
-        # WHY: Anchor to the top visible item to prevent the view from jumping when resizing.
-        top_item = self.mw.list_widget.itemAt(0, 0)
+        if abs(current_width - self.mw.last_viewport_width) < 2: return
+            
+        top_index = self.mw.list_widget.indexAt(self.mw.list_widget.viewport().rect().topLeft())
+        
+        self.row_heights = []
+        for i in range(len(self.mw.current_df)):
+            game_dict = self.mw.current_df.iloc[i].to_dict()
+            self.dummy_card.set_data_for_height_calc(game_dict)
+            size = self.dummy_card.calculate_size_hint(current_width)
+            self.row_heights.append(size)
+            
+        self.model.layoutChanged.emit()
+        self.mw.last_viewport_width = current_width
 
-        for i in range(self.mw.list_widget.count()):
-            item = self.mw.list_widget.item(i)
-            widget = self.mw.list_widget.itemWidget(item)
-            if widget:
-                widget.setFixedWidth(viewport_width)
-                widget.adjustSize()
-                item.setSizeHint(widget.sizeHint())
-                widget.setMinimumWidth(0)
-                widget.setMaximumWidth(16777215)
-        self.mw.last_viewport_width = viewport_width
+        for row, card in list(self.active_widgets.items()):
+            try:
+                card.setFixedWidth(current_width)
+                card.adjustSize()
+            except RuntimeError:
+                pass
         
-        if top_item:
-            self.mw.list_widget.scrollToItem(top_item, QAbstractItemView.PositionAtTop)
+        if top_index.isValid():
+            self.mw.list_widget.scrollTo(top_index, QAbstractItemView.PositionAtTop)
 
     def update_single_card(self, folder_name, force_media_reload=False):
-        """WHY: Finds a specific GameCard and forces it to redraw using updated memory data."""
-        row_data = self.mw.master_df[self.mw.master_df['Folder_Name'] == folder_name]
-        if row_data.empty: return
-        game_dict = row_data.iloc[0].to_dict()
+        c_idx = self.mw.current_df.index[self.mw.current_df['Folder_Name'] == folder_name].tolist()
+        if not c_idx: return
+        row = c_idx[0]
         
-        for i in range(self.mw.list_widget.count()):
-            item = self.mw.list_widget.item(i)
-            if item.data(Qt.UserRole) == folder_name:
-                card = self.mw.list_widget.itemWidget(item)
-                if card:
-                    card.data = game_dict
-                    card.refresh_ui_from_data(force_media_reload=force_media_reload)
-                    item.setSizeHint(card.calculate_size_hint(card.width()))
-                break
+        game_dict = self.mw.current_df.iloc[row].to_dict()
+        
+        current_width = self.mw.last_viewport_width
+        self.dummy_card.set_data_for_height_calc(game_dict)
+        self.row_heights[row] = self.dummy_card.calculate_size_hint(current_width)
+        
+        if row in self.active_widgets:
+            card = self.active_widgets[row]
+            card.data = game_dict
+            card.refresh_ui_from_data(force_media_reload=force_media_reload)
+            card.setFixedWidth(current_width)
+            
+        self.model.dataChanged.emit(self.model.index(row, 0), self.model.index(row, 0))
 
     def remove_single_card(self, folder_name):
-        """WHY: Visually destroys a GameCard instantly without a full database reload (Used in Merges)."""
-        for i in range(self.mw.list_widget.count()):
-            item = self.mw.list_widget.item(i)
-            if item.data(Qt.UserRole) == folder_name:
-                self.mw.list_widget.takeItem(i)
-                if self.mw.loaded_count > 0:
-                    self.mw.loaded_count -= 1
-                self.mw.sidebar.lbl_counter.setText(f"{len(self.mw.current_df)}/{len(self.mw.master_df)}")
-                break
+        self.load_more_items()
+
+    def catch_up_to_anchor(self, target_row):
+        """WHY: Virtualized list calculates geometry instantly in memory, so we can jump to the anchor mathematically."""
+        if 0 <= target_row < self.model.rowCount():
+            index = self.model.index(target_row, 0)
+            if target_row > 0:
+                prev_index = self.model.index(target_row - 1, 0)
+                self.mw.list_widget.scrollTo(prev_index, QAbstractItemView.PositionAtTop)
+            else:
+                self.mw.list_widget.scrollTo(index, QAbstractItemView.PositionAtTop)
+            self.update_visible_widgets()
 
     def apply_display_settings(self, settings):
-        """WHY: Extremely fast loop to dynamically scale all visual cards during setting changes."""
-        # WHY: Anchor to the top visible item to prevent the view from jumping when settings change.
-        top_item = self.mw.list_widget.itemAt(0, 0)
+        top_index = self.mw.list_widget.indexAt(self.mw.list_widget.viewport().rect().topLeft())
+        self.dummy_card.update_style(settings)
         
-        for i in range(self.mw.list_widget.count()):
-            item = self.mw.list_widget.item(i)
-            card = self.mw.list_widget.itemWidget(item)
-            if card:
+        current_width = self.mw.last_viewport_width
+        self.row_heights = []
+        for i in range(len(self.mw.current_df)):
+            game_dict = self.mw.current_df.iloc[i].to_dict()
+            self.dummy_card.set_data_for_height_calc(game_dict)
+            size = self.dummy_card.calculate_size_hint(current_width)
+            self.row_heights.append(size)
+            
+        self.model.layoutChanged.emit()
+        
+        for card in list(self.active_widgets.values()):
+            try:
                 card.update_style(settings)
-                item.setSizeHint(card.calculate_size_hint(card.width()))
-                
-        if top_item:
-            self.mw.list_widget.scrollToItem(top_item, QAbstractItemView.PositionAtTop)
-
-    def restore_scroll_position(self, retries=10):
-        if not hasattr(self.mw, 'pending_scroll'):
-            self.mw.sidebar.setEnabled(True)
-            self.mw.list_widget.setEnabled(True)
-            return
-        
-        sb = self.mw.list_widget.verticalScrollBar()
-        
-        if sb.maximum() < self.mw.pending_scroll and self.mw.loaded_count < len(self.mw.current_df):
-            self.load_more_items()
-            self.mw.list_widget.doItemsLayout() 
-            QTimer.singleShot(10, lambda: self.restore_scroll_position(10))
-        elif sb.maximum() < self.mw.pending_scroll and self.mw.loaded_count >= len(self.mw.current_df) and retries > 0:
-            QTimer.singleShot(50, lambda: self.restore_scroll_position(retries - 1))
-        else:
-            sb.setValue(self.mw.pending_scroll)
-            del self.mw.pending_scroll
-            self.mw.sidebar.setEnabled(True)
-            self.mw.list_widget.setEnabled(True)
-            self.mw.sidebar.search_bar.setFocus()
+                card.setFixedWidth(current_width)
+                card.adjustSize()
+            except RuntimeError:
+                pass
+            
+        if top_index.isValid():
+            self.mw.list_widget.scrollTo(top_index, QAbstractItemView.PositionAtTop)

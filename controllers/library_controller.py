@@ -4,7 +4,7 @@ import shutil
 import logging
 from datetime import datetime
 import pandas as pd
-from PySide6.QtCore import QObject, Slot, QByteArray
+from PySide6.QtCore import QObject, Slot, QByteArray, Qt, QPoint
 from PySide6.QtWidgets import QFileDialog, QMessageBox, QApplication
 
 from backend.library import LibraryManager
@@ -17,6 +17,29 @@ class LibraryController(QObject):
     def __init__(self, main_window):
         super().__init__(main_window)
         self.mw = main_window
+
+    def get_second_visible_folder(self):
+        """WHY: Finds the second item visible at the top of the list to act as a stable layout anchor immune to pixel shifts."""
+        if self.mw.list_widget.model() is None or self.mw.list_widget.model().rowCount() == 0:
+            return None
+            
+        vp_width = self.mw.list_widget.viewport().width()
+        x_pos = vp_width // 2 if vp_width > 0 else 100
+        first_index = self.mw.list_widget.indexAt(QPoint(x_pos, 30))
+        
+        if not first_index.isValid():
+            for i in range(self.mw.list_widget.model().rowCount()):
+                idx = self.mw.list_widget.model().index(i, 0)
+                if self.mw.list_widget.visualRect(idx).bottom() > 0:
+                    first_index = idx
+                    break
+                    
+        if first_index.isValid():
+            row = first_index.row()
+            if row + 1 < self.mw.list_widget.model().rowCount():
+                return self.mw.list_widget.model().data(self.mw.list_widget.model().index(row + 1, 0), Qt.UserRole + 1)
+            return self.mw.list_widget.model().data(first_index, Qt.UserRole + 1)
+        return None
 
     def update_library_info(self):
         lib_name = os.path.basename(get_db_path()).replace('.csv', '')
@@ -65,12 +88,18 @@ class LibraryController(QObject):
     def reload_ui_for_new_library(self):
         self.mw.background_loader.stop()
         self.mw.filter_timer.stop()
-        self.mw.list_widget.clear()
+        if self.mw.list_widget.model():
+             self.mw.list_widget.model().beginResetModel()
+             self.mw.list_widget.model().df = pd.DataFrame()
+             self.mw.list_widget.model().endResetModel()
         self.mw.sidebar.search_bar.clear()
         self.load_database_async()
 
     def load_database_async(self):
-        self.mw.list_widget.clear()
+        if self.mw.list_widget.model():
+             self.mw.list_widget.model().beginResetModel()
+             self.mw.list_widget.model().df = pd.DataFrame()
+             self.mw.list_widget.model().endResetModel()
         self.mw.sidebar.setEnabled(False)
         self.db_worker = DbLoaderWorker()
         self.db_worker.finished.connect(self.on_db_loaded)
@@ -89,11 +118,10 @@ class LibraryController(QObject):
                     lib_settings = json.load(f)
             except: pass
 
-        # WHY: Ensure scroll position is seamlessly recovered when switching libraries mid-session.
-        if not hasattr(self.mw, 'pending_scroll') and not getattr(self.mw, 'pending_anchor_folder', None):
-            saved_scroll = lib_settings.get("scroll_value", 0)
-            if saved_scroll > 0:
-                self.mw.pending_scroll = saved_scroll
+        if not hasattr(self.mw, 'pending_anchor_folder') or not getattr(self.mw, 'pending_anchor_folder', None):
+            saved_anchor = lib_settings.get("anchor_folder")
+            if saved_anchor:
+                self.mw.pending_anchor_folder = saved_anchor
 
         saved_filters = lib_settings.get("filter_states")
         saved_expansion = lib_settings.get("filter_expansion")
@@ -288,8 +316,8 @@ class LibraryController(QObject):
         layout = self.mw.sidebar.filters_layout
         for i in range(layout.count()):
             item = layout.itemAt(i)
-            from ViGaVault_widgets import CollapsibleFilterGroup
-            if item.widget() and isinstance(item.widget(), CollapsibleFilterGroup):
+            # WHY: Use duck-typing instead of importing modules during application closeEvent teardowns.
+            if item.widget() and hasattr(item.widget(), 'toggle_btn') and hasattr(item.widget(), 'title'):
                 group = item.widget()
                 saved_expansion[group.title] = group.toggle_btn.isChecked()
 
@@ -297,7 +325,7 @@ class LibraryController(QObject):
             "sort_desc": self.mw.sort_desc,
             "sort_index": self.mw.sidebar.combo_sort.currentIndex(),
             "search_text": self.mw.sidebar.search_bar.text(),
-            "scroll_value": self.mw.list_widget.verticalScrollBar().value(),
+            "anchor_folder": self.get_second_visible_folder(),
             "scan_new": self.mw.sidebar.chk_show_new.isChecked(),
             "filter_states": filter_states,
             "filter_expansion": saved_expansion
@@ -384,16 +412,16 @@ class LibraryController(QObject):
             self.mw.sidebar.chk_scan_local.setEnabled(enable_local)
             if not enable_local: self.mw.sidebar.chk_scan_local.setChecked(False)
             
-            return lib_settings.get("scroll_value", 0)
+            return lib_settings.get("anchor_folder")
         except Exception as e:
             print(f"Error loading settings: {e}")
-            return 0
+            return None
 
     def refresh_data(self):
         # WHY: Automatically preserve the user's scroll position during mid-session refreshes 
         # (like Full Scans) as long as no explicit game anchor was requested.
         if not getattr(self.mw, 'pending_anchor_folder', None):
-            self.mw.pending_scroll = self.mw.list_widget.verticalScrollBar().value()
+            self.mw.pending_anchor_folder = self.get_second_visible_folder()
             
         self.save_settings()
         self.load_database_async()

@@ -353,11 +353,13 @@ class Sidebar(QWidget):
 # The core display widget for a single game in the list.
 # Handles image display, text wrapping, and buttons.
 class GameCard(QWidget):
-    def __init__(self, game_data, parent_window, item):
-        super().__init__()
+    def __init__(self, game_data, parent_window, list_view=None):
+        # WHY: Assign the list_view as the parent immediately to prevent the OS from flashing it as a standalone desktop window.
+        super().__init__(list_view)
         self.data = game_data
         self.parent_window = parent_window
-        self.item = item
+        self.list_view = list_view
+        self.current_row = -1
         self.info_labels = [] # Store references for dynamic style updates
         self.cached_pixmap = None
         
@@ -374,8 +376,9 @@ class GameCard(QWidget):
         self.img_label.setFixedSize(img_w, img_h)
         self.img_label.setAlignment(Qt.AlignCenter)
         img_name = game_data.get('Image_Link', '')
+        has_image = str(game_data.get('Has_Image')).lower() in ['true', '1']
         self.image_path = os.path.join(get_image_path(), os.path.basename(img_name)) if img_name else ''
-        if self.image_path:
+        if self.image_path and has_image:
             self.img_label.setText("Loading...")
             self.start_image_load(self.image_path)
         else:
@@ -552,18 +555,20 @@ class GameCard(QWidget):
         self.buttons['youtube'].setEnabled(has_trailer)
         self.buttons['folder'].setEnabled(has_local_folder)
         
+        has_image = str(self.data.get('Has_Image')).lower() in ['true', '1']
         # Update Image (Only reload if path actually changed to save IO)
         img_name = self.data.get('Image_Link', '')
         new_image_path = os.path.join(get_image_path(), os.path.basename(img_name)) if img_name else ''
         # WHY: force_media_reload bypasses the path string check to physically reload the image from disk if it was overwritten.
-        if new_image_path != self.image_path or force_media_reload:
+        if (new_image_path != self.image_path or force_media_reload) and has_image:
             self.image_path = new_image_path
             if self.image_path:
                 self.start_image_load(self.image_path)
-            else:
-                self.img_label.setText("No Image")
-                self.img_label.setStyleSheet("border: 1px solid #555;")
-                self.cached_pixmap = None
+        elif not has_image:
+            self.image_path = ''
+            self.img_label.setText("No Image")
+            self.img_label.setStyleSheet("border: 1px solid #555;")
+            self.cached_pixmap = None
                 
         # Update Metadata info labels dynamically
         fields = ['Original_Release_Date', 'Platforms', 'Genre', 'Developer', 'Publisher', 'Collection']
@@ -578,6 +583,27 @@ class GameCard(QWidget):
             self.info_labels[i].setText(f"<b>{display_name}:</b> {self.data.get(field, '')}")
             
         self.summary_content.setText(self.data.get('Summary', ''))
+
+    def set_data_for_height_calc(self, game_data):
+        """WHY: Used strictly by the background mathematics dummy card to rapidly calculate text wrapping heights 
+        without ever triggering image load threads or disk checks."""
+        self.data = game_data
+        self.title_lbl.setText(game_data.get('Clean_Title', 'Unknown'))
+        path_root = game_data.get('Path_Root', '')
+        self.path_lbl.setText(f"({path_root})" if path_root else "")
+        
+        fields = ['Original_Release_Date', 'Platforms', 'Genre', 'Developer', 'Publisher', 'Collection']
+        for i, field in enumerate(fields):
+            display_name = field
+            if field == 'Original_Release_Date': display_name = translator.tr("gamecard_info_release_date")
+            elif field == 'Platforms': display_name = translator.tr("gamecard_info_platforms")
+            elif field == 'Genre': display_name = translator.tr("gamecard_info_genre")            
+            elif field == 'Developer': display_name = translator.tr("gamecard_info_developer")
+            elif field == 'Publisher': display_name = translator.tr("gamecard_info_publisher")
+            elif field == 'Collection': display_name = translator.tr("gamecard_info_collection")
+            self.info_labels[i].setText(f"<b>{display_name}:</b> {game_data.get(field, '')}")
+            
+        self.summary_content.setText(game_data.get('Summary', ''))
 
     def start_image_load(self, path):
         loader = ImageLoader(path)
@@ -676,13 +702,19 @@ class GameCard(QWidget):
         return QSize(target_width, final_h)
 
     def mousePressEvent(self, event):
-        self.item.listWidget().setCurrentItem(self.item)
+        if self.list_view and self.current_row >= 0:
+            model = self.list_view.model()
+            index = model.index(self.current_row, 0)
+            self.list_view.setCurrentIndex(index)
         super().mousePressEvent(event)
 
     def eventFilter(self, obj, event):
         try:
             if event.type() == QEvent.MouseButtonPress:
-                self.item.listWidget().setCurrentItem(self.item)
+                if self.list_view and self.current_row >= 0:
+                    model = self.list_view.model()
+                    index = model.index(self.current_row, 0)
+                    self.list_view.setCurrentIndex(index)
             return super().eventFilter(obj, event)
         except (KeyboardInterrupt, RuntimeError, AttributeError):
             return False

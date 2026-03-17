@@ -175,19 +175,19 @@ class FilterController(QObject):
 
     @Slot(object)
     def on_filtering_finished(self, filtered_df):
-        has_scroll = hasattr(self.mw, 'pending_scroll') and self.mw.pending_scroll > 0
             
         self.mw.current_df = filtered_df
         self.mw.sidebar.lbl_counter.setText(f"{len(filtered_df)}/{len(self.mw.master_df)}")
 
-        current_item = self.mw.list_widget.currentItem()
         if hasattr(self.mw, 'pending_anchor_folder') and self.mw.pending_anchor_folder:
             anchor_folder = self.mw.pending_anchor_folder
             self.mw.pending_anchor_folder = None
         else:
-            anchor_folder = current_item.data(Qt.UserRole) if current_item else None
-
-        self.mw.list_widget.clear()
+            # WHY: DRY Principle - Defer to the central library controller to securely fetch the layout anchor.
+            anchor_folder = self.mw.library_controller.get_second_visible_folder()
+            if not anchor_folder and self.mw.list_widget.currentIndex().isValid():
+                anchor_folder = self.mw.list_widget.model().data(self.mw.list_widget.currentIndex(), Qt.UserRole + 1)
+                
         self.mw.loaded_count = 0
 
         self.mw.list_controller.load_more_items()
@@ -196,20 +196,15 @@ class FilterController(QObject):
             folders_list = self.mw.current_df['Folder_Name'].tolist()
             if anchor_folder in folders_list:
                 row_index = folders_list.index(anchor_folder)
-                while self.mw.loaded_count <= row_index: self.mw.list_controller.load_more_items()
-                item = self.mw.list_widget.item(row_index)
-                if item:
-                    self.mw.list_widget.setCurrentItem(item)
-                    self.mw.list_widget.scrollToItem(item, QAbstractItemView.PositionAtCenter)
+                # WHY: Delegate the slow, blocking load to an asynchronous, non-blocking timer in the ListController.
+                # This allows the UI to render instantly and then catch up to the anchor smoothly.
+                self.mw.list_controller.catch_up_to_anchor(row_index)
 
         self.mw.background_loader.start()
         QApplication.restoreOverrideCursor()
 
         if self.mw.is_startup: self.mw.is_startup = False
             
-        if has_scroll:
-            QTimer.singleShot(100, self.mw.list_controller.restore_scroll_position)
-        else:
-            self.mw.sidebar.setEnabled(True)
-            self.mw.list_widget.setEnabled(True)
-            self.mw.sidebar.search_bar.setFocus()
+        self.mw.sidebar.setEnabled(True)
+        self.mw.list_widget.setEnabled(True)
+        self.mw.sidebar.search_bar.setFocus()

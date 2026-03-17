@@ -5,7 +5,7 @@ import sys
 import pandas as pd
 import os
 import json
-from PySide6.QtWidgets import (QApplication, QMainWindow, QListWidget, QWidget, 
+from PySide6.QtWidgets import (QApplication, QMainWindow, QListView, QWidget, 
                                QHBoxLayout, QAbstractItemView)
 from PySide6.QtCore import Qt, QTimer, QThreadPool, Slot
 from PySide6.QtGui import QFont
@@ -46,7 +46,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
         
-        self.list_widget = QListWidget()
+        self.list_widget = QListView()
         self.list_widget.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
         self.list_widget.verticalScrollBar().setSingleStep(25)
         
@@ -54,8 +54,8 @@ class MainWindow(QMainWindow):
         # Pre-defining a transparent border prevents layout shifting, and setting background-color
         # to transparent ensures the native text selection color remains perfectly visible.
         self.list_widget.setStyleSheet("""
-            QListWidget::item { border: 10px solid transparent; }
-            QListWidget::item:selected { background-color: transparent; border: 10px solid palette(highlight); }
+            QListView::item { border: 10px solid transparent; }
+            QListView::item:selected { background-color: transparent; border: 10px solid palette(highlight); }
         """)
         
         main_layout.addWidget(self.list_widget, stretch=3)
@@ -85,14 +85,13 @@ class MainWindow(QMainWindow):
         # Run Initialization
         self.menu_controller.create_menu_bar()
         self.library_controller.load_database_async()
-        if os.path.exists("settings.json"):
-            self.library_controller.load_settings()
         self.library_controller.update_library_info()
 
         if os.path.exists("settings.json"):
-            saved_scroll = self.library_controller.load_settings()
-            if saved_scroll:
-                self.pending_scroll = saved_scroll
+            # WHY: Removed the redundant double-call to load_settings during startup.
+            saved_anchor = self.library_controller.load_settings()
+            if saved_anchor:
+                self.pending_anchor_folder = saved_anchor
         else:
             self.sidebar.combo_sort.setCurrentIndex(1)
 
