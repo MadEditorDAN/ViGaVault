@@ -299,11 +299,13 @@ def apply_theme(app, theme_name):
         dark_palette.setColor(QPalette.Window, QColor(53, 53, 53))
         dark_palette.setColor(QPalette.WindowText, Qt.white)
         dark_palette.setColor(QPalette.Base, QColor(25, 25, 25))
-        dark_palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
+        # WHY: Create a distinct mid-tone for AlternateBase so it stands out against the Window and Base colors.
+        dark_palette.setColor(QPalette.AlternateBase, QColor(40, 40, 40))
         dark_palette.setColor(QPalette.ToolTipBase, Qt.white)
         dark_palette.setColor(QPalette.ToolTipText, Qt.white)
         dark_palette.setColor(QPalette.Text, Qt.white)
-        dark_palette.setColor(QPalette.Button, QColor(53, 53, 53))
+        # WHY: Use a lighter grey for buttons in Dark Mode so they naturally contrast against the AlternateBase column background.
+        dark_palette.setColor(QPalette.Button, QColor("#555555"))
         dark_palette.setColor(QPalette.ButtonText, Qt.white)
         dark_palette.setColor(QPalette.BrightText, Qt.red)
         dark_palette.setColor(QPalette.Link, QColor(42, 130, 218))

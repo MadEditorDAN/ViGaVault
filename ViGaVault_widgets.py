@@ -392,7 +392,7 @@ class GameCard(QWidget):
         
         # WHY: Zone 1 (Image). Encapsulate in a VBox with a stretch to push it to the top natively without forced heights.
         self.image_frame = QFrame()
-        self.image_frame.setObjectName("grid_col")
+        self.image_frame.setStyleSheet("border-right: 1px solid palette(dark);")
         image_col = QVBoxLayout(self.image_frame)
         image_col.setContentsMargins(0, 0, 0, 0)
         image_col.addWidget(self.img_label)
@@ -401,7 +401,7 @@ class GameCard(QWidget):
         
         # --- COLUMN 2 (METADATA) ---
         self.metadata_frame = QFrame()
-        self.metadata_frame.setObjectName("grid_col")
+        self.metadata_frame.setStyleSheet("border-right: 1px solid palette(dark);")
         metadata_col = QVBoxLayout(self.metadata_frame)
         metadata_col.setContentsMargins(10, 0, 10, 0) 
         metadata_col.setSpacing(2)
@@ -464,7 +464,7 @@ class GameCard(QWidget):
 
         # --- COLUMN 3 (SCROLLABLE SUMMARY) ---
         self.summary_frame = QFrame()
-        self.summary_frame.setObjectName("grid_col")
+        # WHY: Removed the right border so there is no vertical line between the summary and the action buttons.
         summary_col = QVBoxLayout(self.summary_frame)
         summary_col.setContentsMargins(0, 0, 10, 0)
         summary_col.setSpacing(5)
@@ -513,7 +513,7 @@ class GameCard(QWidget):
         has_trailer = bool(self.trailer_link and self.trailer_link.startswith('http'))
 
         self.actions_frame = QFrame()
-        self.actions_frame.setObjectName("actions_col")
+        self.actions_frame.setStyleSheet("background-color: palette(alternate-base); border-radius: 5px;")
         self.actions_col = QVBoxLayout(self.actions_frame)
         self.actions_col.setContentsMargins(5, 5, 5, 5)
         self.actions_col.setSpacing(0)
@@ -540,17 +540,21 @@ class GameCard(QWidget):
         settings = getattr(self.parent_window, 'display_settings', {'image': 200, 'button': 45, 'text': 22})
         btn_size = settings.get('button', 45)
 
+        # WHY: Injected tooltip translation keys directly into the dictionary to map them cleanly within the DRY loop.
         button_definitions = {
-            'local_video': {'enabled': has_local_video, 'fallback': "🎞️", 'font_size': "32px"},
-            'youtube':     {'enabled': has_trailer,     'fallback': "▶", 'font_size': "30px"},
-            'folder':      {'enabled': has_local_folder,'fallback': "📁", 'font_size': "32px"},
-            'edit':        {'enabled': True,            'fallback': "✏️", 'font_size': "28px"},
-            'scan':        {'enabled': True,            'fallback': "🔍", 'font_size': "28px"}
+            'local_video': {'enabled': has_local_video, 'fallback': "🎞️", 'font_size': "32px", 'tt_key': 'gamecard_tooltip_local_video'},
+            'youtube':     {'enabled': has_trailer,     'fallback': "▶", 'font_size': "32px", 'tt_key': 'gamecard_tooltip_youtube'},
+            'folder':      {'enabled': has_local_folder,'fallback': "📁", 'font_size': "32px", 'tt_key': 'gamecard_tooltip_folder'},
+            'edit':        {'enabled': True,            'fallback': "✏️", 'font_size': "28px", 'tt_key': 'gamecard_tooltip_edit'},
+            'scan':        {'enabled': True,            'fallback': "🔍", 'font_size': "28px", 'tt_key': 'gamecard_tooltip_scan'}
         }
 
         for name, props in button_definitions.items():
             btn = self.buttons.get(name)
             if not btn: continue
+            
+            # WHY: Force child buttons to break their OS-level style cache and instantly fetch the new global theme colors.
+            btn.setStyleSheet(" ")
             
             btn.setFixedSize(btn_size, btn_size)
             
@@ -562,22 +566,32 @@ class GameCard(QWidget):
             if not os.path.exists(icon_path):
                 icon_path = f"icons/{icon_to_load}.png"
 
+            # WHY: Define an explicit CSS style for the buttons. Because their parent frame uses a stylesheet,
+            # Qt drops the native OS 3D button rendering. We must rebuild the square button look manually.
+            base_style = (
+                "QPushButton { background-color: palette(button); border: 1px solid palette(dark); border-radius: 4px; }\n"
+                "QPushButton:pressed { background-color: palette(mid); }"
+            )
+
             if os.path.exists(icon_path):
                 btn.setIcon(QIcon(icon_path))
                 btn.setIconSize(QSize(int(btn_size*0.7), int(btn_size*0.7)))
-                btn.setStyleSheet("")
+                btn.setStyleSheet(base_style)
                 btn.setText("")
             else:
                 fallback_emoji = props['fallback']
-                style = f"font-size: {props['font_size']};"
-                if fallback_emoji == "▶": style += " color: #FF0000;"
-                btn.setStyleSheet(style)
+                color_css = "color: #FF0000; " if fallback_emoji == "▶" else ""
+                custom_style = (
+                    f"QPushButton {{ font-size: {props['font_size']}; {color_css} background-color: palette(button); border: 1px solid palette(dark); border-radius: 4px; }}\n"
+                    "QPushButton:pressed { background-color: palette(mid); }"
+                )
+                btn.setStyleSheet(custom_style)
                 btn.setText(fallback_emoji)
                 btn.setIcon(QIcon())
             
             btn.setEnabled(props['enabled'])
-            if name == 'local_video' and not props['enabled'] and self.video_path: btn.setToolTip(f"File not found: {self.video_path}")
-            else: btn.setToolTip("")
+            if name == 'local_video' and not props['enabled'] and self.video_path: btn.setToolTip(f"File not found: {self.video_path}") 
+            else: btn.setToolTip(translator.tr(props['tt_key']))
 
     def refresh_ui_from_data(self, force_media_reload=False):
         """WHY: Allows surgical updates of the UI instantly without reloading the widget or the list."""
@@ -657,13 +671,14 @@ class GameCard(QWidget):
         
         self.setFixedHeight(img_h + 10)
         
-        # WHY: Force Qt to re-evaluate the palette() keywords by clearing the stylesheet first.
-        # This fixes the bug where visible cards fail to switch colors when toggling Dark/Light mode.
-        self.setStyleSheet("")
-        self.setStyleSheet("""
-            QFrame#grid_col { border-right: 1px solid palette(dark); }
-            QFrame#actions_col { background-color: palette(alternate-base); border-radius: 5px; }
-        """)
+        # WHY: Force child frames to break their OS-level style cache individually.
+        # Setting styles on the parent widget fails to cascade cleanly during dynamic theme swaps.
+        for frame in [self.image_frame, self.metadata_frame]:
+            frame.setStyleSheet("")
+            frame.setStyleSheet("border-right: 1px solid palette(dark);")
+        self.summary_frame.setStyleSheet("")
+        self.actions_frame.setStyleSheet("")
+        self.actions_frame.setStyleSheet("background-color: palette(alternate-base); border-radius: 5px;")
         # Update Image
         self.img_label.setFixedSize(img_w, img_h)
         if self.cached_pixmap:
