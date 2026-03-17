@@ -119,8 +119,8 @@ def scan_local_system(config, games_dict, token, worker_thread=None):
         if not is_on_disk and had_a_path:
             platforms_str = game_to_check.data.get('Platforms', '')
             platform_list = [p.strip() for p in platforms_str.split(',') if p.strip()]
-            # WHY: We must ignore 'Local Copy' tags when checking for real platforms.
-            real_platforms = [p for p in platform_list if p.lower() not in ['local copy', 'unknown']]
+            # WHY: Ignore 'Local Copy' and both forms of unknown tags when evaluating if a ghost has a real digital platform.
+            real_platforms = [p for p in platform_list if p.lower() not in ['local copy', 'unknown', '_unknown']]
             
             game_ids = game_to_check.data.get('game_ID', '')
             has_external_id = any(x in game_ids for x in ['gog_', 'steam_', 'epic_', 'uplay_', 'origin_'])

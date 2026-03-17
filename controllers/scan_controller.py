@@ -101,6 +101,12 @@ class ScanController(QObject):
         self.mw.current_scan_game = game_data
         self.mw.sidebar.scan_panel.show()
         self.mw.filter_controller.set_filters_ui_state(False)
+        
+        # WHY: Disable the main scan UI elements during a manual scan to prevent accidental clicks and conflicting tasks.
+        self.mw.sidebar.btn_full_scan.setEnabled(False)
+        self.mw.sidebar.chk_scan_gog.setEnabled(False)
+        self.mw.sidebar.chk_scan_local.setEnabled(False)
+        
         self.restore_scan_panel()
         
         raw_name = game_data.get('Folder_Name', '')
@@ -181,6 +187,13 @@ class ScanController(QObject):
     def cancel_inline_scan(self):
         self.mw.sidebar.scan_panel.hide()
         self.mw.filter_controller.set_filters_ui_state(True)
+        
+        # WHY: Targeted Update - Restore the main scan UI elements based on their configured global state.
+        self.mw.sidebar.btn_full_scan.setEnabled(True)
+        config = build_scanner_config()
+        self.mw.sidebar.chk_scan_gog.setEnabled(config.get('enable_gog_db', True))
+        self.mw.sidebar.chk_scan_local.setEnabled(config.get('local_scan_config', {}).get('enable_local_scan', True))
+        
         self.mw.sidebar.scan_results.clear()
         self.mw.sidebar.scan_input.clear()
         self.restore_scan_panel()
@@ -211,10 +224,15 @@ class ScanController(QObject):
             new_data = game_obj.to_dict()
             idx = self.mw.master_df.index[self.mw.master_df['Folder_Name'] == folder_name].tolist()
             if idx:
-                for k, v in new_data.items(): self.mw.master_df.at[idx[0], k] = v
+                # WHY: Dynamically check the Pandas column dtype. Prevents warnings when injecting strings into pure boolean columns.
+                for k, v in new_data.items():
+                    if k in self.mw.master_df.columns:
+                        self.mw.master_df.at[idx[0], k] = bool(v) if self.mw.master_df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
             c_idx = self.mw.current_df.index[self.mw.current_df['Folder_Name'] == folder_name].tolist()
             if c_idx:
-                for k, v in new_data.items(): self.mw.current_df.at[c_idx[0], k] = v
+                for k, v in new_data.items():
+                    if k in self.mw.current_df.columns:
+                        self.mw.current_df.at[c_idx[0], k] = bool(v) if self.mw.current_df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
                 
             self.mw.list_controller.update_single_card(folder_name, force_media_reload=True)
             

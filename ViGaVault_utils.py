@@ -27,6 +27,27 @@ def is_hidden(filepath):
     except:
         return False
 
+GENRE_MAP = {}
+TAXONOMY_FILE = os.path.join(BASE_DIR, "genre_taxonomy.json")
+
+def load_genre_taxonomy():
+    """WHY: Loads the user-configurable taxonomy JSON to strictly enforce spelling and capitalization rules."""
+    global GENRE_MAP
+    GENRE_MAP.clear()
+    if os.path.exists(TAXONOMY_FILE):
+        try:
+            with open(TAXONOMY_FILE, 'r', encoding='utf-8') as f:
+                taxonomy = json.load(f)
+                for canonical, aliases in taxonomy.items():
+                    for alias in aliases:
+                        GENRE_MAP[alias.lower()] = canonical
+                    # WHY: Self-map the canonical name to enforce perfect capitalization globally (e.g. "moba" -> "MOBA")
+                    GENRE_MAP[canonical.lower()] = canonical
+        except Exception as e:
+            logging.error(f"Error loading {TAXONOMY_FILE}: {e}")
+
+load_genre_taxonomy()
+
 def normalize_genre(text):
     if not text: return ""
     parts = str(text).split(',')
@@ -35,7 +56,10 @@ def normalize_genre(text):
     for p in parts:
         p = p.strip()
         if not p: continue
-        p_norm = p.title()
+        
+        # WHY: Apply taxonomy mapping to deduplicate conceptually identical genres
+        p_norm = GENRE_MAP.get(p.lower(), p.title())
+        
         if p_norm.lower() not in seen:
             clean_parts.append(p_norm)
             seen.add(p_norm.lower())
@@ -285,6 +309,11 @@ def apply_theme(app, theme_name):
         dark_palette.setColor(QPalette.Link, QColor(42, 130, 218))
         dark_palette.setColor(QPalette.Highlight, QColor(50, 50, 50))
         dark_palette.setColor(QPalette.HighlightedText, Qt.white)
+        
+        # WHY: Manually define the 'Dark' palette role to match the #555 image frame. 
+        # This guarantees both horizontal and vertical table borders are perfectly visible in Dark Mode 
+        # against the deep grey Base background, without altering the native Light Mode.
+        dark_palette.setColor(QPalette.Dark, QColor("#555555"))
         
         # WHY: Explicitly set disabled colors so disabled widgets (like All/None buttons) actually look greyed out.
         dark_palette.setColor(QPalette.Disabled, QPalette.ButtonText, Qt.gray)

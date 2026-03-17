@@ -102,11 +102,13 @@ class Game:
 
         plats = set(x.strip() for x in self.data.get('Platforms', '').split(',') if x.strip())
         plats.update(x.strip() for x in other.data.get('Platforms', '').split(',') if x.strip())
-        # WHY: Treat "Local Copy" as a non-real platform that should be overridden if merged with a digital platform.
-        real_plats = [p for p in plats if p.lower() != 'local copy']
+        # WHY: Treat "Local Copy" and "_UNKNOWN" as non-real platforms that should be overridden if merged with a valid digital platform.
+        real_plats = [p for p in plats if p.lower() not in ['local copy', '_unknown']]
         if real_plats:
             if 'Local Copy' in plats: plats.remove('Local Copy')
             if 'local copy' in plats: plats.remove('local copy')
+            if '_UNKNOWN' in plats: plats.remove('_UNKNOWN')
+            if '_unknown' in plats: plats.remove('_unknown')
         self.data['Platforms'] = ", ".join(sorted(plats))
 
         for i in range(1, 51):

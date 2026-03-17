@@ -103,20 +103,18 @@
     "gog_db_path": "C:\\ProgramData\\GOG.com\\Galaxy\\storage\\galaxy-2.0.db",
     "download_videos": true,
     "scan_new": false,
-    "filter_states": {
-        "Platforms": [
-            "Local Copy"
-        ]
-    },
+    "filter_states": {},
     "db_path": "C:/Users/mad_e/OneDrive/Batch Collection/ViGaVault/VGVDB.csv",
     "enable_gog_db": true,
     "video_path": "D:\\ViGaVault\\Videos",
     "filter_expansion": {
-        "Platforms": false,
+        "Platforms": true,
         "Genre": false,
         "Collection": false
     },
     "image_path": "D:\\ViGaVault\\Images",
     "download_images": true,
-    "anchor_folder": "Titan Souls"
+    "anchor_folder": "Planet of Lana II",
+    "sidebar_chk_gog": true,
+    "sidebar_chk_local": false
 }

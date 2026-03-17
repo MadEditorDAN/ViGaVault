@@ -121,7 +121,8 @@ def sync_gog_database(config, games_dict, worker_thread=None):
             title = re.sub(r'\s*-\s*Amazon.*$', '', title, flags=re.IGNORECASE)
             title = re.sub(r'[^\w\s\-\.\:\,\;\!\?\(\)\[\]\&\'\"]', '', title)
 
-            platform = 'Unknown'
+            # WHY: Using an underscore leverages ASCII sorting to force it to the very top of the filter list.
+            platform = '_UNKNOWN'
             if '_' in releaseKey:
                 prefix = releaseKey.split('_', 1)[0].lower()
                 platform_map = config.get('platform_map', {})
@@ -223,11 +224,10 @@ def sync_gog_database(config, games_dict, worker_thread=None):
             game_obj.data['Clean_Title'] = title
             
             current_platforms = set(x.strip() for x in game_obj.data.get('Platforms', '').split(',') if x.strip())
-            if 'Unknown' in current_platforms: current_platforms.remove('Unknown')
             # WHY: Remove "Local Copy" tag if we have a real platform or if the game is a ghost (not installed locally).
-            if platform != 'Unknown' and 'Local Copy' in current_platforms: current_platforms.remove('Local Copy')
+            if platform != '_UNKNOWN' and 'Local Copy' in current_platforms: current_platforms.remove('Local Copy')
             if not game_obj.data.get('Path_Root') and 'Local Copy' in current_platforms: current_platforms.remove('Local Copy')
-            if platform != 'Unknown' or not current_platforms: current_platforms.add(platform)
+            if platform != '_UNKNOWN' or not current_platforms: current_platforms.add(platform)
             
             for i in range(50):
                 col_name = f"platform_ID_{i+1:02d}"

@@ -1,0 +1,51 @@
+Action
+Adventure
+Arcade
+Aventure
+Ball Games
+Benchmark
+Card & Board Game
+Card Board Game
+Co-Op
+Coop
+Dungeon Crawler
+Fighting
+First Person Shooter
+Fps
+Hack And Slash/Beat 'Em Up
+Hack and slash/Beat 'em up
+Indie
+Kingdom-Like
+Moba
+Music
+Original Experience
+Pinball
+Platform
+Point-And-Click
+Point-and-click
+Puzzle
+Quiz/Trivia
+Racing
+Rage Game
+Rage Games
+Rail Shooter
+Real Time Strategy
+Real Time Strategy (Rts)
+Reflexion
+Remakes
+Role Playing Games
+Role-Playing (Rpg)
+Rpg
+Shooter
+Simulation
+Simulations
+Simulator
+Space Sim
+Sport
+Strategy
+Survival
+Tactical
+Turn-Based Strategy
+Turn-Based Strategy (Tbs)
+Turn-based Strategy
+Visual Novel

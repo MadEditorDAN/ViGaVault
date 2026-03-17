@@ -22,9 +22,12 @@ class GameDelegate(QStyledItemDelegate):
         super().__init__()
         self.lc = list_controller
     def sizeHint(self, option, index):
-        row = index.row()
-        if row < len(self.lc.row_heights): return self.lc.row_heights[row]
-        return QSize(option.rect.width(), 200)
+        # WHY: Because every card's height is now strictly locked to the image size, 
+        # the Delegate can instantly calculate row heights without querying the database or doing complex text math.
+        settings = getattr(self.lc.mw, 'display_settings', {'image': 200})
+        img_h = int(settings.get('image', 200) * 1.33)
+        # WHY: 10px internal card padding + 10px external QListView padding = 20px total bounding compensation.
+        return QSize(option.rect.width(), img_h + 20)
 
 class ListController(QObject):
     def __init__(self, main_window):
@@ -36,9 +39,6 @@ class ListController(QObject):
         self.mw.list_widget.setItemDelegate(self.delegate)
         
         self.active_widgets = {}
-        self.row_heights = []
-        self.dummy_card = GameCard({}, self.mw, self.mw.list_widget)
-        self.dummy_card.hide()
         
         self.mw.list_widget.verticalScrollBar().valueChanged.connect(self.update_visible_widgets)
 
@@ -50,6 +50,7 @@ class ListController(QObject):
         Calculates mathematics in memory instantly and defers widget creation purely to the scrolling viewport."""
         vp_width = self.mw.list_widget.viewport().width()
         current_width = vp_width if vp_width > 100 else 600
+        widget_w = current_width - 10 # WHY: Account for standard padding instead of the legacy massive borders.
         
         # WHY: Clear tracking BEFORE resetting model. Qt inherently deletes old index widgets during a model reset.
         self.active_widgets.clear()
@@ -57,13 +58,6 @@ class ListController(QObject):
         self.model.beginResetModel()
         self.model.df = self.mw.current_df
         
-        self.row_heights = []
-        for i in range(len(self.mw.current_df)):
-            game_dict = self.mw.current_df.iloc[i].to_dict()
-            self.dummy_card.set_data_for_height_calc(game_dict)
-            size = self.dummy_card.calculate_size_hint(current_width)
-            self.row_heights.append(size)
-            
         self.model.endResetModel()
         
         self.mw.last_viewport_width = current_width
@@ -92,6 +86,7 @@ class ListController(QObject):
         
         visible_rows = set(range(start_row, end_row + 1))
         current_width = viewport.width() if viewport.width() > 100 else 600
+        widget_w = current_width - 10
         
         for row in list(self.active_widgets.keys()):
             if row not in visible_rows:
@@ -107,7 +102,7 @@ class ListController(QObject):
                 card.data = game_dict
                 card.current_row = row 
                 card.refresh_ui_from_data(force_media_reload=False)
-                card.setFixedWidth(current_width)
+                card.setFixedWidth(widget_w)
                 
                 self.active_widgets[row] = card
                 self.mw.list_widget.setIndexWidget(self.model.index(row, 0), card)
@@ -115,24 +110,19 @@ class ListController(QObject):
     def update_item_sizes(self):
         vp_width = self.mw.list_widget.viewport().width()
         current_width = vp_width if vp_width > 100 else 600
+        widget_w = current_width - 10
         
         if abs(current_width - self.mw.last_viewport_width) < 2: return
             
         top_index = self.mw.list_widget.indexAt(self.mw.list_widget.viewport().rect().topLeft())
         
-        self.row_heights = []
-        for i in range(len(self.mw.current_df)):
-            game_dict = self.mw.current_df.iloc[i].to_dict()
-            self.dummy_card.set_data_for_height_calc(game_dict)
-            size = self.dummy_card.calculate_size_hint(current_width)
-            self.row_heights.append(size)
             
         self.model.layoutChanged.emit()
         self.mw.last_viewport_width = current_width
 
         for row, card in list(self.active_widgets.items()):
             try:
-                card.setFixedWidth(current_width)
+                card.setFixedWidth(widget_w)
                 card.adjustSize()
             except RuntimeError:
                 pass
@@ -141,21 +131,22 @@ class ListController(QObject):
             self.mw.list_widget.scrollTo(top_index, QAbstractItemView.PositionAtTop)
 
     def update_single_card(self, folder_name, force_media_reload=False):
-        c_idx = self.mw.current_df.index[self.mw.current_df['Folder_Name'] == folder_name].tolist()
-        if not c_idx: return
-        row = c_idx[0]
+        # WHY: Use enumerate to find the true positional index (0-based) rather than the DataFrame's index label. 
+        # The label causes IndexError with iloc[] when the DataFrame is sorted or filtered.
+        positions = [i for i, f in enumerate(self.mw.current_df['Folder_Name']) if f == folder_name]
+        if not positions: return
+        row = positions[0]
         
         game_dict = self.mw.current_df.iloc[row].to_dict()
         
         current_width = self.mw.last_viewport_width
-        self.dummy_card.set_data_for_height_calc(game_dict)
-        self.row_heights[row] = self.dummy_card.calculate_size_hint(current_width)
+        widget_w = current_width - 10
         
         if row in self.active_widgets:
             card = self.active_widgets[row]
             card.data = game_dict
             card.refresh_ui_from_data(force_media_reload=force_media_reload)
-            card.setFixedWidth(current_width)
+            card.setFixedWidth(widget_w)
             
         self.model.dataChanged.emit(self.model.index(row, 0), self.model.index(row, 0))
 
@@ -175,22 +166,21 @@ class ListController(QObject):
 
     def apply_display_settings(self, settings):
         top_index = self.mw.list_widget.indexAt(self.mw.list_widget.viewport().rect().topLeft())
-        self.dummy_card.update_style(settings)
+        
+        # WHY: Force the QListView to re-evaluate its CSS palette variables (like horizontal borders and selection highlight) during theme switches.
+        sheet = self.mw.list_widget.styleSheet()
+        self.mw.list_widget.setStyleSheet("")
+        self.mw.list_widget.setStyleSheet(sheet)
         
         current_width = self.mw.last_viewport_width
-        self.row_heights = []
-        for i in range(len(self.mw.current_df)):
-            game_dict = self.mw.current_df.iloc[i].to_dict()
-            self.dummy_card.set_data_for_height_calc(game_dict)
-            size = self.dummy_card.calculate_size_hint(current_width)
-            self.row_heights.append(size)
+        widget_w = current_width - 10
             
         self.model.layoutChanged.emit()
         
         for card in list(self.active_widgets.values()):
             try:
                 card.update_style(settings)
-                card.setFixedWidth(current_width)
+                card.setFixedWidth(widget_w)
                 card.adjustSize()
             except RuntimeError:
                 pass

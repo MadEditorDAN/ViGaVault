@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QFileDialog, QMessageBox, QApplication
 from backend.library import LibraryManager
 from ViGaVault_utils import (get_db_path, get_library_settings_file, build_scanner_config, 
                              get_platform_config, apply_theme, translator)
+from ViGaVault_utils import get_image_path, get_video_path
 from ViGaVault_workers import DbLoaderWorker, StartupSyncWorker
 from dialogs import ConflictDialog
 
@@ -209,11 +210,16 @@ class LibraryController(QObject):
         
         idx = self.mw.master_df.index[self.mw.master_df['Folder_Name'] == folder_name].tolist()
         if idx:
-            for k, v in final_data.items(): self.mw.master_df.at[idx[0], k] = v
+            # WHY: Dynamically check the Pandas column dtype. Prevents warnings when injecting strings into pure boolean columns.
+            for k, v in final_data.items():
+                if k in self.mw.master_df.columns:
+                    self.mw.master_df.at[idx[0], k] = bool(v) if self.mw.master_df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
             
         c_idx = self.mw.current_df.index[self.mw.current_df['Folder_Name'] == folder_name].tolist()
         if c_idx:
-            for k, v in final_data.items(): self.mw.current_df.at[c_idx[0], k] = v
+            for k, v in final_data.items():
+                if k in self.mw.current_df.columns:
+                    self.mw.current_df.at[c_idx[0], k] = bool(v) if self.mw.current_df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
             
         self.mw.list_controller.update_single_card(folder_name, force_media_reload=True)
         self.save_settings()
@@ -245,6 +251,11 @@ class LibraryController(QObject):
 
         del manager.games[folder_b]
         game_a.update_media_filenames(old_title, old_year)
+        
+        # WHY: A manual merge represents deliberate user curation. 
+        # We automatically lock the resulting game to protect these curated changes from future API scans.
+        game_a.data['Status_Flag'] = 'LOCKED'
+        
         for f in rejected_media:
             try: os.remove(f)
             except: pass
@@ -255,10 +266,14 @@ class LibraryController(QObject):
         new_data_a = game_a.to_dict()
         idx_a = self.mw.master_df.index[self.mw.master_df['Folder_Name'] == folder_a].tolist()
         if idx_a:
-            for k, v in new_data_a.items(): self.mw.master_df.at[idx_a[0], k] = v
+            for k, v in new_data_a.items():
+                if k in self.mw.master_df.columns:
+                    self.mw.master_df.at[idx_a[0], k] = bool(v) if self.mw.master_df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
         c_idx_a = self.mw.current_df.index[self.mw.current_df['Folder_Name'] == folder_a].tolist()
         if c_idx_a:
-            for k, v in new_data_a.items(): self.mw.current_df.at[c_idx_a[0], k] = v
+            for k, v in new_data_a.items():
+                if k in self.mw.current_df.columns:
+                    self.mw.current_df.at[c_idx_a[0], k] = bool(v) if self.mw.current_df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
             
         self.mw.master_df = self.mw.master_df[self.mw.master_df['Folder_Name'] != folder_b]
         self.mw.current_df = self.mw.current_df[self.mw.current_df['Folder_Name'] != folder_b]
@@ -277,10 +292,44 @@ class LibraryController(QObject):
             manager.save_db()
             idx = self.mw.master_df.index[self.mw.master_df['Folder_Name'] == folder_name].tolist()
             if idx:
-                for k, v in flags_dict.items(): self.mw.master_df.at[idx[0], k] = v
+                for k, v in flags_dict.items():
+                    if k in self.mw.master_df.columns:
+                        self.mw.master_df.at[idx[0], k] = bool(v) if self.mw.master_df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
             c_idx = self.mw.current_df.index[self.mw.current_df['Folder_Name'] == folder_name].tolist()
             if c_idx:
-                for k, v in flags_dict.items(): self.mw.current_df.at[c_idx[0], k] = v
+                for k, v in flags_dict.items():
+                    if k in self.mw.current_df.columns:
+                        self.mw.current_df.at[c_idx[0], k] = bool(v) if self.mw.current_df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
+
+    def delete_game(self, folder_name):
+        """
+        WHY: Single Responsibility Principle - Handles the complete removal of a game from 
+        the database, the physical disk (media), and the live visual layout.
+        """
+        manager = LibraryManager(build_scanner_config())
+        manager.load_db()
+        
+        game_obj = manager.games.get(folder_name)
+        if game_obj:
+            img_name = game_obj.data.get('Image_Link', '')
+            vid_name = game_obj.data.get('Path_Video', '')
+            
+            if img_name:
+                try: os.remove(os.path.join(get_image_path(), os.path.basename(img_name)))
+                except: pass
+            if vid_name:
+                try: os.remove(os.path.join(get_video_path(), os.path.basename(vid_name)))
+                except: pass
+                
+            del manager.games[folder_name]
+            manager.save_db()
+            
+        # WHY: Targeted Update - Erase from Pandas in-memory and dynamically update visual list.
+        self.mw.master_df = self.mw.master_df[self.mw.master_df['Folder_Name'] != folder_name]
+        self.mw.current_df = self.mw.current_df[self.mw.current_df['Folder_Name'] != folder_name]
+        self.mw.list_controller.remove_single_card(folder_name)
+        self.save_settings()
+        logging.info(f"Deleted game and media completely: {folder_name}")
 
     def save_settings(self):
         global_settings = {}
@@ -328,7 +377,9 @@ class LibraryController(QObject):
             "anchor_folder": self.get_second_visible_folder(),
             "scan_new": self.mw.sidebar.chk_show_new.isChecked(),
             "filter_states": filter_states,
-            "filter_expansion": saved_expansion
+            "filter_expansion": saved_expansion,
+            "sidebar_chk_gog": self.mw.sidebar.chk_scan_gog.isChecked(),
+            "sidebar_chk_local": self.mw.sidebar.chk_scan_local.isChecked()
         })
 
         if "platform_map" not in lib_settings:
@@ -409,8 +460,10 @@ class LibraryController(QObject):
             enable_local = lib_settings.get("local_scan_config", {}).get("enable_local_scan", True)
             self.mw.sidebar.chk_scan_gog.setEnabled(enable_gog)
             if not enable_gog: self.mw.sidebar.chk_scan_gog.setChecked(False)
+            else: self.mw.sidebar.chk_scan_gog.setChecked(lib_settings.get("sidebar_chk_gog", True))
             self.mw.sidebar.chk_scan_local.setEnabled(enable_local)
             if not enable_local: self.mw.sidebar.chk_scan_local.setChecked(False)
+            else: self.mw.sidebar.chk_scan_local.setChecked(lib_settings.get("sidebar_chk_local", True))
             
             return lib_settings.get("anchor_folder")
         except Exception as e:
@@ -440,6 +493,9 @@ class LibraryController(QObject):
             self.retranslate_ui()
             
         self.mw.sidebar.refresh_styles()
+        
+        # WHY: Force re-evaluation of CSS palette variables inside custom widgets when the application theme switches dynamically.
+        self.mw.list_controller.apply_display_settings(self.mw.display_settings)
 
     def retranslate_ui(self):
         self.mw.setWindowTitle(translator.tr("app_title"))

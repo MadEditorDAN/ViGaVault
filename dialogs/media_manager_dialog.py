@@ -328,10 +328,15 @@ class MediaManagerDialog(QDialog):
             new_data = game.to_dict()
             idx = self.parent_window.master_df.index[self.parent_window.master_df['Folder_Name'] == folder_name].tolist()
             if idx:
-                for k, v in new_data.items(): self.parent_window.master_df.at[idx[0], k] = v
+                # WHY: Dynamically check the Pandas column dtype. Prevents warnings when injecting strings into pure boolean columns.
+                for k, v in new_data.items():
+                    if k in self.parent_window.master_df.columns:
+                        self.parent_window.master_df.at[idx[0], k] = bool(v) if self.parent_window.master_df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
             c_idx = self.parent_window.current_df.index[self.parent_window.current_df['Folder_Name'] == folder_name].tolist()
             if c_idx:
-                for k, v in new_data.items(): self.parent_window.current_df.at[c_idx[0], k] = v
+                for k, v in new_data.items():
+                    if k in self.parent_window.current_df.columns:
+                        self.parent_window.current_df.at[c_idx[0], k] = bool(v) if self.parent_window.current_df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
                 
             if hasattr(self.parent_window, 'list_controller'):
                 self.parent_window.list_controller.update_single_card(folder_name, force_media_reload=True)

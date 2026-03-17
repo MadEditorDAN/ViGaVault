@@ -50,12 +50,11 @@ class MainWindow(QMainWindow):
         self.list_widget.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
         self.list_widget.verticalScrollBar().setSingleStep(25)
         
-        # WHY: Swap the native selection background fill for a subtle 5px inside border.
-        # Pre-defining a transparent border prevents layout shifting, and setting background-color
-        # to transparent ensures the native text selection color remains perfectly visible.
+        # WHY: Removed the massive invisible borders to reclaim space. 
+        # Selection now natively relies on background highlighting without squishing the layout.
         self.list_widget.setStyleSheet("""
-            QListView::item { border: 10px solid transparent; }
-            QListView::item:selected { background-color: transparent; border: 10px solid palette(highlight); }
+            QListView::item { padding: 5px; border-bottom: 1px solid palette(dark); }
+            QListView::item:selected { background-color: palette(highlight); border-radius: 3px; }
         """)
         
         main_layout.addWidget(self.list_widget, stretch=3)
@@ -108,6 +107,7 @@ class MainWindow(QMainWindow):
     def start_inline_scan(self, game_data): self.scan_controller.start_inline_scan(game_data)
     def update_game_flags(self, folder, flags): self.library_controller.update_game_flags(folder, flags)
     def update_game_data(self, folder, data): self.library_controller.update_game_data(folder, data)
+    def delete_game(self, folder): self.library_controller.delete_game(folder)
     def execute_merge(self, a, b): return self.library_controller.execute_merge(a, b)
     def save_database(self): self.library_controller.save_database()
     def save_settings(self): self.library_controller.save_settings()

@@ -41,8 +41,9 @@ class ActionDialog(QDialog):
         self.chk_locked.setChecked(self.original_data.get('Status_Flag') == 'LOCKED')
         self.form_layout.addRow("", self.chk_locked)
         
-        fields_to_disable = ['Folder_Name', 'Path_Video', 'Status_Flag', 'Image_Link', 'Platforms']
-        fields_to_exclude = ['Trailer_Link', 'game_ID', 'Image_Link', 'temp_sort_date', 'temp_sort_title', 'Path_Root', 'Year_Folder']
+        fields_to_disable = ['Folder_Name', 'Status_Flag', 'Image_Link', 'Platforms']
+        # WHY: Explicitly exclude internal system flags and media paths so they don't clutter the generic text zone.
+        fields_to_exclude = ['Trailer_Link', 'game_ID', 'Image_Link', 'temp_sort_date', 'temp_sort_title', 'Path_Root', 'Year_Folder', 'Is_Local', 'Has_Image', 'Has_Video', 'Cover_URL', 'Path_Video']
 
         for field, value in self.original_data.items():
             if field in fields_to_exclude or field.startswith('platform_ID_'):
@@ -149,6 +150,11 @@ class ActionDialog(QDialog):
         btn_merge.clicked.connect(self.start_merge)
         button_box.addWidget(btn_merge)
         
+        btn_delete = QPushButton(translator.tr("dialog_edit_btn_delete"))
+        btn_delete.setStyleSheet("color: red; font-weight: bold;")
+        btn_delete.clicked.connect(self.request_delete)
+        button_box.addWidget(btn_delete)
+        
         button_box.addStretch()
         
         btn_save = QPushButton(translator.tr("dialog_edit_save_btn"))
@@ -165,7 +171,22 @@ class ActionDialog(QDialog):
             selected_game = dlg.get_selected()
             if selected_game:
                 if self.parent_window.execute_merge(self.original_data['Folder_Name'], selected_game['Folder_Name']):
-                    self.accept()
+                    # WHY: Reject gracefully closes the window without triggering the GameCard's secondary save routine.
+                    self.reject()
+
+    def request_delete(self):
+        """Asks for confirmation and delegates total deletion to the library controller."""
+        reply = QMessageBox.warning(
+            self, 
+            translator.tr("dialog_delete_confirm_title"),
+            translator.tr("dialog_delete_confirm_msg"),
+            QMessageBox.Yes | QMessageBox.No, 
+            QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            if hasattr(self.parent_window, 'delete_game'):
+                self.parent_window.delete_game(self.original_data['Folder_Name'])
+                self.accept()
 
     def update_cover_display(self):
         img_name = self.updated_data.get('Image_Link') or self.original_data.get('Image_Link', '')

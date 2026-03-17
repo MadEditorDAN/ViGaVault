@@ -71,16 +71,21 @@ class MergeSelectionDialog(QDialog):
     def populate_list(self):
         self.table_widget.setRowCount(0)
         items_to_show = []
+        target_row = -1
         
         if self.chk_show_all.isChecked():
             games = self.master_df.sort_values(by='Clean_Title').to_dict('records')
             for g in games:
+                if g.get('Folder_Name') == self.current_folder:
+                    # WHY: The exact moment we skip the game, the current length of items_to_show 
+                    # perfectly represents the 0-based row index where it WOULD have been.
+                    target_row = len(items_to_show)
+                    continue
                 items_to_show.append((None, g))
         else:
             for ratio, g in self.resembling:
                 items_to_show.append((ratio, g))
 
-        target_row = -1
         for i, (ratio, g) in enumerate(items_to_show):
             row = self.table_widget.rowCount()
             self.table_widget.insertRow(row)
@@ -90,10 +95,6 @@ class MergeSelectionDialog(QDialog):
             plat_val = str(g.get('Platforms', ''))
             path_val = str(g.get('Path_Root', ''))
             match_val = f"{int(ratio*100)}%" if ratio is not None else ""
-                
-            if g.get('Folder_Name') == self.current_folder:
-                name_val = f">>> {name_val} <<<"
-                target_row = row
                 
             item_date = QTableWidgetItem(date_val)
             item_date.setData(Qt.UserRole, g)
@@ -107,11 +108,13 @@ class MergeSelectionDialog(QDialog):
             self.table_widget.setItem(row, 3, item_match)
             
             path_item = QTableWidgetItem(path_val)
-            path_item.setToolTip(path_val) # WHY: Ensures the path is always viewable on hover, even if the user resizes the window down.
             self.table_widget.setItem(row, 4, path_item)
             
+        # WHY: Fallback clamp if the excluded game belonged at the absolute end of the alphabet.
+        if self.chk_show_all.isChecked() and items_to_show and target_row >= self.table_widget.rowCount():
+            target_row = self.table_widget.rowCount() - 1
+
         if target_row >= 0:
-            self.table_widget.selectRow(target_row)
             item = self.table_widget.item(target_row, 0)
             if item:
                 self.table_widget.scrollToItem(item, QAbstractItemView.PositionAtCenter)

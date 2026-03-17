@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, Q
 from PySide6.QtCore import Qt, QSize, QEvent
 from PySide6.QtGui import QIcon, QPixmap, QFont, QPalette
 
-from ViGaVault_utils import translator, get_image_path, get_video_path
+from ViGaVault_utils import translator, get_image_path, get_video_path, get_root_path
 from dialogs import ActionDialog
 from ViGaVault_workers import ImageLoader
 
@@ -370,6 +370,10 @@ class GameCard(QWidget):
         settings = getattr(self.parent_window, 'display_settings', {'image': 200, 'button': 45, 'text': 22})
         img_w = settings.get('image', 200)
         img_h = int(img_w * 1.33) # Aspect ratio 3:4
+        
+        # WHY: Force Fixed Height based purely on the image. 
+        # This decouples the geometry entirely from the text length, stopping all visual bugs perfectly.
+        self.setFixedHeight(img_h + 10)
 
         # Image
         self.img_label = QLabel()
@@ -385,19 +389,24 @@ class GameCard(QWidget):
             self.img_label.setText("No Image")
             self.img_label.setStyleSheet("border: 1px solid #555;")
         self.img_label.installEventFilter(self)
-        main_layout.addWidget(self.img_label, 0, Qt.AlignTop)
         
-        # --- RIGHT COLUMN (DETAILS) ---
-        # Details
-        details_layout = QVBoxLayout()
-        details_layout.setContentsMargins(0, 0, 0, 0) 
-        details_layout.setSpacing(0)
-        details_layout.setAlignment(Qt.AlignTop)
+        # WHY: Zone 1 (Image). Encapsulate in a VBox with a stretch to push it to the top natively without forced heights.
+        self.image_frame = QFrame()
+        self.image_frame.setObjectName("grid_col")
+        image_col = QVBoxLayout(self.image_frame)
+        image_col.setContentsMargins(0, 0, 0, 0)
+        image_col.addWidget(self.img_label)
+        image_col.addStretch()
+        main_layout.addWidget(self.image_frame)
         
-        header_layout = QHBoxLayout()
-        header_layout.setContentsMargins(0, 0, 0, 0)
-
-        # Title Layout (Title + Path Label)
+        # --- COLUMN 2 (METADATA) ---
+        self.metadata_frame = QFrame()
+        self.metadata_frame.setObjectName("grid_col")
+        metadata_col = QVBoxLayout(self.metadata_frame)
+        metadata_col.setContentsMargins(10, 0, 10, 0) 
+        metadata_col.setSpacing(2)
+        metadata_col.setAlignment(Qt.AlignTop)
+        
         title_layout = QVBoxLayout()
         title_layout.setContentsMargins(0, 0, 0, 0)
         title_layout.setSpacing(0)
@@ -414,7 +423,11 @@ class GameCard(QWidget):
         title_layout.addWidget(self.title_lbl)
 
         path_root = game_data.get('Path_Root', '')
-        path_text = f"({path_root})" if path_root else ""
+        main_path = get_root_path()
+        if path_root and path_root.startswith(main_path):
+            # WHY: Strip the global root path for a cleaner, relative display
+            path_root = path_root[len(main_path):].lstrip('\\/')
+        path_text = f"<b>{translator.tr('gamecard_info_local_path')}</b>{path_root}" if path_root else ""
         self.path_lbl = QLabel(path_text)
         self.path_lbl.setStyleSheet("font-size: 11px; color: gray;")
         self.path_lbl.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -424,19 +437,108 @@ class GameCard(QWidget):
         self.path_lbl.installEventFilter(self)
         title_layout.addWidget(self.path_lbl)
         
-        header_layout.addLayout(title_layout, 1) # Give title stretch priority
+        metadata_col.addLayout(title_layout)
+        metadata_col.addSpacing(10)
         
-        # Buttons
+        info_font_size = max(10, settings.get('text', 22) - 6)
+        for field in ['Original_Release_Date', 'Platforms', 'Genre', 'Developer', 'Publisher', 'Collection']:
+            display_name = field
+            if field == 'Original_Release_Date': display_name = translator.tr("gamecard_info_release_date")
+            elif field == 'Platforms': display_name = translator.tr("gamecard_info_platforms")
+            elif field == 'Genre': display_name = translator.tr("gamecard_info_genre")            
+            elif field == 'Developer': display_name = translator.tr("gamecard_info_developer")
+            elif field == 'Publisher': display_name = translator.tr("gamecard_info_publisher")
+            elif field == 'Collection': display_name = translator.tr("gamecard_info_collection")
+            
+            label = QLabel(f"<b>{display_name}:</b> {game_data.get(field, '')}")
+            label.setStyleSheet(f"font-size: {info_font_size}px;")
+            label.setWordWrap(True)
+            label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+            label.installEventFilter(self)
+            metadata_col.addWidget(label)
+            self.info_labels.append(label)
+            
+        metadata_col.addStretch()
+        main_layout.addWidget(self.metadata_frame, stretch=2)
+
+        # --- COLUMN 3 (SCROLLABLE SUMMARY) ---
+        self.summary_frame = QFrame()
+        self.summary_frame.setObjectName("grid_col")
+        summary_col = QVBoxLayout(self.summary_frame)
+        summary_col.setContentsMargins(0, 0, 10, 0)
+        summary_col.setSpacing(5)
+
+        self.summary_title = QLabel(translator.tr("gamecard_summary_title"))
+        self.summary_title.setStyleSheet(f"font-weight: bold; font-size: {info_font_size}px;")
+        self.summary_title.installEventFilter(self)
+        summary_col.addWidget(self.summary_title)
+        
+        self.summary_scroll = QScrollArea()
+        self.summary_scroll.setWidgetResizable(True)
+        self.summary_scroll.setFrameShape(QFrame.NoFrame)
+        self.summary_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.summary_scroll.setStyleSheet("QScrollArea { background: transparent; }")
+        self.summary_scroll.installEventFilter(self)
+        
+        # WHY: Explicitly bind the scroll container to 'self' to protect it from Python's aggressive garbage collector.
+        self.scroll_content = QWidget()
+        self.scroll_content.setStyleSheet("background: transparent;")
+        self.scroll_content.installEventFilter(self)
+        scroll_layout = QVBoxLayout(self.scroll_content)
+        scroll_layout.setContentsMargins(0, 0, 5, 0)
+        
+        summary_font_size = max(10, settings.get('text', 22) - 8)
+        self.summary_content = QLabel(game_data.get('Summary', ''))
+        self.summary_content.setWordWrap(True)
+        self.summary_content.setStyleSheet(f"font-size: {summary_font_size}px;")
+        self.summary_content.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.summary_content.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self.summary_content.installEventFilter(self)
+        
+        scroll_layout.addWidget(self.summary_content)
+        scroll_layout.addStretch() # Push text to top inside the scroll box
+        
+        self.summary_scroll.setWidget(self.scroll_content)
+        summary_col.addWidget(self.summary_scroll)
+        main_layout.addWidget(self.summary_frame, stretch=3)
+
+        # --- COLUMN 4 (ACTIONS) ---
         vid_name = str(game_data.get('Path_Video', '')).strip()
         self.video_path = os.path.join(get_video_path(), os.path.basename(vid_name)) if vid_name else ''
         self.trailer_link = game_data.get('Trailer_Link', '')
 
-        # WHY: Database driven truth mechanism. Using string match parsing because CSV loading
-        # can turn pure booleans into lowercased strings across data bridges.
         has_local_folder = str(game_data.get('Is_Local')).lower() in ['true', '1']
         has_local_video = str(game_data.get('Has_Video')).lower() in ['true', '1']
-        
         has_trailer = bool(self.trailer_link and self.trailer_link.startswith('http'))
+
+        self.actions_frame = QFrame()
+        self.actions_frame.setObjectName("actions_col")
+        self.actions_col = QVBoxLayout(self.actions_frame)
+        self.actions_col.setContentsMargins(5, 5, 5, 5)
+        self.actions_col.setSpacing(0)
+
+        self.buttons = {}
+        self.actions_col.addStretch()
+        for name in ['scan', 'edit', 'folder', 'youtube', 'local_video']:
+            btn = QPushButton()
+            self.buttons[name] = btn
+            btn.installEventFilter(self)
+            self.actions_col.addWidget(btn)
+            self.actions_col.addStretch()
+
+        self.buttons['local_video'].clicked.connect(self.start_video)
+        self.buttons['youtube'].clicked.connect(self.start_trailer)
+        self.buttons['folder'].clicked.connect(self.open_folder)
+        self.buttons['edit'].clicked.connect(self.edit_game)
+        self.buttons['scan'].clicked.connect(self.scan_game)
+        
+        main_layout.addWidget(self.actions_frame)
+
+    def _update_button_icons(self, has_local_video, has_trailer, has_local_folder):
+        """WHY: Single Responsibility Principle - Consolidates all button state and icon rendering logic into one dynamic method."""
+        settings = getattr(self.parent_window, 'display_settings', {'image': 200, 'button': 45, 'text': 22})
+        btn_size = settings.get('button', 45)
 
         button_definitions = {
             'local_video': {'enabled': has_local_video, 'fallback': "🎞️", 'font_size': "32px"},
@@ -446,12 +548,12 @@ class GameCard(QWidget):
             'scan':        {'enabled': True,            'fallback': "🔍", 'font_size': "28px"}
         }
 
-        self.buttons = {}
-        btn_size = settings.get('button', 45)
         for name, props in button_definitions.items():
-            btn = QPushButton()
-            self.buttons[name] = btn
-
+            btn = self.buttons.get(name)
+            if not btn: continue
+            
+            btn.setFixedSize(btn_size, btn_size)
+            
             icon_to_load = name
             if not props['enabled'] and name in ['local_video', 'youtube', 'folder']:
                 icon_to_load = f"{name}_disabled"
@@ -463,84 +565,30 @@ class GameCard(QWidget):
             if os.path.exists(icon_path):
                 btn.setIcon(QIcon(icon_path))
                 btn.setIconSize(QSize(int(btn_size*0.7), int(btn_size*0.7)))
-                btn.setStyleSheet("border: none;")
+                btn.setStyleSheet("")
+                btn.setText("")
             else:
-                # Fallback to emoji if icon file is missing
                 fallback_emoji = props['fallback']
-                font_size = props['font_size']
-                style = f"font-size: {font_size}; border: none;"
-                if fallback_emoji == "▶":
-                    style += " color: #FF0000;"
+                style = f"font-size: {props['font_size']};"
+                if fallback_emoji == "▶": style += " color: #FF0000;"
                 btn.setStyleSheet(style)
                 btn.setText(fallback_emoji)
+                btn.setIcon(QIcon())
             
             btn.setEnabled(props['enabled'])
-            
-            if name == 'local_video' and not props['enabled'] and self.video_path:
-                btn.setToolTip(f"File not found: {self.video_path}")
-
-        buttons = [self.buttons['local_video'], self.buttons['youtube'], self.buttons['folder'], self.buttons['edit'], self.buttons['scan']]
-            
-        for btn in buttons:
-            btn.setFixedSize(btn_size, btn_size)
-            btn.installEventFilter(self)
-            header_layout.addWidget(btn)
-
-        self.buttons['local_video'].clicked.connect(self.start_video)
-        self.buttons['youtube'].clicked.connect(self.start_trailer)
-        self.buttons['folder'].clicked.connect(self.open_folder)
-        self.buttons['edit'].clicked.connect(self.edit_game)
-        self.buttons['scan'].clicked.connect(self.scan_game)
-        
-        details_layout.addLayout(header_layout)
-        
-        # Info
-        info_font_size = max(10, settings.get('text', 22) - 6)
-        # WHY: Reordered fields to group Platforms/Genre, Dev/Pub, and Collection. Added spacing between these groups.
-        for field in ['Original_Release_Date', 'Platforms', 'Genre', 'Developer', 'Publisher', 'Collection']:
-            display_name = 'Developer' # Default
-            if field == 'Original_Release_Date': display_name = translator.tr("gamecard_info_release_date")
-            elif field == 'Platforms': display_name = translator.tr("gamecard_info_platforms")
-            elif field == 'Genre': display_name = translator.tr("gamecard_info_genre")            
-            elif field == 'Developer': display_name = translator.tr("gamecard_info_developer")
-            elif field == 'Publisher': display_name = translator.tr("gamecard_info_publisher")
-            elif field == 'Collection': display_name = translator.tr("gamecard_info_collection")
-            label = QLabel(f"<b>{display_name}:</b> {game_data.get(field, '')}")
-            label.setStyleSheet(f"font-weight: bold; font-size: {info_font_size}px;")
-            label.setWordWrap(True)
-            label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-            # Policy and MinimumWidth are crucial to prevent "disappearing buttons" bug
-            label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-            label.setMinimumWidth(0)
-            label.installEventFilter(self)
-            details_layout.addWidget(label)
-            self.info_labels.append(label)
-            
-            if field in ['Genre', 'Publisher']:
-                details_layout.addSpacing(10)
-        
-        self.summary_title = QLabel(translator.tr("gamecard_summary_title"))
-        self.summary_title.setStyleSheet(f"font-weight: bold; font-size: {info_font_size}px;")
-        self.summary_title.installEventFilter(self)
-        details_layout.addWidget(self.summary_title)
-
-        summary_font_size = max(10, settings.get('text', 22) - 8)
-        self.summary_content = QLabel(game_data.get('Summary', ''))
-        self.summary_content.setWordWrap(True)
-        self.summary_content.setStyleSheet(f"font-size: {summary_font_size}px;")
-        self.summary_content.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        # Vertical Policy Minimum prevents the summary from forcing the card to be too tall
-        self.summary_content.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
-        self.summary_content.installEventFilter(self)
-        details_layout.addWidget(self.summary_content)
-        main_layout.addLayout(details_layout)
+            if name == 'local_video' and not props['enabled'] and self.video_path: btn.setToolTip(f"File not found: {self.video_path}")
+            else: btn.setToolTip("")
 
     def refresh_ui_from_data(self, force_media_reload=False):
         """WHY: Allows surgical updates of the UI instantly without reloading the widget or the list."""
         # Update Texts
         self.title_lbl.setText(self.data.get('Clean_Title', 'Unknown'))
         path_root = self.data.get('Path_Root', '')
-        self.path_lbl.setText(f"({path_root})" if path_root else "")
+        main_path = get_root_path()
+        if path_root and path_root.startswith(main_path):
+            # WHY: Strip the global root path for a cleaner, relative display
+            path_root = path_root[len(main_path):].lstrip('\\/')
+        self.path_lbl.setText(f"<b>{translator.tr('gamecard_info_local_path')}</b>{path_root}" if path_root else "")
         
         # Update Buttons
         vid_name = str(self.data.get('Path_Video', '')).strip()
@@ -551,9 +599,7 @@ class GameCard(QWidget):
         has_local_video = str(self.data.get('Has_Video')).lower() in ['true', '1']
         has_trailer = bool(self.trailer_link and self.trailer_link.startswith('http'))
         
-        self.buttons['local_video'].setEnabled(has_local_video)
-        self.buttons['youtube'].setEnabled(has_trailer)
-        self.buttons['folder'].setEnabled(has_local_folder)
+        self._update_button_icons(has_local_video, has_trailer, has_local_folder)
         
         has_image = str(self.data.get('Has_Image')).lower() in ['true', '1']
         # Update Image (Only reload if path actually changed to save IO)
@@ -584,27 +630,6 @@ class GameCard(QWidget):
             
         self.summary_content.setText(self.data.get('Summary', ''))
 
-    def set_data_for_height_calc(self, game_data):
-        """WHY: Used strictly by the background mathematics dummy card to rapidly calculate text wrapping heights 
-        without ever triggering image load threads or disk checks."""
-        self.data = game_data
-        self.title_lbl.setText(game_data.get('Clean_Title', 'Unknown'))
-        path_root = game_data.get('Path_Root', '')
-        self.path_lbl.setText(f"({path_root})" if path_root else "")
-        
-        fields = ['Original_Release_Date', 'Platforms', 'Genre', 'Developer', 'Publisher', 'Collection']
-        for i, field in enumerate(fields):
-            display_name = field
-            if field == 'Original_Release_Date': display_name = translator.tr("gamecard_info_release_date")
-            elif field == 'Platforms': display_name = translator.tr("gamecard_info_platforms")
-            elif field == 'Genre': display_name = translator.tr("gamecard_info_genre")            
-            elif field == 'Developer': display_name = translator.tr("gamecard_info_developer")
-            elif field == 'Publisher': display_name = translator.tr("gamecard_info_publisher")
-            elif field == 'Collection': display_name = translator.tr("gamecard_info_collection")
-            self.info_labels[i].setText(f"<b>{display_name}:</b> {game_data.get(field, '')}")
-            
-        self.summary_content.setText(game_data.get('Summary', ''))
-
     def start_image_load(self, path):
         loader = ImageLoader(path)
         loader.signals.loaded.connect(self.on_image_loaded)
@@ -630,19 +655,25 @@ class GameCard(QWidget):
         btn_size = settings.get('button', 45)
         text_size = settings.get('text', 22)
         
+        self.setFixedHeight(img_h + 10)
+        
+        # WHY: Force Qt to re-evaluate the palette() keywords by clearing the stylesheet first.
+        # This fixes the bug where visible cards fail to switch colors when toggling Dark/Light mode.
+        self.setStyleSheet("")
+        self.setStyleSheet("""
+            QFrame#grid_col { border-right: 1px solid palette(dark); }
+            QFrame#actions_col { background-color: palette(alternate-base); border-radius: 5px; }
+        """)
         # Update Image
         self.img_label.setFixedSize(img_w, img_h)
         if self.cached_pixmap:
             self.img_label.setPixmap(self.cached_pixmap.scaled(img_w, img_h, Qt.KeepAspectRatio, Qt.SmoothTransformation))
             
         # Update Buttons
-        for btn in self.buttons.values():
-            btn.setFixedSize(btn_size, btn_size)
-            if btn.icon().isNull(): # Emoji fallback
-                # Simple heuristic for emoji font size
-                btn.setStyleSheet(f"font-size: {int(btn_size*0.7)}px; border: none;")
-            else:
-                btn.setIconSize(QSize(int(btn_size*0.7), int(btn_size*0.7)))
+        has_local_folder = str(self.data.get('Is_Local')).lower() in ['true', '1']
+        has_local_video = str(self.data.get('Has_Video')).lower() in ['true', '1']
+        has_trailer = bool(self.trailer_link and self.trailer_link.startswith('http'))
+        self._update_button_icons(has_local_video, has_trailer, has_local_folder)
 
         # Update Text
         self.title_lbl.setStyleSheet(f"font-weight: bold; font-size: {text_size}px;")
@@ -652,54 +683,6 @@ class GameCard(QWidget):
             lbl.setStyleSheet(f"font-weight: bold; font-size: {info_size}px;")
         self.summary_title.setStyleSheet(f"font-weight: bold; font-size: {info_size}px;")
         self.summary_content.setStyleSheet(f"font-size: {max(10, text_size - 8)}px;")
-
-    def calculate_size_hint(self, target_width):
-        """
-        Manually calculates the exact required height for the card at a specific width.
-        Why: The standard sizeHint() often fails during resize events or when text wraps,
-        leading to huge vertical gaps or cut-off text. We compute the math manually to guarantee precision.
-        """
-        m = self.layout().contentsMargins()
-        spacing_main = self.layout().spacing()
-        if spacing_main == -1: spacing_main = 6
-        
-        img_w = self.img_label.width()
-        img_h = self.img_label.height()
-        
-        # Width available for the Details Column
-        details_w = target_width - m.left() - m.right() - img_w - spacing_main
-        if details_w <= 50: return QSize(target_width, max(img_h + m.top() + m.bottom(), 100))
-        
-        # 1. Header Height
-        spacing_header = 6
-        btn_count = 5
-        btn_size = self.buttons['edit'].width()
-        # 5 buttons + spacing between title_layout and buttons
-        buttons_block_w = (btn_count * btn_size) + (btn_count * spacing_header)
-        
-        title_w = details_w - buttons_block_w
-        if title_w < 10: title_w = 10
-        
-        h_title = self.title_lbl.heightForWidth(title_w)
-        h_path = self.path_lbl.heightForWidth(title_w)
-        # Fallback if heightForWidth returns -1 (valid for non-wrapping, but safe to check)
-        if h_title <= 0: h_title = self.title_lbl.sizeHint().height()
-        if h_path <= 0: h_path = self.path_lbl.sizeHint().height()
-        
-        h_header = max(h_title + h_path, btn_size)
-        
-        # 2. Rest of the content (Info + Summary)
-        h_rest = 0
-        labels_to_measure = self.info_labels + [self.summary_title, self.summary_content]
-        for lbl in labels_to_measure:
-            h = lbl.heightForWidth(details_w)
-            if h <= 0: h = lbl.sizeHint().height()
-            h_rest += h
-            
-        h_rest += 20 # WHY: Account for the 2x10px spacing added between info groups
-            
-        final_h = max(img_h, h_header + h_rest) + m.top() + m.bottom() + 4 # +4 buffer
-        return QSize(target_width, final_h)
 
     def mousePressEvent(self, event):
         if self.list_view and self.current_row >= 0:
