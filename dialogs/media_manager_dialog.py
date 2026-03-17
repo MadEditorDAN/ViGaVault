@@ -137,13 +137,17 @@ class MediaManagerDialog(QDialog):
         self.lbl_missing_vid.setText(translator.tr("media_manager_missing_count", count=missing_vid_count))
         self.lbl_missing_trl.setText(translator.tr("media_manager_missing_count", count=missing_trl_count))
         
-        for game_info in sorted(missing_games, key=lambda x: x['title'].lower()):
-            self.add_table_row(game_info, check_img, check_vid, check_trl)
-            
-    def add_table_row(self, game_info, check_img, check_vid, check_trl):
-        row = self.table.rowCount()
-        self.table.insertRow(row)
+        # WHY: Smart Refresh - Freeze layout, pre-allocate rows, and cache disk items to prevent a repaint avalanche.
+        self.table.setUpdatesEnabled(False)
+        self.table.setRowCount(len(missing_games))
+        folder_icon = QIcon("assets/folder.png") if os.path.exists("assets/folder.png") else None
         
+        for row, game_info in enumerate(sorted(missing_games, key=lambda x: x['title'].lower())):
+            self.add_table_row(row, game_info, check_img, check_vid, check_trl, folder_icon)
+            
+        self.table.setUpdatesEnabled(True)
+            
+    def add_table_row(self, row, game_info, check_img, check_vid, check_trl, folder_icon):
         col_idx = 0
         item_name = QTableWidgetItem(game_info['title'])
         item_name.setData(Qt.UserRole, game_info['folder'])
@@ -178,8 +182,8 @@ class MediaManagerDialog(QDialog):
             col_idx += 1
         
         btn_import = QPushButton()
-        icon_path = "assets/folder.png"
-        if os.path.exists(icon_path): btn_import.setIcon(QIcon(icon_path))
+        # WHY: DRY Principle - Uses the pre-cached icon instead of querying the hard drive for every single row.
+        if folder_icon: btn_import.setIcon(folder_icon)
         else: btn_import.setText("📁")
             
         btn_import.setProperty("selected_file", "")
