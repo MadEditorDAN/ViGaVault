@@ -331,6 +331,48 @@ class LibraryController(QObject):
         self.save_settings()
         logging.info(f"Deleted game and media completely: {folder_name}")
 
+    def batch_delete_metadata(self, field, items_to_delete):
+        """
+        WHY: Performs a safe string-based batch deletion of metadata tags across the entire DB.
+        Updates memory DataFrames directly and triggers a targeted UI refresh.
+        """
+        manager = LibraryManager(build_scanner_config())
+        manager.load_db()
+        
+        items_set = set(i.lower() for i in items_to_delete)
+        changes_made = False
+        
+        for folder, game in manager.games.items():
+            val = str(game.data.get(field, ''))
+            if val:
+                parts = [p.strip() for p in val.split(',')]
+                new_parts = [p for p in parts if p.lower() not in items_set]
+                if len(parts) != len(new_parts):
+                    game.data[field] = ", ".join(new_parts)
+                    changes_made = True
+                    
+        if changes_made:
+            manager.save_db()
+            
+            # WHY: Targeted Update - Patch Pandas memory to reflect deletions without reloading from disk
+            def remove_items(val):
+                if not val: return val
+                parts = [p.strip() for p in str(val).split(',')]
+                new_parts = [p for p in parts if p.lower() not in items_set]
+                return ", ".join(new_parts)
+            
+            if field in self.mw.master_df.columns:
+                self.mw.master_df[field] = self.mw.master_df[field].apply(remove_items)
+            if field in self.mw.current_df.columns:
+                self.mw.current_df[field] = self.mw.current_df[field].apply(remove_items)
+                
+            # WHY: Smart Refresh - Update visible cards instantly
+            self.mw.list_controller.update_visible_widgets()
+            
+            # WHY: Rebuild Sidebar Filters so deleted items physically disappear from the checkboxes
+            self.save_settings()
+            self.mw.library_controller.load_settings()
+
     def save_settings(self):
         global_settings = {}
         if os.path.exists("settings.json"):

@@ -13,6 +13,24 @@ from PySide6.QtCore import Qt, QObject, Signal
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 
+
+# --- UI CONSTANTS ---
+# WHY: DRY Principle - Centralizes standard window sizes for easy global modification.
+MAIN_WINDOW_SIZE = (1600, 900)
+DIALOG_STD_SIZE = (1280, 720)
+
+def center_window(window, parent=None):
+    """WHY: Ensures all dialogs explicitly spawn perfectly centered on the screen or relative to their parent window."""
+    window.updateGeometry()
+    if parent:
+        parent_geo = parent.geometry()
+        size = window.geometry()
+        window.move(parent_geo.center() - size.center())
+    else:
+        screen = QApplication.primaryScreen().availableGeometry()
+        size = window.geometry()
+        window.move((screen.width() - size.width()) // 2, (screen.height() - size.height()) // 2)
+
 def get_safe_filename(name):
     safe_name = name.replace(':', ' ')
     safe_name = re.sub(r'[^\w\s\-\.\(\)\[\]]', '', safe_name).strip()
@@ -348,6 +366,21 @@ def apply_theme(app, theme_name):
         light_palette.setColor(QPalette.Disabled, QPalette.WindowText, Qt.gray)
         
         app.setPalette(light_palette)
+        
+    # WHY: Force all QGroupBox widgets across the entire application to draw a highly visible, 
+    # professional frame, bypassing the flat look of the native OS Fusion engine.
+    app.setStyleSheet("""
+        QGroupBox { 
+            border: 1px solid palette(dark); 
+            border-radius: 5px; 
+            margin-top: 1.5ex; 
+        }
+        QGroupBox::title { 
+            subcontrol-origin: margin; 
+            subcontrol-position: top left; 
+            padding: 0 5px; 
+        }
+    """)
 
 # --- Custom Logging Handler for UI ---
 # WHY: Moved here to centralize all utility and core infrastructure classes.

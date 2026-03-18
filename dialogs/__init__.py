@@ -7,3 +7,4 @@ from .settings_dialog import SettingsDialog
 from .statistics_dialog import StatisticsDialog, ProgressBarDelegate
 from .utility_dialogs import PlatformManagerDialog, SelectionDialog, DocumentationDialog
 from .media_manager_dialog import MediaManagerDialog
+from .metadata_manager_dialog import MetadataManagerDialog

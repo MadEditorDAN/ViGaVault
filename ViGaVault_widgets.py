@@ -290,8 +290,12 @@ class Sidebar(QWidget):
         self.scan_layout.addLayout(self.btns_layout)
 
         # --- BOTTOM CONTAINER (Scan Buttons) ---
-        self.bottom_layout = QHBoxLayout()
-        
+        self.frame_bottom = QFrame()
+        self.frame_bottom.setObjectName("sidebar_frame")
+        self.frame_bottom.setStyleSheet(self.frame_style)
+        self.bottom_layout = QHBoxLayout(self.frame_bottom)
+        self.bottom_layout.setContentsMargins(8, 8, 8, 8)
+
         # --- FULL SCAN BUTTON ---
         self.btn_full_scan = QPushButton(translator.tr("sidebar_btn_full_scan"))
         self.btn_full_scan.setMinimumHeight(80) # WHY: Taller button to accommodate the 3 checkboxes visually
@@ -320,7 +324,7 @@ class Sidebar(QWidget):
 
         self.layout.addWidget(self.scan_panel)
         self.scan_panel.hide()
-        self.layout.addLayout(self.bottom_layout)
+        self.layout.addWidget(self.frame_bottom)
         
         # --- CONNECTIONS ---
         self.search_bar.textChanged.connect(self.parent.request_filter_update)
@@ -355,7 +359,7 @@ class Sidebar(QWidget):
 
     def refresh_styles(self):
         # Only refresh elements that use stylesheets and might cache colors
-        for frame in [self.frame_counters, self.frame_search, self.frame_sort, self.frame_filters]:
+        for frame in [self.frame_counters, self.frame_search, self.frame_sort, self.frame_filters, self.frame_bottom]:
             frame.setStyleSheet(self.frame_style)
 
         # Refresh Filter Groups to pick up new palette

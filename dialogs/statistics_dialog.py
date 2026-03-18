@@ -1,12 +1,12 @@
 # WHY: Single Responsibility Principle - Handles ONLY the generation and display of Pandas-driven statistics.
 import pandas as pd
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QScrollArea, QFrame, QWidget, QLabel, 
-                               QPushButton, QFormLayout, QSizePolicy, QTableWidget, QTableWidgetItem, 
+                               QPushButton, QFormLayout, QSizePolicy, QTableWidget, QTableWidgetItem, QGroupBox,
                                QHeaderView, QAbstractItemView, QStyledItemDelegate, QStyleOptionProgressBar, 
                                QApplication, QStyle, QTextBrowser)
 from PySide6.QtCore import Qt
 
-from ViGaVault_utils import translator
+from ViGaVault_utils import translator, DIALOG_STD_SIZE, center_window
 
 class ProgressBarDelegate(QStyledItemDelegate):
     """
@@ -39,8 +39,8 @@ class StatisticsDialog(QDialog):
     def __init__(self, df, parent=None):
         super().__init__(parent)
         self.setWindowTitle(translator.tr("tools_stats_title"))
-        # WHY: Increased vertical starting height to 900 to comfortably fit the new HTML QLabel and bottom graphs.
-        self.resize(1300, 900)
+        self.resize(*DIALOG_STD_SIZE)
+        center_window(self, parent)
         self.df = df
         
         # WHY: Shift the dialog background to the darker 'Base' color (matching the GameCard list)
@@ -58,16 +58,16 @@ class StatisticsDialog(QDialog):
         container.setObjectName("stats_container")
         dashboard_layout = QVBoxLayout(container)
         
-        lbl_overview = QLabel(translator.tr("tools_stats_overview"))
-        lbl_overview.setStyleSheet("font-size: 18px; font-weight: bold;")
-        dashboard_layout.addWidget(lbl_overview)
-        
-        dashboard_layout.addWidget(self.create_overview_section())
+        # WHY: Split into two separate sections so they each get their own native QGroupBox frame.
+        dashboard_layout.addWidget(self.create_kpi_section())
+        dashboard_layout.addWidget(self.create_details_section())
         
         graphs_layout = QHBoxLayout()
         graphs_layout.addWidget(self.create_distribution_section("Platforms", translator.tr("tools_stats_platforms")))
         graphs_layout.addWidget(self.create_distribution_section("Genre", translator.tr("tools_stats_genres")))
         graphs_layout.addWidget(self.create_timeline_section())
+        
+        graphs_layout.setSpacing(20)
         
         dashboard_layout.addLayout(graphs_layout)
         scroll.setWidget(container)
@@ -77,17 +77,17 @@ class StatisticsDialog(QDialog):
         btn_close.clicked.connect(self.accept)
         layout.addWidget(btn_close, 0, Qt.AlignRight)
 
-    def create_overview_section(self):
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(0, 0, 0, 15)
+    def create_kpi_section(self):
+        widget = QGroupBox()
+        boxes_layout = QHBoxLayout(widget)
+        # WHY: Synchronize horizontal and vertical spacing to create a perfectly even, symmetrical grid.
+        boxes_layout.setContentsMargins(20, 20, 20, 20)
+        boxes_layout.setSpacing(20)
         
         total_games = len(self.df)
         scrapped = len(self.df[self.df['Status_Flag'].isin(['OK', 'LOCKED'])])
         incomplete = total_games - scrapped
         
-        boxes_layout = QHBoxLayout()
-
         def add_stat_card(title, value, color):
             frame = QFrame()
             frame.setFrameShape(QFrame.StyledPanel)
@@ -108,8 +108,14 @@ class StatisticsDialog(QDialog):
         add_stat_card(translator.tr("tools_stats_total"), total_games, "#2196F3")
         add_stat_card(translator.tr("tools_stats_scrapped"), scrapped, "#4CAF50")
         add_stat_card(translator.tr("tools_stats_incomplete"), incomplete, "#FF9800")
-        layout.addLayout(boxes_layout)
+        
+        return widget
 
+    def create_details_section(self):
+        widget = QGroupBox()
+        layout = QVBoxLayout(widget)
+        
+        total_games = len(self.df)
         stats_data = []
 
         def get_top_count(col):
@@ -233,9 +239,10 @@ class StatisticsDialog(QDialog):
         return widget
 
     def create_distribution_section(self, col_name, title):
-        widget = QWidget()
+        widget = QGroupBox()
         layout = QVBoxLayout(widget)
-        layout.setContentsMargins(0, 0, 0, 0)
+        # WHY: Add padding to prevent the inner table from touching the QGroupBox frame.
+        layout.setContentsMargins(10, 15, 10, 10)
         
         all_values = []
         for item in self.df[col_name].dropna():
@@ -281,9 +288,10 @@ class StatisticsDialog(QDialog):
         return widget
 
     def create_timeline_section(self):
-        widget = QWidget()
+        widget = QGroupBox()
         layout = QVBoxLayout(widget)
-        layout.setContentsMargins(0, 0, 0, 0)
+        # WHY: Add padding to prevent the inner table from touching the QGroupBox frame.
+        layout.setContentsMargins(10, 15, 10, 10)
         
         years = pd.to_datetime(self.df['Original_Release_Date'], errors='coerce', dayfirst=True).dt.year
         year_counts = years.dropna().astype(int).value_counts().sort_index()

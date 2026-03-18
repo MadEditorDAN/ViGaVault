@@ -2,29 +2,36 @@
 import os
 import difflib
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QCheckBox, QTableWidget, 
-                               QTableWidgetItem, QHeaderView, QAbstractItemView, QPushButton, QScrollArea, 
-                               QWidget, QGridLayout, QFrame, QButtonGroup, QRadioButton, QTextEdit, QLineEdit)
+                               QTableWidgetItem, QHeaderView, QAbstractItemView, QPushButton, QScrollArea, QFormLayout,
+                               QWidget, QGridLayout, QFrame, QButtonGroup, QRadioButton, QTextEdit, QLineEdit, QGroupBox, QSizePolicy)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 
-from ViGaVault_utils import get_image_path, get_video_path, translator
+from ViGaVault_utils import get_image_path, get_video_path, translator, DIALOG_STD_SIZE, center_window
 
 class MergeSelectionDialog(QDialog):
     def __init__(self, current_data, master_df, parent=None):
         super().__init__(parent)
         self.setWindowTitle(translator.tr("dialog_merge_title"))
-        self.resize(1150, 500) # WHY: Expanded to provide adequate room for the separated columns
+        self.resize(*DIALOG_STD_SIZE)
+        center_window(self, parent)
         self.current_title = current_data.get('Clean_Title', '')
         self.current_folder = current_data.get('Folder_Name', '')
         self.master_df = master_df
         
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(translator.tr("dialog_merge_desc")))
+        
+        top_group = QGroupBox()
+        top_layout = QVBoxLayout(top_group)
+        top_layout.addWidget(QLabel(translator.tr("dialog_merge_desc")))
         
         self.chk_show_all = QCheckBox(translator.tr("dialog_merge_show_all"))
         self.chk_show_all.toggled.connect(self.populate_list)
-        layout.addWidget(self.chk_show_all)
+        top_layout.addWidget(self.chk_show_all)
+        layout.addWidget(top_group)
         
+        table_group = QGroupBox()
+        table_layout = QVBoxLayout(table_group)
         self.table_widget = QTableWidget()
         self.table_widget.setColumnCount(5)
         self.table_widget.setHorizontalHeaderLabels([
@@ -44,7 +51,8 @@ class MergeSelectionDialog(QDialog):
         self.table_widget.setSelectionMode(QAbstractItemView.SingleSelection)
         self.table_widget.verticalHeader().setVisible(False)
         self.table_widget.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        layout.addWidget(self.table_widget)
+        table_layout.addWidget(self.table_widget)
+        layout.addWidget(table_group)
         
         # Pre-calculate textual resemblance for the default filtered view
         games = master_df.to_dict('records')
@@ -130,7 +138,8 @@ class ConflictDialog(QDialog):
     def __init__(self, data_a, data_b, conflicts, parent=None):
         super().__init__(parent)
         self.setWindowTitle(translator.tr("dialog_conflict_title"))
-        self.resize(750, 500)
+        self.resize(*DIALOG_STD_SIZE)
+        center_window(self, parent)
         self.conflicts = conflicts
         self.resolutions = {}
         
@@ -141,47 +150,43 @@ class ConflictDialog(QDialog):
         scroll.setWidgetResizable(True)
         container = QWidget()
         
-        self.grid = QGridLayout(container)
+        # WHY: Split the grid into two entirely independent QFormLayouts wrapped in their own QGroupBox zones.
+        self.zones_layout = QHBoxLayout(container)
         
-        vline = QFrame()
-        vline.setFrameShape(QFrame.VLine)
-        vline.setFrameShadow(QFrame.Sunken)
-        self.grid.addWidget(vline, 0, 3, len(conflicts) + 1, 1)
-
-        self.grid.addWidget(QLabel(""), 0, 0)
-        lbl_a = QLabel(translator.tr("dialog_conflict_game_a"))
-        lbl_a.setStyleSheet("font-weight: bold; font-size: 16px;")
-        lbl_a.setAlignment(Qt.AlignCenter)
-        self.grid.addWidget(lbl_a, 0, 1, 1, 2)
+        group_a = QGroupBox(translator.tr("dialog_conflict_game_a"))
+        self.layout_a = QFormLayout(group_a)
         
-        lbl_b = QLabel(translator.tr("dialog_conflict_game_b"))
-        lbl_b.setStyleSheet("font-weight: bold; font-size: 16px;")
-        lbl_b.setAlignment(Qt.AlignCenter)
-        self.grid.addWidget(lbl_b, 0, 4, 1, 2)
+        group_b = QGroupBox(translator.tr("dialog_conflict_game_b"))
+        self.layout_b = QFormLayout(group_b)
+        
+        self.zones_layout.addWidget(group_a)
+        self.zones_layout.addWidget(group_b)
         
         self.bgs = {}
-        row = 1
         for field, vals in conflicts.items():
-            lbl_field = QLabel(field.replace('_', ' ').title())
-            lbl_field.setStyleSheet("font-weight: bold;")
-            self.grid.addWidget(lbl_field, row, 0)
+            lbl_field = field.replace('_', ' ').title()
             
             bg = QButtonGroup(self)
             self.bgs[field] = bg
             
+            # Zone A
             rb_a = QRadioButton()
             rb_a.setChecked(True)
-            rb_b = QRadioButton()
             bg.addButton(rb_a, 0)
+            
+            box_a = QHBoxLayout()
+            box_a.addWidget(rb_a)
+            box_a.addWidget(self.create_widget(field, vals['A']), 1)
+            self.layout_a.addRow(lbl_field, box_a)
+            
+            # Zone B
+            rb_b = QRadioButton()
             bg.addButton(rb_b, 1)
             
-            self.grid.addWidget(rb_a, row, 1)
-            self.grid.addWidget(self.create_widget(field, vals['A']), row, 2)
-            
-            self.grid.addWidget(rb_b, row, 4)
-            self.grid.addWidget(self.create_widget(field, vals['B']), row, 5)
-            
-            row += 1
+            box_b = QHBoxLayout()
+            box_b.addWidget(rb_b)
+            box_b.addWidget(self.create_widget(field, vals['B']), 1)
+            self.layout_b.addRow(lbl_field, box_b)
             
         scroll.setWidget(container)
         layout.addWidget(scroll)

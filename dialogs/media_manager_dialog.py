@@ -6,12 +6,12 @@ import logging
 import shutil
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QGridLayout, QCheckBox, 
                                QLabel, QTableWidget, QAbstractItemView, QTableWidgetItem, QHeaderView, 
-                               QLineEdit, QFileDialog, QMessageBox, QApplication)
+                               QLineEdit, QFileDialog, QMessageBox, QApplication, QGroupBox)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QIcon
 
 from backend.library import LibraryManager
-from ViGaVault_utils import BASE_DIR, build_scanner_config, translator, get_safe_filename
+from ViGaVault_utils import BASE_DIR, build_scanner_config, translator, get_safe_filename, DIALOG_STD_SIZE, center_window
 
 class MediaManagerDialog(QDialog):
     def __init__(self, parent=None):
@@ -19,11 +19,13 @@ class MediaManagerDialog(QDialog):
         self.parent_window = parent
         self.global_changes_made = False
         self.setWindowTitle(translator.tr("menu_tools_media_manager"))
-        self.resize(1100, 600)
+        self.resize(*DIALOG_STD_SIZE)
+        center_window(self, parent)
         
         main_layout = QVBoxLayout(self)
         
-        top_layout = QHBoxLayout()
+        top_group = QGroupBox()
+        top_layout = QHBoxLayout(top_group)
         
         self.btn_scan = QPushButton(translator.tr("media_manager_scan_btn"))
         self.btn_scan.setMinimumHeight(80)
@@ -67,14 +69,17 @@ class MediaManagerDialog(QDialog):
         top_layout.addStretch(2)
         top_layout.addWidget(lbl_notice, 1)
         
-        main_layout.addLayout(top_layout)
+        main_layout.addWidget(top_group)
         
+        table_group = QGroupBox()
+        table_layout = QVBoxLayout(table_group)
         self.table = QTableWidget()
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setSelectionMode(QAbstractItemView.NoSelection)
+        table_layout.addWidget(self.table)
         
-        main_layout.addWidget(self.table)
+        main_layout.addWidget(table_group)
         
         self.manager = LibraryManager(build_scanner_config())
         self.manager.load_db()
@@ -199,10 +204,13 @@ class MediaManagerDialog(QDialog):
         col_idx += 1
         
         btn_apply = QPushButton(translator.tr("media_manager_btn_apply"))
-        btn_apply.clicked.connect(lambda _, r=row, f=game_info['folder'], i_c=import_col_idx, u_c=url_col_idx: self.apply_media(r, f, i_c, u_c, check_img, check_vid, check_trl))
+        btn_apply.setEnabled(False)
+        url_input.textChanged.connect(lambda text, b=btn_apply, btn=btn_import: b.setEnabled(bool(text.strip()) or bool(btn.property("selected_file"))))
+        btn_import.clicked.connect(lambda _, r=row, b=btn_import, ab=btn_apply: self.import_local_file(r, b, ab))
+        btn_apply.clicked.connect(lambda _, r=row, f=game_info['folder'], i_c=import_col_idx, u_c=url_col_idx, ab=btn_apply: self.apply_media(r, f, i_c, u_c, check_img, check_vid, check_trl, ab))
         self.table.setCellWidget(row, col_idx, btn_apply)
 
-    def import_local_file(self, row, btn):
+    def import_local_file(self, row, btn, apply_btn):
         file_path, _ = QFileDialog.getOpenFileName(
             self, 
             translator.tr("media_manager_import_dialog_title"), 
@@ -212,8 +220,9 @@ class MediaManagerDialog(QDialog):
         if file_path:
             btn.setProperty("selected_file", file_path)
             btn.setStyleSheet("background-color: #4CAF50;")
+            apply_btn.setEnabled(True)
 
-    def apply_media(self, row, folder_name, import_col, url_col, check_img, check_vid, check_trl):
+    def apply_media(self, row, folder_name, import_col, url_col, check_img, check_vid, check_trl, btn_apply=None):
         btn_import = self.table.cellWidget(row, import_col)
         url_input = self.table.cellWidget(row, url_col)
         
@@ -323,7 +332,9 @@ class MediaManagerDialog(QDialog):
             
         if changes_made:
             self.manager.save_db()
-            
+            self.global_changes_made = True # WHY: Flag that a change was made without forcing an immediate UI refresh
+            if btn_apply: btn_apply.setEnabled(False)
+
             # WHY: Target update without reloading the entire UI.
             new_data = game.to_dict()
             idx = self.parent_window.master_df.index[self.parent_window.master_df['Folder_Name'] == folder_name].tolist()

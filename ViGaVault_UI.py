@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QListView, QWidget,
 from PySide6.QtCore import Qt, QTimer, QThreadPool, Slot
 from PySide6.QtGui import QFont
 
-from ViGaVault_utils import setup_logging, translator, apply_theme
+from ViGaVault_utils import setup_logging, translator, apply_theme, MAIN_WINDOW_SIZE
 from ViGaVault_widgets import Sidebar
 
 from controllers import MenuController, LibraryController, ListController, FilterController, ScanController
@@ -19,7 +19,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(translator.tr("app_title"))
-        self.resize(1200, 800)
+        self.resize(*MAIN_WINDOW_SIZE)
         self.is_startup = True
         self.sort_desc = True
         self.display_settings = {'image': 200, 'button': 45, 'text': 22}

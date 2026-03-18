@@ -8,20 +8,24 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QW
                                QFileDialog, QGridLayout, QScrollArea, QFrame, QMessageBox, QSizePolicy)
 from PySide6.QtCore import Qt
 
-from ViGaVault_utils import BASE_DIR, get_library_settings_file, translator
+from ViGaVault_utils import BASE_DIR, get_library_settings_file, translator, DIALOG_STD_SIZE, center_window
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent_window = parent
         self.setWindowTitle(translator.tr("settings_title"))
+        
+        # WHY: Pre-initialize to prevent crashes when signals fire during UI construction.
+        self.btn_apply = None
 
         # WHY: Apply user-requested size limits.
-        self.IMG_SIZES = [150, 175, 200, 225, 250, 275, 300]
-        self.BTN_SIZES = [30, 35, 40, 45, 50, 55, 60]
+        self.IMG_SIZES = [175, 200, 225, 250, 275, 300]
+        self.BTN_SIZES = [25, 30, 35, 40, 45, 50, 55]
         self.TXT_SIZES = [14, 16, 18, 20, 22, 24, 26]
 
-        self.resize(700, 500)
+        self.resize(*DIALOG_STD_SIZE)
+        center_window(self, parent)
         
         layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
@@ -40,30 +44,49 @@ class SettingsDialog(QDialog):
         self.tabs.addTab(self.tab_data, translator.tr("settings_tab_data"))
         
         btn_layout = QHBoxLayout()
-        btn_apply = QPushButton(translator.tr("settings_btn_apply"))
+        self.btn_apply = QPushButton(translator.tr("settings_btn_apply"))
+        self.btn_apply.setEnabled(False)
         btn_save = QPushButton(translator.tr("settings_btn_save"))
         btn_cancel = QPushButton(translator.tr("settings_btn_cancel"))
-        btn_apply.clicked.connect(self.apply_settings)
+        self.btn_apply.clicked.connect(self.apply_settings)
         btn_save.clicked.connect(self.accept)
         btn_cancel.clicked.connect(self.reject)
         btn_layout.addStretch()
-        btn_layout.addWidget(btn_apply)
+        btn_layout.addWidget(self.btn_apply)
         btn_layout.addWidget(btn_save)
         btn_layout.addWidget(btn_cancel)
         layout.addLayout(btn_layout)
 
         self.load_settings()
 
+    def mark_changed(self, *args):
+        """WHY: Enables the Apply button the moment any state inside the dialog is modified."""
+        if self.btn_apply:
+            self.btn_apply.setEnabled(True)
+
     def setup_display_tab(self):
-        layout = QFormLayout(self.tab_display)
+        layout = QVBoxLayout(self.tab_display)
         
+        grp_theme = QGroupBox(translator.tr("settings_display_theme"))
+        layout_theme = QVBoxLayout(grp_theme)
         self.combo_theme = QComboBox()
         self.combo_theme.addItems([translator.tr("theme_system"), translator.tr("theme_dark"), translator.tr("theme_light")])
-        layout.addRow(translator.tr("settings_display_theme"), self.combo_theme)
+        self.combo_theme.currentIndexChanged.connect(self.mark_changed)
+        layout_theme.addWidget(self.combo_theme)
+        layout.addWidget(grp_theme)
         
+        grp_lang = QGroupBox(translator.tr("settings_display_language"))
+        layout_lang = QVBoxLayout(grp_lang)
         self.combo_lang = QComboBox()
         self.combo_lang.addItems(["English", "French", "German", "Spanish", "Italian"])
-        layout.addRow(translator.tr("settings_display_language"), self.combo_lang)
+        self.combo_lang.currentIndexChanged.connect(self.mark_changed)
+        layout_lang.addWidget(self.combo_lang)
+        layout.addWidget(grp_lang)
+        
+        grp_sizes = QGroupBox(translator.tr("settings_display_sizes_group"))
+        layout_sizes = QFormLayout(grp_sizes)
+        # WHY: Inserts the equivalent of an empty line vertically between each slider.
+        layout_sizes.setVerticalSpacing(25)
         
         img_layout = QHBoxLayout()
         self.slider_img_size = QSlider(Qt.Horizontal)
@@ -76,7 +99,7 @@ class SettingsDialog(QDialog):
         self.lbl_img_size.setFixedWidth(60)
         img_layout.addWidget(self.slider_img_size)
         img_layout.addWidget(self.lbl_img_size)
-        layout.addRow(translator.tr("settings_display_img_size"), img_layout)
+        layout_sizes.addRow(translator.tr("settings_display_img_size"), img_layout)
 
         btn_layout = QHBoxLayout()
         self.slider_btn_size = QSlider(Qt.Horizontal)
@@ -88,7 +111,7 @@ class SettingsDialog(QDialog):
         self.lbl_btn_size.setFixedWidth(60)
         btn_layout.addWidget(self.slider_btn_size)
         btn_layout.addWidget(self.lbl_btn_size)
-        layout.addRow(translator.tr("settings_display_btn_size"), btn_layout)
+        layout_sizes.addRow(translator.tr("settings_display_btn_size"), btn_layout)
 
         txt_layout = QHBoxLayout()
         self.slider_text_size = QSlider(Qt.Horizontal)
@@ -100,11 +123,18 @@ class SettingsDialog(QDialog):
         self.lbl_text_size.setFixedWidth(60)
         txt_layout.addWidget(self.slider_text_size)
         txt_layout.addWidget(self.lbl_text_size)
-        layout.addRow(translator.tr("settings_display_txt_size"), txt_layout)
+        layout_sizes.addRow(translator.tr("settings_display_txt_size"), txt_layout)
+
+        layout.addWidget(grp_sizes)
+        layout.addStretch()
 
         self.slider_img_size.valueChanged.connect(self.update_preview_labels)
         self.slider_btn_size.valueChanged.connect(self.update_preview_labels)
         self.slider_text_size.valueChanged.connect(self.update_preview_labels)
+
+        self.slider_img_size.valueChanged.connect(self.mark_changed)
+        self.slider_btn_size.valueChanged.connect(self.mark_changed)
+        self.slider_text_size.valueChanged.connect(self.mark_changed)
 
     def update_preview_labels(self):
         self.lbl_img_size.setText(f"{self.IMG_SIZES[self.slider_img_size.value()]} px")
@@ -116,12 +146,14 @@ class SettingsDialog(QDialog):
         
         self.chk_scan_local = QCheckBox(translator.tr("settings_folders_scan_local"))
         self.chk_scan_local.setChecked(True)
+        self.chk_scan_local.toggled.connect(self.mark_changed)
         self.chk_scan_local.toggled.connect(self.toggle_local_scan_options)
         layout.addWidget(self.chk_scan_local)
 
         grp_root = QGroupBox(translator.tr("settings_folders_root_group"))
         layout_root = QFormLayout(grp_root)
         self.root_path_input = QLineEdit(r"\\madhdd02\Software\GAMES")
+        self.root_path_input.textChanged.connect(self.mark_changed)
         self.btn_browse_root = QPushButton("...")
         self.btn_browse_root.setFixedWidth(40)
         self.btn_browse_root.clicked.connect(self.browse_root_path)
@@ -137,6 +169,7 @@ class SettingsDialog(QDialog):
         self.struct_layout = QVBoxLayout(grp_structure)
         
         self.chk_ignore_hidden = QCheckBox(translator.tr("settings_folders_ignore_hidden"))
+        self.chk_ignore_hidden.toggled.connect(self.mark_changed)
         self.struct_layout.addWidget(self.chk_ignore_hidden)
 
         self.mode_simple_widget = QWidget()
@@ -150,9 +183,11 @@ class SettingsDialog(QDialog):
         form_simple = QFormLayout()
         self.combo_global_type = QComboBox()
         self.combo_global_type.addItems(["Direct (Root -> Games)", "Genre", "Collection", "Publisher", "Developer", "Year", "Other", "None"])
+        self.combo_global_type.currentIndexChanged.connect(self.mark_changed)
         form_simple.addRow(translator.tr("settings_folders_simple_mode_content"), self.combo_global_type)
         
         self.chk_global_filter = QCheckBox(translator.tr("settings_folders_simple_mode_add_filter"))
+        self.chk_global_filter.toggled.connect(self.mark_changed)
         form_simple.addRow("", self.chk_global_filter)
         simple_layout.addLayout(form_simple)
         
@@ -218,11 +253,11 @@ class SettingsDialog(QDialog):
 
         self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_folder")), 0, 0)
         self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_content_type")), 0, 1)
-        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_filter")), 0, 2)
-        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_scan")), 0, 3)
-        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_inject")), 0, 5)
-        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_inject_field")), 0, 6)
-        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_inject_value")), 0, 7)
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_filter")), 0, 3)
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_scan")), 0, 4)
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_inject")), 0, 6)
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_inject_field")), 0, 7)
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_inject_value")), 0, 8)
 
         root = self.root_path_input.text().strip()
         disk_folders = set()
@@ -236,8 +271,16 @@ class SettingsDialog(QDialog):
         vline = QFrame()
         vline.setFrameShape(QFrame.VLine)
         vline.setFrameShadow(QFrame.Sunken)
-        self.folders_grid.addWidget(vline, 0, 4, len(all_folders) + 1, 1)
-        self.folders_grid.setColumnMinimumWidth(4, 20)
+        self.folders_grid.addWidget(vline, 0, 5, len(all_folders) + 1, 1)
+        
+        # WHY: Redefined column spacing to perfectly distribute checkboxes and add requested padding.
+        self.folders_grid.setColumnMinimumWidth(1, 200)
+        self.folders_grid.setColumnMinimumWidth(2, 40) # Spacer Col
+        self.folders_grid.setColumnMinimumWidth(3, 40) # Filter
+        self.folders_grid.setColumnMinimumWidth(4, 40) # Scan
+        self.folders_grid.setColumnMinimumWidth(5, 10) # VLine
+        self.folders_grid.setColumnMinimumWidth(6, 40) # Inject
+        self.folders_grid.setColumnMinimumWidth(7, 200) # Target
         
         self.folder_widgets = {}
         
@@ -248,6 +291,8 @@ class SettingsDialog(QDialog):
                 lbl.setStyleSheet("color: red;")
             
             combo = QComboBox()
+            # WHY: Explicitly force the widget to stretch horizontally to utilize the 1280px window width.
+            combo.setMinimumWidth(200)
             combo.addItems(["None", "Genre", "Collection", "Publisher", "Developer", "Year", "Other"])
             
             chk_filter = QCheckBox()
@@ -255,6 +300,7 @@ class SettingsDialog(QDialog):
             
             chk_inject = QCheckBox()
             combo_inject = QComboBox()
+            combo_inject.setMinimumWidth(200)
             # WHY: Align the target fields with the content type fields, excluding "None".
             combo_inject.addItems(["Genre", "Collection", "Publisher", "Developer", "Year", "Other"])
             txt_inject = QLineEdit()
@@ -283,13 +329,20 @@ class SettingsDialog(QDialog):
             chk_inject.stateChanged.connect(lambda state, ci=combo_inject, ti=txt_inject: 
                                             (ci.setEnabled(state), ti.setEnabled(state)))
             
+            combo.currentIndexChanged.connect(self.mark_changed)
+            chk_filter.toggled.connect(self.mark_changed)
+            chk_scan.toggled.connect(self.mark_changed)
+            chk_inject.toggled.connect(self.mark_changed)
+            combo_inject.currentIndexChanged.connect(self.mark_changed)
+            txt_inject.textChanged.connect(self.mark_changed)
+            
             self.folders_grid.addWidget(lbl, row, 0)
             self.folders_grid.addWidget(combo, row, 1)
-            self.folders_grid.addWidget(chk_filter, row, 2)
-            self.folders_grid.addWidget(chk_scan, row, 3)
-            self.folders_grid.addWidget(chk_inject, row, 5)
-            self.folders_grid.addWidget(combo_inject, row, 6)
-            self.folders_grid.addWidget(txt_inject, row, 7)
+            self.folders_grid.addWidget(chk_filter, row, 3)
+            self.folders_grid.addWidget(chk_scan, row, 4)
+            self.folders_grid.addWidget(chk_inject, row, 6)
+            self.folders_grid.addWidget(combo_inject, row, 7)
+            self.folders_grid.addWidget(txt_inject, row, 8)
             
             self.folder_widgets[folder] = {
                 "combo": combo, "filter": chk_filter, "scan": chk_scan, 
@@ -307,8 +360,10 @@ class SettingsDialog(QDialog):
         self.chk_enable_gog.toggled.connect(self.toggle_gog_input)
 
         self.gog_db_input = QLineEdit()
+        self.gog_db_input.textChanged.connect(self.mark_changed)
         default_path = os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db')
         self.gog_db_input.setText(default_path)
+        self.chk_enable_gog.toggled.connect(self.mark_changed)
         
         self.btn_browse_gog = QPushButton("...")
         self.btn_browse_gog.setFixedWidth(40)
@@ -327,22 +382,26 @@ class SettingsDialog(QDialog):
         
         layout_media.addWidget(QLabel(translator.tr("settings_data_media_images_path")), 0, 0)
         self.image_path_input = QLineEdit()
+        self.image_path_input.textChanged.connect(self.mark_changed)
         layout_media.addWidget(self.image_path_input, 0, 1)
         self.btn_browse_image = QPushButton("...")
         self.btn_browse_image.setFixedWidth(40)
         self.btn_browse_image.clicked.connect(self.browse_image_path)
         layout_media.addWidget(self.btn_browse_image, 0, 2)
         self.chk_download_images = QCheckBox(translator.tr("settings_data_media_download_images"))
+        self.chk_download_images.toggled.connect(self.mark_changed)
         layout_media.addWidget(self.chk_download_images, 0, 3)
         
         layout_media.addWidget(QLabel(translator.tr("settings_data_media_videos_path")), 1, 0)
         self.video_path_input = QLineEdit()
+        self.video_path_input.textChanged.connect(self.mark_changed)
         layout_media.addWidget(self.video_path_input, 1, 1)
         self.btn_browse_video = QPushButton("...")
         self.btn_browse_video.setFixedWidth(40)
         self.btn_browse_video.clicked.connect(self.browse_video_path)
         layout_media.addWidget(self.btn_browse_video, 1, 2)
         self.chk_download_videos = QCheckBox(translator.tr("settings_data_media_download_videos"))
+        self.chk_download_videos.toggled.connect(self.mark_changed)
         layout_media.addWidget(self.chk_download_videos, 1, 3)
         
         layout_media.setColumnStretch(1, 1)
@@ -447,6 +506,9 @@ class SettingsDialog(QDialog):
         default_video_path = os.path.join(BASE_DIR, "videos")
         self.video_path_input.setText(lib_settings.get("video_path", default_video_path))
         self.original_video_path = self.video_path_input.text()
+        
+        # WHY: Disable the apply button after loading state programmatically.
+        self.btn_apply.setEnabled(False)
 
     def save_settings(self):
         global_settings = {}
@@ -606,6 +668,9 @@ class SettingsDialog(QDialog):
                 if not new_local: self.parent_window.sidebar.chk_scan_local.setChecked(False)
             self.initial_gog = new_gog
             self.initial_local = new_local
+            
+        # WHY: State successfully committed.
+        self.btn_apply.setEnabled(False)
 
     def accept(self):
         self.apply_settings()

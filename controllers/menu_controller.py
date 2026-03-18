@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QMessageBox, QApplication
 from PySide6.QtGui import QAction, QPalette
 
 from ViGaVault_utils import translator
-from dialogs import PlatformManagerDialog, MediaManagerDialog, StatisticsDialog, SettingsDialog, DocumentationDialog
+from dialogs import PlatformManagerDialog, MediaManagerDialog, StatisticsDialog, SettingsDialog, DocumentationDialog, MetadataManagerDialog
 
 class MenuController(QObject):
     def __init__(self, main_window):
@@ -43,6 +43,10 @@ class MenuController(QObject):
         action_media_manager = QAction(translator.tr("menu_tools_media_manager"), self.mw)
         action_media_manager.triggered.connect(self.show_media_manager)
         tools_menu.addAction(action_media_manager)
+        
+        action_metadata_manager = QAction(translator.tr("menu_tools_metadata_manager"), self.mw)
+        action_metadata_manager.triggered.connect(self.show_metadata_manager)
+        tools_menu.addAction(action_metadata_manager)
         
         action_platforms = QAction(translator.tr("menu_tools_platform_manager"), self.mw)
         action_platforms.triggered.connect(self.show_platform_manager)
@@ -83,6 +87,14 @@ class MenuController(QObject):
             QMessageBox.warning(self.mw, "Warning", translator.tr("msg_wait_for_scan"))
             return
         dlg = MediaManagerDialog(self.mw)
+        dlg.exec()
+
+    def show_metadata_manager(self):
+        # WHY: Block metadata manager access during a full scan to prevent data corruption via race conditions.
+        if self.mw.full_scan_in_progress:
+            QMessageBox.warning(self.mw, "Warning", translator.tr("msg_wait_for_scan"))
+            return
+        dlg = MetadataManagerDialog(self.mw)
         dlg.exec()
 
     def show_statistics(self):

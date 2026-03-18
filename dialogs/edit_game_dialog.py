@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 
 from backend.library import LibraryManager
-from ViGaVault_utils import BASE_DIR, get_image_path, get_video_path, build_scanner_config, translator, get_safe_filename
+from ViGaVault_utils import BASE_DIR, get_image_path, get_video_path, build_scanner_config, translator, get_safe_filename, DIALOG_STD_SIZE, center_window
 
 # WHY: Use a relative import to access the Merge tool from within the same package safely.
 from .merge_tool_dialogs import MergeSelectionDialog
@@ -22,7 +22,8 @@ class ActionDialog(QDialog):
         super().__init__(parent)
         self.parent_window = parent
         self.setWindowTitle(translator.tr(title))
-        self.setMinimumWidth(1300)
+        self.resize(*DIALOG_STD_SIZE)
+        center_window(self, parent)
         self.original_data = data.copy()
         self.updated_data = {}
 
@@ -70,7 +71,7 @@ class ActionDialog(QDialog):
         cover_layout = QVBoxLayout(cover_group)
         self.cover_image_label = QLabel(translator.tr("dialog_edit_no_cover"))
         self.cover_image_label.setAlignment(Qt.AlignCenter)
-        self.cover_image_label.setFixedSize(200, 266)
+        self.cover_image_label.setFixedSize(150, 200) # WHY: Reduced to fit 1280x720 standard size safely.
         
         path_layout_img = QHBoxLayout()
         path_layout_img.addWidget(QLabel(translator.tr("dialog_edit_path_label")))
@@ -118,7 +119,8 @@ class ActionDialog(QDialog):
         self.trailer_layout = QVBoxLayout(self.trailer_group)
         self.trailer_thumbnail_label = QLabel("No Trailer")
         self.trailer_thumbnail_label.setAlignment(Qt.AlignCenter)
-        self.trailer_thumbnail_label.setFixedSize(320, 180)
+        # WHY: Bumped to 288x162 to nicely fit the 16:9 ratio while remaining compact.
+        self.trailer_thumbnail_label.setFixedSize(288, 162)
 
         url_layout = QHBoxLayout()
         url_layout.addWidget(QLabel(translator.tr("dialog_edit_trailer_url_label")))
@@ -135,9 +137,14 @@ class ActionDialog(QDialog):
         self.trailer_layout.addWidget(self.btn_play_trailer)
 
         self.setup_trailer_section()
-        right_layout.addWidget(self.trailer_group)
-
+        
+        # WHY: Adding stretches evenly BETWEEN the groups causes them to perfectly distribute
+        # vertically to match the dynamic height of the left metadata column.
+        right_layout.addWidget(cover_group)
         right_layout.addStretch()
+        right_layout.addWidget(video_group)
+        right_layout.addStretch()
+        right_layout.addWidget(self.trailer_group)
 
         columns_layout = QHBoxLayout()
         columns_layout.addWidget(left_widget, 2)
@@ -151,7 +158,7 @@ class ActionDialog(QDialog):
         button_box.addWidget(btn_merge)
         
         btn_delete = QPushButton(translator.tr("dialog_edit_btn_delete"))
-        btn_delete.setStyleSheet("color: red; font-weight: bold;")
+        btn_delete.setStyleSheet("color: #C62828; font-weight: bold;")
         btn_delete.clicked.connect(self.request_delete)
         button_box.addWidget(btn_delete)
         
@@ -194,7 +201,7 @@ class ActionDialog(QDialog):
         self.img_path_edit.setText(img_path)
         self.img_path_edit.setCursorPosition(0)
         if img_path and os.path.exists(img_path):
-            pixmap = QPixmap(img_path).scaled(200, 266, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            pixmap = QPixmap(img_path).scaled(150, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.cover_image_label.setPixmap(pixmap)
             self.cover_image_label.setStyleSheet("")
             self.btn_view_image.setEnabled(True)
@@ -306,7 +313,7 @@ class ActionDialog(QDialog):
         if thumbnail_data:
             pixmap = QPixmap()
             pixmap.loadFromData(thumbnail_data)
-            self.trailer_thumbnail_label.setPixmap(pixmap.scaled(320, 180, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.trailer_thumbnail_label.setPixmap(pixmap.scaled(288, 162, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         else:
             self.trailer_thumbnail_label.setText("Trailer Available")
             self.trailer_thumbnail_label.setStyleSheet("border: 1px solid #555;")

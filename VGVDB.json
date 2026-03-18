@@ -119,8 +119,8 @@
     "enable_gog_db": true,
     "video_path": "D:\\ViGaVault\\Videos",
     "filter_expansion": {
-        "Platforms": true,
-        "Genre": true,
+        "Platforms": false,
+        "Genre": false,
         "Collection": false
     },
     "image_path": "D:\\ViGaVault\\Images",
