@@ -12,6 +12,7 @@ def scan_local_system(config, games_dict, token, worker_thread=None):
     scan_mode = scan_config.get("scan_mode", "advanced")
     folder_rules = scan_config.get("folder_rules", {})
     global_type = scan_config.get("global_type", "Genre")
+    target_folders = scan_config.get("target_folders", None)
     root_path = config.get('root_path', '')
 
     logging.info("--- START OF SCAN ---")
@@ -39,6 +40,12 @@ def scan_local_system(config, games_dict, token, worker_thread=None):
             dirs[:] = []
             continue
         
+        # WHY: Targeted scanning explicitly ignores folders that the user unchecked in the Scan Settings panel.
+        if depth == 1:
+            if target_folders is not None and lvl1_folder not in target_folders:
+                dirs[:] = []
+                continue
+
         if depth == 1:
             logging.info(f"Analyzing: {lvl1_folder} (Type: {rule.get('type', 'None')})")
             
@@ -62,7 +69,7 @@ def scan_local_system(config, games_dict, token, worker_thread=None):
                                 break
                     
                     if ghost_match_key:
-                        logging.info(f"    [MERGE] Linking local folder '{folder}' to GOG entry '{ghost_match_key}'")
+                        logging.info(f"    [MERGE] Linking local folder '{folder}' to Galaxy entry '{ghost_match_key}'")
                         game_obj = games_dict.pop(ghost_match_key)
                         game_obj.data['Folder_Name'] = folder
                         game_obj.data['Path_Root'] = full_path
@@ -132,6 +139,16 @@ def scan_local_system(config, games_dict, token, worker_thread=None):
 
         is_on_disk = folder in found_folders
         had_a_path = bool(game_to_check.data.get('Path_Root'))
+
+        # WHY: Jurisdiction Check - Prevent the cleanup engine from deleting games that live 
+        # inside Lvl 1 folders the user intentionally excluded from this specific scan.
+        if target_folders is not None and had_a_path and not is_on_disk:
+            try:
+                rel_path = os.path.relpath(game_to_check.data.get('Path_Root'), root_path)
+                lvl1_folder = rel_path.split(os.sep)[0]
+                if lvl1_folder not in target_folders:
+                    continue
+            except Exception: pass
 
         if not is_on_disk and had_a_path:
             platforms_str = game_to_check.data.get('Platforms', '')

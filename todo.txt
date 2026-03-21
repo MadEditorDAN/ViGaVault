@@ -5,96 +5,16 @@ TO DO MAYBE :
 - SQL LITE
 - Pour ne pas perdre l'avantage du CSV (la visibilité), tu pourras utiliser un outil gratuit comme "DB Browser for SQLite". C'est un logiciel qui te permet de voir ta base SQL exactement comme un tableau Excel, de modifier les cases à la main et de faire des recherches. Ça t'enlèvera la peur de "ne plus voir tes données".
 
-TO DO :
+Bug/Features :
 
+- Game manager, with Batch game edit, Batch game delete. List the games in a table with the following columns release date/name/platfoms/filter category 1/filter category 2, etc.../developper/publisher. On top of each column put listbox with the content of the below column (like excel filter box) and for the name a text box. If you type in it, it search the game starting with what you type and the list dynamically shrink to that selection.
+If you select something in the upper listbox it filter the below list to what you selected.
 
+And a custom word list you can use to filter the gamelist on (goodie, dlc,...)
 
-- Clean up genre, we have duplicates in genre because of the different way the same genre is named, example, we currently have RPG, Role Playing Game and Role playing game (RPG). We need to normalize this and we need to do it at the scan level, when that metadata is acquired. But the normalization should not be limited ti punctation or capital letters, there are a lot of acronyms to consider, like the example.
-Could you ceate a normalisation scheme for the genres.
+-In settings, put everything that is in the tab "Local copies" in the tab "Local sources" under the current content. and Remove the tab "Local Copies"
+-In settings, create a tab Platforms Manager, move the platform manager in that tab, to do so reduce the size of everything in the platform manager to a "normal text size" remove the gamepad icon and next to each platform name put in smaller text copyright owners of each brand. leave a little space between each connect button.
 
-- when searching on igdb, isn't there a way to choose between the igdb candidates, the original game instaed of the dlc, or a collector version. i know that on the igdb site, I can see some tags, like "main game" or "standalone expansion" or "port"... can we use these to identify the main game ? Is it relevant for our case. Because I noticed that in many ces it took the most recent updated version of the game instead of the game itself.
+TO DO : 
 
-- Fix the "Unknown" platform issue.Is the lsist of platform hardcoded ? are we limited ? where does the unknown platform comes from ? I'm pretty sure it is not in the GOG Galaxy.
-
-- Use folder structure from the /local folder to add a tag 
-
-- To select a gamecard I noticed that some "zones" in the gamecard will not react to the click and other would. If you click on the image it always work, but if you click on the text zone it almost never work but somtimes it does. and if you click under the text it does.
-
-- In the media manager , despite all modification to speed up db acceesses, when clicking on the scan button with all 3 checkboxes selected, it can take up to 15 sec to show a result, this is way too long. How can we fix this ?
-
-- create an extensive help html page, with every details of the settings and the logic behind the scans leave placehoolder fro screenshots that I will fill in.
-
- - If trying to go in the media manager, manual scan or settings while a FULL Scan is ongoing should give a message popup saying, "please wait for the scan to finish" to avoid data corruption/issues.
-
- - when manual scan is open greye out the big SCAN button and the checkboxes next to it so we don't click on them accidently, restore them when the manual scan is closed
- 
-  - in the merge windows the game to merge with should not appear on the list even if we check show all games.
-  
-  - In the edit windows, remove "is_local", "Has Image" and "has_video" the path video (in the text zone)
-  
-  - When a gamecard is selected the backround color changes, but it's the same color as when you select something, so selecting text on a selected gamecard is invisible. To avoid that and make the selection cue more subtle, could we instead os chaging the backgrount, surround it with a 5 px border with the select color
-  
-  - some time ago we tried to fix the gamecard height which is almost always incorrect, we totice that the more text there were in the gamecard the more the empty space below is. Somhow, with the "smart refresh" and/or "targeted update" it fixes the issue and the gap disappears.Only to return at next big refresh. But this may help us understand the underlying issue.
-
- -Platforms Manager !
-Future structure : 
-ViGaVault/
-├── ViGaVault_UI.py             # (Existant - Ton interface)
-├── ViGaVault_Scan.py           # (Existant - Ton LibraryManager et CSV)
-├── ViGaVault_SCRAPPERS.py      # L'orchestrateur (À créer)
-└── connectors/                 
-    └── steam_cloud.py          # Le spécialiste Steam (À créer)
-Voici les informations techniques que tu dois donner à Gemini pour qu'il code le connecteur :
-Source de données : API Store Front de Steam.
-Endpoint : https://store.steampowered.com/api/appdetails?appids={APPID}&l=french
-Données à extraire (Metadata) :
----------------------------------------------------------------------------------------------------------
-Type,		Champ Steam API,									Action ViGaVault
----------------------------------------------------------------------------------------------------------
-Metadata,	"name, developers, publishers, release_date",		Injection CSV via LibraryManager
-Texte,		"about_the_game, short_description",				Récupéré dans la langue de l'UI
-Genres,		genres,												Passage par ta fonction normalize_genre
-Images,		"header_image (Cover), 								background",Téléchargement dans ./images/
-Vidéos,		movies -> mp4 -> max,								Téléchargement .mp4 si lien direct
-Vidéos,		YouTube URL,										Copie simple du lien dans le CSV
----------------------------------------------------------------------------------------------------------
-Si un lien .mp4 ou .webm existe (ex: mp4['max']) -> Téléchargement direct dans ./videos/.
-Si seul un lien YouTube est présent -> Copie de l'URL dans le CSV uniquement.
-
-3. Protocole de Connexion (Le Flux)
-
-Récupération de la liste : On utilise l'URL userdata de Steam (nécessite les cookies de session de l'utilisateur) pour obtenir tous les AppIDs possédés. 
-Boucle d'enrichissement : Pour chaque AppID, on appelle l'API appdetails pour obtenir le "gros" JSON.
-Injection : On passe ce dictionnaire à LibraryManager.add_game_to_db pour qu'il s'occupe de l'écriture dans VGVDB.csv et du rangement des fichiers.
-
-4. Le Guide pour Gemini dans VS Code
-Copie ce bloc et colle-le dans ton chat VS Code une fois les fichiers ouverts :
-
-"@workspace, nous allons implémenter le connecteur Cloud pour Steam.
-Fichiers de référence : 
-1. backend_steam_network.py pour voir comment ils gèrent les requêtes Web.
-2. ViGaVault_Scan.py pour utiliser mon LibraryManager (méthode add_game_to_db).
-
-Travail à réaliser :
-Crée connectors/steam_cloud.py. Ce module doit contenir une classe capable de :
-Récupérer la liste des AppIDs possédés via l'URL Steam UserData.
-Pour chaque jeu, interroger l'API Store Front (appdetails).
-Extraire TOUTES les métadonnées (Dev, Éditeur, Date, Résumé, Genres).
-Médias : Télécharger les images (header) et les vidéos si un lien direct (.mp4/.webm) est disponible. Si c'est du YouTube, stocker l'URL sans télécharger.
-Faire en sorte que le résultat final soit injecté proprement dans mon CSV via LibraryManager."
-
-5. Pourquoi commencer par Steam ?
-Fiabilité : L'API appdetails de Steam est la plus documentée et la plus stable du marché.
-Qualité : C'est là que tu trouveras les plus belles descriptions et les trailers les plus faciles à télécharger (souvent en MP4 direct sans protection).
-Template : Une fois que Steam fonctionne, on pourra copier 80% du code pour GOG et Epic, car la logique de "Récupérer ID -> Chercher Infos -> Télécharger Médias" sera déjà en place.	
-
-
-Le Plan de Vol pour Gemini (VS Code)
-Initialisation : Créer connectors/steam_cloud.py.
-Authentification : Utiliser les cookies de session (référence : backend_steam_network.py) pour récupérer la liste des jeux possédés sur le compte.
-Boucle de Scrapping :
-Prendre la langue de l'utilisateur (via settings.json).
-Appeler l'API Steam Store pour chaque jeu.
-Télécharger les images et les vidéos MP4.
-
-Finalisation : Appeler LibraryManager.add_game_to_db pour chaque jeu pour garantir que le CSV est à jour et que les fichiers sont bien nommés (via get_safe_filename).
+When adding a platform, first do a full Data Discovery Dump with a separate script to assess the data we can recover from that platform. Get all the metadata, all the image url's and files and all the video url's. Analyse the results and select the data/files to import.

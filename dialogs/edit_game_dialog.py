@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 
 from backend.library import LibraryManager
-from ViGaVault_utils import BASE_DIR, get_image_path, get_video_path, build_scanner_config, translator, get_safe_filename, DIALOG_STD_SIZE, center_window
+from ViGaVault_utils import BASE_DIR, get_image_path, build_scanner_config, translator, get_safe_filename, DIALOG_STD_SIZE, center_window
 
 # WHY: Use a relative import to access the Merge tool from within the same package safely.
 from .merge_tool_dialogs import MergeSelectionDialog
@@ -45,6 +45,7 @@ class ActionDialog(QDialog):
         fields_to_disable = ['Folder_Name', 'Status_Flag', 'Image_Link', 'Platforms']
         # WHY: Explicitly exclude internal system flags and media paths so they don't clutter the generic text zone.
         fields_to_exclude = ['Trailer_Link', 'game_ID', 'Image_Link', 'temp_sort_date', 'temp_sort_title', 'Path_Root', 'Year_Folder', 'Is_Local', 'Has_Image', 'Has_Video', 'Cover_URL', 'Path_Video']
+        fmt_str = build_scanner_config().get('date_format_str', 'DD/MM/YYYY')
 
         for field, value in self.original_data.items():
             if field in fields_to_exclude or field.startswith('platform_ID_'):
@@ -54,6 +55,9 @@ class ActionDialog(QDialog):
                 inp = QTextEdit(str(value))
             else:
                 inp = QLineEdit(str(value))
+                if field == 'Original_Release_Date':
+                    # WHY: Provide UI guidance so the user doesn't manually enter a conflicting date format.
+                    inp.setPlaceholderText(fmt_str)
             if field in fields_to_disable:
                 inp.setEnabled(False)
                 inp.setStyleSheet("background-color: palette(window);")
@@ -71,7 +75,8 @@ class ActionDialog(QDialog):
         cover_layout = QVBoxLayout(cover_group)
         self.cover_image_label = QLabel(translator.tr("dialog_edit_no_cover"))
         self.cover_image_label.setAlignment(Qt.AlignCenter)
-        self.cover_image_label.setFixedSize(150, 200) # WHY: Reduced to fit 1280x720 standard size safely.
+        # WHY: With the video section removed, we can massively expand the Cover preview to 225x300.
+        self.cover_image_label.setFixedSize(225, 300)
         
         path_layout_img = QHBoxLayout()
         path_layout_img.addWidget(QLabel(translator.tr("dialog_edit_path_label")))
@@ -92,35 +97,13 @@ class ActionDialog(QDialog):
         
         self.update_cover_display()
 
-        # Section 2: Video File
-        video_group = QGroupBox(translator.tr("dialog_edit_video_group"))
-        video_layout = QVBoxLayout(video_group)
-        
-        path_layout_vid = QHBoxLayout()
-        path_layout_vid.addWidget(QLabel(translator.tr("dialog_edit_path_label")))
-        self.vid_path_edit = QLineEdit()
-        self.vid_path_edit.setReadOnly(True)
-        path_layout_vid.addWidget(self.vid_path_edit, 1)
-        self.btn_select_video = QPushButton(translator.tr("dialog_edit_select_btn"))
-        self.btn_select_video.clicked.connect(self.select_new_video)
-        path_layout_vid.addWidget(self.btn_select_video)
-        
-        self.btn_play_video = QPushButton(translator.tr("dialog_edit_video_play_btn"))
-        self.btn_play_video.clicked.connect(self.play_video)
-        
-        video_layout.addLayout(path_layout_vid)
-        video_layout.addWidget(self.btn_play_video)
-        right_layout.addWidget(video_group)
-        
-        self.update_video_display()
-        
         # Section 3: Trailer
         self.trailer_group = QGroupBox(translator.tr("dialog_edit_trailer_group"))
         self.trailer_layout = QVBoxLayout(self.trailer_group)
         self.trailer_thumbnail_label = QLabel("No Trailer")
         self.trailer_thumbnail_label.setAlignment(Qt.AlignCenter)
-        # WHY: Bumped to 288x162 to nicely fit the 16:9 ratio while remaining compact.
-        self.trailer_thumbnail_label.setFixedSize(288, 162)
+        # WHY: With the video section removed, we can heavily expand the Trailer preview to 384x216.
+        self.trailer_thumbnail_label.setFixedSize(384, 216)
 
         url_layout = QHBoxLayout()
         url_layout.addWidget(QLabel(translator.tr("dialog_edit_trailer_url_label")))
@@ -141,8 +124,6 @@ class ActionDialog(QDialog):
         # WHY: Adding stretches evenly BETWEEN the groups causes them to perfectly distribute
         # vertically to match the dynamic height of the left metadata column.
         right_layout.addWidget(cover_group)
-        right_layout.addStretch()
-        right_layout.addWidget(video_group)
         right_layout.addStretch()
         right_layout.addWidget(self.trailer_group)
 
@@ -201,7 +182,7 @@ class ActionDialog(QDialog):
         self.img_path_edit.setText(img_path)
         self.img_path_edit.setCursorPosition(0)
         if img_path and os.path.exists(img_path):
-            pixmap = QPixmap(img_path).scaled(150, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            pixmap = QPixmap(img_path).scaled(225, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.cover_image_label.setPixmap(pixmap)
             self.cover_image_label.setStyleSheet("")
             self.btn_view_image.setEnabled(True)
@@ -228,41 +209,6 @@ class ActionDialog(QDialog):
         except Exception as e:
             logging.error(f"Failed to copy new image: {e}")
             QMessageBox.critical(self, "Error", f"Could not copy the image: {e}")
-
-    def update_video_display(self):
-        vid_name = self.updated_data.get('Path_Video') or self.original_data.get('Path_Video', '')
-        vid_path = os.path.join(get_video_path(), os.path.basename(vid_name)) if vid_name else ''
-        self.vid_path_edit.setText(vid_path)
-        self.vid_path_edit.setCursorPosition(0)
-        self.btn_play_video.setEnabled(bool(vid_path and os.path.exists(vid_path)))
-
-    def select_new_video(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, translator.tr("dialog_edit_select_btn"), "", "Video Files (*.mp4 *.mkv *.avi *.wmv *.webm)")
-        if not file_path: return
-        safe_filename_base = get_safe_filename(self.original_data.get('Folder_Name', ''))
-        _, ext = os.path.splitext(file_path)
-        new_filename = f"{safe_filename_base}{ext}"
-        
-        manager = LibraryManager(build_scanner_config())
-        dest_dir = manager.config.get('video_path', os.path.join(BASE_DIR, 'videos'))
-        dest_path = os.path.join(dest_dir, new_filename)
-        
-        try:
-            os.makedirs(dest_dir, exist_ok=True)
-            shutil.copy2(file_path, dest_path)
-            self.updated_data['Path_Video'] = new_filename
-            self.updated_data['Has_Video'] = True
-            self.update_video_display()
-        except Exception as e:
-            logging.error(f"Failed to copy new video: {e}")
-            QMessageBox.critical(self, "Error", f"Could not copy the video: {e}")
-            
-    def play_video(self):
-        vid_name = self.updated_data.get('Path_Video') or self.original_data.get('Path_Video', '')
-        vid_path = os.path.join(get_video_path(), os.path.basename(vid_name)) if vid_name else ''
-        if vid_path and os.path.exists(vid_path):
-            try: os.startfile(vid_path)
-            except Exception as e: QMessageBox.critical(self, "Error", f"Could not open video file:\n{e}")
 
     def view_full_image(self):
         img_name = self.updated_data.get('Image_Link') or self.original_data.get('Image_Link', '')
@@ -313,7 +259,7 @@ class ActionDialog(QDialog):
         if thumbnail_data:
             pixmap = QPixmap()
             pixmap.loadFromData(thumbnail_data)
-            self.trailer_thumbnail_label.setPixmap(pixmap.scaled(288, 162, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.trailer_thumbnail_label.setPixmap(pixmap.scaled(384, 216, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         else:
             self.trailer_thumbnail_label.setText("Trailer Available")
             self.trailer_thumbnail_label.setStyleSheet("border: 1px solid #555;")

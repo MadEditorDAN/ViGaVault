@@ -113,8 +113,8 @@
         }
     },
     "gog_db_path": "C:\\ProgramData\\GOG.com\\Galaxy\\storage\\galaxy-2.0.db",
-    "download_videos": true,
-    "scan_new": true,
+    "download_videos": false,
+    "scan_new": false,
     "filter_states": {},
     "enable_gog_db": true,
     "video_path": "D:\\ViGaVault\\Videos",
@@ -125,7 +125,14 @@
     },
     "image_path": "D:\\ViGaVault\\Images",
     "download_images": true,
-    "anchor_folder": "2016 - Outcast Legacy of the Yods",
+    "anchor_folder": "Field of Glory II Medieval",
     "sidebar_chk_gog": true,
-    "sidebar_chk_local": true
+    "sidebar_chk_local": true,
+    "enable_galaxy_db": true,
+    "galaxy_db_path": "C:\\ProgramData\\GOG.com\\Galaxy\\storage\\galaxy-2.0.db",
+    "sidebar_chk_galaxy": false,
+    "sidebar_chk_gog_web": false,
+    "sidebar_chk_folders": [
+        "GAMES"
+    ]
 }

@@ -2,6 +2,7 @@ import pandas as pd
 from PySide6.QtCore import Qt, QTimer, QObject, QAbstractListModel, QModelIndex, QSize
 from PySide6.QtWidgets import QStyledItemDelegate, QAbstractItemView
 from ViGaVault_widgets import GameCard
+from ViGaVault_utils import DEFAULT_DISPLAY_SETTINGS
 
 class GameListModel(QAbstractListModel):
     def __init__(self, df=pd.DataFrame()):
@@ -24,8 +25,8 @@ class GameDelegate(QStyledItemDelegate):
     def sizeHint(self, option, index):
         # WHY: Because every card's height is now strictly locked to the image size, 
         # the Delegate can instantly calculate row heights without querying the database or doing complex text math.
-        settings = getattr(self.lc.mw, 'display_settings', {'image': 200})
-        img_h = int(settings.get('image', 200) * 1.33)
+        settings = getattr(self.lc.mw, 'display_settings', DEFAULT_DISPLAY_SETTINGS)
+        img_h = int(settings.get('image', DEFAULT_DISPLAY_SETTINGS['image']) * 1.33)
         # WHY: 10px internal card padding + 10px external QListView padding = 20px total bounding compensation.
         return QSize(option.rect.width(), img_h + 20)
 

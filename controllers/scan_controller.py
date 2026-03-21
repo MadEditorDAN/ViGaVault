@@ -22,6 +22,23 @@ class ScanController(QObject):
         self.mw.sidebar.scan_results.addItem(message)
         self.mw.sidebar.scan_results.scrollToBottom()
 
+    def open_scan_settings(self):
+        # WHY: Roll up the filters smoothly instead of making them vanish abruptly.
+        self.mw.filter_controller.set_filters_ui_state(False)
+        self.mw.sidebar.scan_panel.hide()
+        self.mw.sidebar.scan_settings_panel.show()
+        # WHY: Share the stretch factor so the settings panel perfectly fills the gap left by the rolled-up filters.
+        self.mw.sidebar.layout.setStretchFactor(self.mw.sidebar.scan_panel, 0)
+        self.mw.sidebar.layout.setStretchFactor(self.mw.sidebar.scan_settings_panel, 1)
+        self.mw.sidebar.btn_scan_settings.setEnabled(False)
+
+    def close_scan_settings(self):
+        self.mw.sidebar.scan_settings_panel.hide()
+        self.mw.sidebar.layout.setStretchFactor(self.mw.sidebar.scan_settings_panel, 0)
+        # Unroll filters
+        self.mw.filter_controller.set_filters_ui_state(True)
+        self.mw.sidebar.btn_scan_settings.setEnabled(True)
+
     def start_full_scan(self):
         if self.mw.full_scan_in_progress:
             QMessageBox.information(self.mw, "Info", translator.tr("msg_task_in_progress"))
@@ -30,17 +47,20 @@ class ScanController(QObject):
         try:
             output = subprocess.check_output('tasklist', shell=True).decode(errors='ignore')
             if "GalaxyClient.exe" in output:
-                reply = QMessageBox.question(self.mw, "GOG Galaxy Detected",
-                                            "GOG Galaxy is running. It must be closed to access the database.\n\nPlease close it and click Yes.",
+                reply = QMessageBox.question(self.mw, "Galaxy Client Detected",
+                                            "The Galaxy Client is running. It must be closed to access the database.\n\nPlease close it and click Yes.",
                                             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
                 if reply == QMessageBox.No: return
         except: pass
 
         self.mw.full_scan_in_progress = True
+        self.mw.sidebar.scan_settings_panel.hide()
+        self.mw.sidebar.btn_scan_settings.setEnabled(False)
         self.mw.sidebar.btn_full_scan.setEnabled(False)
         self.mw.sidebar.btn_full_scan.setText(translator.tr("sidebar_btn_scanning"))
         self.mw.sidebar.chk_show_new.setEnabled(False)
-        self.mw.sidebar.chk_scan_gog.setEnabled(False)
+        self.mw.sidebar.chk_scan_galaxy.setEnabled(False)
+        self.mw.sidebar.chk_scan_gog_web.setEnabled(False)
         self.mw.sidebar.chk_scan_local.setEnabled(False)
         self.mw.filter_controller.set_filters_ui_state(False)
 
@@ -63,9 +83,15 @@ class ScanController(QObject):
         self.qt_log_handler = QtLogHandler(self.log_signal)
         logging.getLogger().addHandler(self.qt_log_handler)
 
-        do_gog = self.mw.sidebar.chk_scan_gog.isChecked()
+        do_galaxy = self.mw.sidebar.chk_scan_galaxy.isChecked()
+        do_gog_web = self.mw.sidebar.chk_scan_gog_web.isChecked()
         do_local = self.mw.sidebar.chk_scan_local.isChecked()
-        self.full_scan_worker = FullScanWorker(do_gog=do_gog, do_local=do_local)
+        
+        target_folders = []
+        for folder, chk in self.mw.sidebar.chk_scan_folders.items():
+            if chk.isChecked(): target_folders.append(folder)
+            
+        self.full_scan_worker = FullScanWorker(do_galaxy=do_galaxy, do_local=do_local, do_gog_web=do_gog_web, target_folders=target_folders)
         self.full_scan_worker.finished.connect(self.finish_full_scan)
         self.full_scan_worker.start()
 
@@ -81,10 +107,13 @@ class ScanController(QObject):
         logging.getLogger().removeHandler(self.qt_log_handler)
         
         self.mw.full_scan_in_progress = False
+        self.mw.sidebar.btn_scan_settings.setEnabled(True)
         self.mw.sidebar.btn_full_scan.setEnabled(True)
         self.mw.sidebar.btn_full_scan.setText(translator.tr("sidebar_btn_full_scan"))
         self.mw.sidebar.chk_show_new.setEnabled(True)
-        self.mw.sidebar.chk_scan_gog.setEnabled(True)
+        self.mw.sidebar.chk_show_review.setChecked(True)
+        self.mw.sidebar.chk_scan_galaxy.setEnabled(True)
+        self.mw.sidebar.chk_scan_gog_web.setEnabled(True)
         self.mw.sidebar.chk_scan_local.setEnabled(True)
 
         if self.mw.sidebar.scan_panel.isVisible():
@@ -105,11 +134,14 @@ class ScanController(QObject):
             
         self.mw.current_scan_game = game_data
         self.mw.sidebar.scan_panel.show()
+        self.mw.sidebar.scan_settings_panel.hide()
         self.mw.filter_controller.set_filters_ui_state(False)
         
         # WHY: Disable the main scan UI elements during a manual scan to prevent accidental clicks and conflicting tasks.
         self.mw.sidebar.btn_full_scan.setEnabled(False)
-        self.mw.sidebar.chk_scan_gog.setEnabled(False)
+        self.mw.sidebar.btn_scan_settings.setEnabled(False)
+        self.mw.sidebar.chk_scan_galaxy.setEnabled(False)
+        self.mw.sidebar.chk_scan_gog_web.setEnabled(False)
         self.mw.sidebar.chk_scan_local.setEnabled(False)
         
         self.restore_scan_panel()
@@ -194,9 +226,11 @@ class ScanController(QObject):
         self.mw.filter_controller.set_filters_ui_state(True)
         
         # WHY: Targeted Update - Restore the main scan UI elements based on their configured global state.
+        self.mw.sidebar.btn_scan_settings.setEnabled(True)
         self.mw.sidebar.btn_full_scan.setEnabled(True)
         config = build_scanner_config()
-        self.mw.sidebar.chk_scan_gog.setEnabled(config.get('enable_gog_db', True))
+        self.mw.sidebar.chk_scan_galaxy.setEnabled(config.get('enable_galaxy_db', True))
+        self.mw.sidebar.chk_scan_gog_web.setEnabled(True)
         self.mw.sidebar.chk_scan_local.setEnabled(config.get('local_scan_config', {}).get('enable_local_scan', True))
         
         self.mw.sidebar.scan_results.clear()
@@ -227,17 +261,8 @@ class ScanController(QObject):
             # WHY: Target update without reloading the entire UI.
             folder_name = self.mw.current_scan_game.get('Folder_Name')
             new_data = game_obj.to_dict()
-            idx = self.mw.master_df.index[self.mw.master_df['Folder_Name'] == folder_name].tolist()
-            if idx:
-                # WHY: Dynamically check the Pandas column dtype. Prevents warnings when injecting strings into pure boolean columns.
-                for k, v in new_data.items():
-                    if k in self.mw.master_df.columns:
-                        self.mw.master_df.at[idx[0], k] = bool(v) if self.mw.master_df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
-            c_idx = self.mw.current_df.index[self.mw.current_df['Folder_Name'] == folder_name].tolist()
-            if c_idx:
-                for k, v in new_data.items():
-                    if k in self.mw.current_df.columns:
-                        self.mw.current_df.at[c_idx[0], k] = bool(v) if self.mw.current_df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
+            self.mw.library_controller.patch_memory_df(folder_name, new_data)
+            self.mw.library_controller.update_status_checkboxes_state()
                 
             self.mw.list_controller.update_single_card(folder_name, force_media_reload=True)
             

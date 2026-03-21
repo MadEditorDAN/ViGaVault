@@ -1,25 +1,25 @@
 import sqlite3
 import os
 
-def analyze_gog_db():
+def analyze_galaxy_db():
     """
-    Connects to the local GOG Galaxy database and displays its structure.
+    Connects to the local Galaxy database and displays its structure.
     """
-    output_filename = "analyze_gog_db.txt"
+    output_filename = "analyze_galaxy_db.txt"
     try:
         with open(output_filename, 'w', encoding='utf-8') as f:
-            gog_db_path = os.path.join(os.environ['ProgramData'], 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db')
+            galaxy_db_path = os.path.join(os.environ['ProgramData'], 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db')
 
-            if not os.path.exists(gog_db_path):
-                f.write(f"Error: GOG database file not found at the expected location:\n")
-                f.write(gog_db_path)
-                print(f"Error: GOG database file not found. See {output_filename} for details.")
+            if not os.path.exists(galaxy_db_path):
+                f.write(f"Error: Galaxy database file not found at the expected location:\n")
+                f.write(galaxy_db_path)
+                print(f"Error: Galaxy database file not found. See {output_filename} for details.")
                 return
 
-            f.write(f"Analyzing database: {gog_db_path}\n\n")
+            f.write(f"Analyzing database: {galaxy_db_path}\n\n")
 
             # Connect in read-only mode for more safety
-            con = sqlite3.connect(f'file:{gog_db_path}?mode=ro', uri=True)
+            con = sqlite3.connect(f'file:{galaxy_db_path}?mode=ro', uri=True)
             cursor = con.cursor()
 
             # 1. Get the list of all tables
@@ -48,8 +48,8 @@ def analyze_gog_db():
         print(f"\nAn error occurred during analysis. See {output_filename} for details.")
         with open(output_filename, 'a', encoding='utf-8') as f:
             f.write(f"\nAn error occurred during analysis: {e}\n")
-            f.write("Please make sure GOG Galaxy is closed before running the script.\n")
+            f.write("Please make sure the Galaxy Client is closed before running the script.\n")
 
 if __name__ == "__main__":
-    analyze_gog_db()
+    analyze_galaxy_db()
     

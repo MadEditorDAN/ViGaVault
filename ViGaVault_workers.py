@@ -14,21 +14,25 @@ from ViGaVault_utils import get_db_path, build_scanner_config
 # Operations like scanning or filtering can take time. We run them in separate threads
 # to prevent the GUI from freezing (becoming unresponsive) while they process.
 class FullScanWorker(QThread):
-    def __init__(self, do_gog=True, do_local=True, parent=None):
+    def __init__(self, do_galaxy=True, do_local=True, do_gog_web=False, target_folders=None, parent=None):
         super().__init__(parent)
-        self.do_gog = do_gog
+        self.do_galaxy = do_galaxy
         self.do_local = do_local
+        self.do_gog_web = do_gog_web
+        self.target_folders = target_folders
         self.config = build_scanner_config()
 
     def run(self):
         """Runs the full scan process."""
         # WHY: Dynamically overriding the execution config with UI instructions
         # ensures the LibraryManager respects user choice cleanly without modifying permanent settings.
-        self.config['enable_gog_db'] = self.do_gog
+        self.config['enable_galaxy_db'] = self.do_galaxy
+        self.config['enable_gog_web'] = self.do_gog_web
         
         if 'local_scan_config' not in self.config:
             self.config['local_scan_config'] = {}
         self.config['local_scan_config']['enable_local_scan'] = self.do_local
+        self.config['local_scan_config']['target_folders'] = self.target_folders
         
         try:
             manager = LibraryManager(self.config)
@@ -67,10 +71,11 @@ class FilterWorker(QThread):
                 df = df[df['Summary'].fillna('').str.lower().str.contains(search)]
             
         is_scan_new = self.params.get('scan_new', False)
+        is_scan_review = self.params.get('scan_review', False)
 
         # 2. Dynamic Filters (Sidebar Checkboxes)
         # Only apply if NOT scanning new games, as new games often lack metadata
-        if not is_scan_new:
+        if not is_scan_new and not is_scan_review:
             active_filters = self.params.get('active_filters', {})
             for col, selected_values in active_filters.items():
                 if not selected_values:
@@ -83,10 +88,16 @@ class FilterWorker(QThread):
                 df = df[df[col].astype(str).str.contains(regex_pattern, case=False, na=False)]
 
         # Status Filter (Exclusive)
-        if is_scan_new:
-            df = df[~df['Status_Flag'].isin(['OK', 'LOCKED'])]
-        else:
+        allowed_flags = []
+        if is_scan_new: 
+            allowed_flags.append('NEW')
+            allowed_flags.append('NEEDS_ATTENTION')
+        if is_scan_review: allowed_flags.append('REVIEW')
+        
+        if not allowed_flags:
             df = df[df['Status_Flag'].isin(['OK', 'LOCKED'])]
+        else:
+            df = df[df['Status_Flag'].isin(allowed_flags)]
             
         # 3. Sorting
         sort_col = self.params['sort_col']
@@ -105,13 +116,24 @@ class DbLoaderWorker(QThread):
 
     def run(self):
         db_path = get_db_path()
+        config = build_scanner_config()
+        date_fmt = config.get('date_format', '%d/%m/%Y')
+        
         if os.path.exists(db_path):
             try:
                 df = pd.read_csv(db_path, sep=';', encoding='utf-8').fillna('')
                 if 'Status_Flag' not in df.columns:
                     df['Status_Flag'] = 'NEW'
-                # Pre-calculate columns for faster sorting
-                df['temp_sort_date'] = pd.to_datetime(df['Original_Release_Date'], errors='coerce', dayfirst=True)
+                    
+                # WHY: Pass 1 - Strictly parse dates using the globally configured Regional Format to prevent day/month swapping.
+                parsed_dates = pd.to_datetime(df['Original_Release_Date'], format=date_fmt, errors='coerce')
+                # WHY: Pass 2 - Catch dates that failed (like pure "2020" years) and fallback to generic parsing.
+                mask = parsed_dates.isna() & (df['Original_Release_Date'] != '')
+                if mask.any():
+                    fallback = pd.to_datetime(df.loc[mask, 'Original_Release_Date'], errors='coerce')
+                    parsed_dates.update(fallback)
+                    
+                df['temp_sort_date'] = parsed_dates
                 df['temp_sort_title'] = df['Clean_Title'].str.lower()
                 # WHY: Store the physical CSV row number to allow sorting by "Date Added".
                 df['temp_sort_index'] = df.index
@@ -119,6 +141,10 @@ class DbLoaderWorker(QThread):
                 logging.error(f"Error loading DB: {e}")
                 df = pd.DataFrame()
         else:
+            # WHY: Automatically instantiate a physical blank database on the hard drive if it's missing on boot.
+            expected_columns = ['Folder_Name', 'Clean_Title', 'Search_Title', 'Path_Root', 'Path_Video', 'Status_Flag', 'Image_Link', 'Cover_URL', 'Year_Folder', 'Platforms', 'Developer', 'Publisher', 'Original_Release_Date', 'Summary', 'Genre', 'Collection', 'Trailer_Link', 'game_ID', 'Is_Local', 'Has_Image', 'Has_Video'] + [f'platform_ID_{i:02d}' for i in range(1, 51)]
+            pd.DataFrame(columns=expected_columns).to_csv(db_path, sep=';', index=False, encoding='utf-8')
+            logging.info(f"Created new empty database at {db_path}")
             df = pd.DataFrame(columns=['Clean_Title', 'Platforms', 'Original_Release_Date', 'Status_Flag', 'Path_Root', 'Folder_Name'])
             df['temp_sort_date'] = pd.to_datetime([])
             df['temp_sort_title'] = []

@@ -11,8 +11,6 @@ import requests
 from ViGaVault_utils import BASE_DIR, get_safe_filename, normalize_genre
 from .api_igdb import query_igdb_api
 
-VIDEO_EXTS = ('.mp4', '.mkv', '.avi', '.wmv', '.webm')
-
 class Game:
     def __init__(self, config=None, **kwargs):
         self.config = config or {}
@@ -25,11 +23,9 @@ class Game:
         
         self.data.setdefault('Is_Local', False)
         self.data.setdefault('Has_Image', False)
-        self.data.setdefault('Has_Video', False)
         
         if not self.data.get('Clean_Title'):
             self._parse_folder_name()
-        self._find_video()
         self._find_image()
 
     def _parse_folder_name(self):
@@ -81,20 +77,6 @@ class Game:
                             self.data['Image_Link'] = new_img_name
                     except Exception as e: logging.error(f"Failed to rename image: {e}")
 
-            old_vid_name = self.data.get('Path_Video', '')
-            if old_vid_name:
-                vid_dir = self.config.get('video_path', os.path.join(BASE_DIR, 'videos'))
-                old_vid_path = os.path.join(vid_dir, os.path.basename(old_vid_name))
-                if os.path.exists(old_vid_path):
-                    ext = os.path.splitext(old_vid_name)[1]
-                    new_vid_name = f"{new_safe_name}{ext}"
-                    new_vid_path = os.path.join(vid_dir, new_vid_name)
-                    try:
-                        if new_vid_path != old_vid_path:
-                            os.rename(old_vid_path, new_vid_path)
-                            self.data['Path_Video'] = new_vid_name
-                    except Exception as e: logging.error(f"Failed to rename video: {e}")
-
     def merge_with(self, other):
         ids = set(x.strip() for x in self.data.get('game_ID', '').split(',') if x.strip())
         ids.update(x.strip() for x in other.data.get('game_ID', '').split(',') if x.strip())
@@ -117,7 +99,7 @@ class Game:
                 self.data[col] = other.data.get(col)
 
         conflicts = {}
-        fields_to_check = ['Clean_Title', 'Summary', 'Original_Release_Date', 'Developer', 'Publisher', 'Genre', 'Collection', 'Path_Root', 'Path_Video', 'Image_Link', 'Trailer_Link', 'Year_Folder']
+        fields_to_check = ['Clean_Title', 'Summary', 'Original_Release_Date', 'Developer', 'Publisher', 'Genre', 'Collection', 'Path_Root', 'Image_Link', 'Trailer_Link', 'Year_Folder']
         
         for field in fields_to_check:
             val_a = str(self.data.get(field, '')).strip()
@@ -126,22 +108,6 @@ class Game:
             elif val_a and val_b and val_a.casefold() != val_b.casefold():
                 conflicts[field] = {'A': val_a, 'B': val_b}
         return conflicts
-
-    def _find_video(self):
-        video_dir = self.config.get('video_path', os.path.join(BASE_DIR, 'videos'))
-        current_name = self.data.get('Path_Video', '')
-        if current_name:
-            full_check = os.path.join(video_dir, os.path.basename(current_name))
-            if os.path.exists(full_check):
-                self.data['Path_Video'] = os.path.basename(current_name)
-                return
-
-        safe_name = get_safe_filename(self.data.get('Clean_Title') or self.data.get('Folder_Name', ''))
-        for ext in VIDEO_EXTS:
-            potential_path = os.path.join(video_dir, f"{safe_name}{ext}")
-            if os.path.exists(potential_path):
-                self.data['Path_Video'] = f"{safe_name}{ext}"
-                return
 
     def _find_image(self):
         images_dir = self.config.get('image_path', os.path.join(BASE_DIR, 'images'))
@@ -252,7 +218,7 @@ class Game:
                     valid_dates = [d['date'] for d in dates if 'date' in d]
                     if valid_dates:
                         orig_ts = min(valid_dates)
-                        self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%d/%m/%Y')
+                        self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime(self.config.get('date_format', '%d/%m/%Y'))
                         api_year_str = datetime.utcfromtimestamp(orig_ts).strftime('%Y')
                 
                 if self.data.get('Platforms') == 'Local Copy' and 'id' in g:
@@ -324,8 +290,10 @@ class Game:
                 
                 dates = g.get('release_dates', [])
                 if dates:
-                    orig_ts = min([d['date'] for d in dates if 'date' in d])
-                    self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%d/%m/%Y')
+                    valid_dates = [d['date'] for d in dates if 'date' in d]
+                    if valid_dates:
+                        orig_ts = min(valid_dates)
+                        self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime(self.config.get('date_format', '%d/%m/%Y'))
                 
                 self.data['Image_Link'] = self._ensure_cover(g)
                 self.data['Status_Flag'] = 'OK'
@@ -347,8 +315,10 @@ class Game:
         
         dates = g.get('release_dates', [])
         if dates:
-            orig_ts = min([d['date'] for d in dates if 'date' in d])
-            self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%d/%m/%Y')
+            valid_dates = [d['date'] for d in dates if 'date' in d]
+            if valid_dates:
+                orig_ts = min(valid_dates)
+                self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime(self.config.get('date_format', '%d/%m/%Y'))
         
         if self.data.get('Platforms') == 'Local Copy' and 'id' in g:
             current_ids = set(x.strip() for x in self.data.get('game_ID', '').split(',') if x.strip())

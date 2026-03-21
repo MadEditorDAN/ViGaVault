@@ -1,4 +1,4 @@
-# WHY: Single Responsibility Principle - Isolates GOG SQLite parsing and game metadata mapping.
+# WHY: Single Responsibility Principle - Isolates Galaxy SQLite parsing and game metadata mapping.
 import os
 import re
 import json
@@ -13,26 +13,16 @@ from urllib.parse import urlparse
 from ViGaVault_utils import BASE_DIR, get_safe_filename, normalize_genre
 from .game import Game
 
-try:
-    import yt_dlp
-    YT_DLP_AVAILABLE = True
-except ImportError:
-    YT_DLP_AVAILABLE = False
+def sync_galaxy_database(config, games_dict, worker_thread=None):
+    logging.info("--- START OF GALAXY SYNC ---")
+    galaxy_db_path = config.get('galaxy_db_path', os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db'))
 
-VIDEO_EXTS = ('.mp4', '.mkv', '.avi', '.wmv', '.webm')
-_yt_dlp_warning_logged = False
-
-def sync_gog_database(config, games_dict, worker_thread=None):
-    global _yt_dlp_warning_logged
-    logging.info("--- START OF GOG SYNC ---")
-    gog_db_path = config.get('gog_db_path', os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db'))
-
-    if not os.path.exists(gog_db_path):
-        logging.error(f"GOG Galaxy database not found at: {gog_db_path}")
+    if not os.path.exists(galaxy_db_path):
+        logging.error(f"Galaxy database not found at: {galaxy_db_path}")
         return
 
     try:
-        con = sqlite3.connect(f'file:{gog_db_path}?mode=ro', uri=True)
+        con = sqlite3.connect(f'file:{galaxy_db_path}?mode=ro', uri=True)
         cursor = con.cursor()
         query = """SELECT DISTINCT
  urp.releaseKey,
@@ -57,16 +47,14 @@ def sync_gog_database(config, games_dict, worker_thread=None):
  (rp.isDlc IS NULL OR rp.isDlc = 0)"""
         cursor.execute(query)
     except Exception as e:
-        logging.error(f"Error reading GOG database: {e}")
+        logging.error(f"Error reading Galaxy database: {e}")
         if 'con' in locals() and con: con.close()
         return
 
     images_dir = config.get('image_path', os.path.join(BASE_DIR, 'images'))
     os.makedirs(images_dir, exist_ok=True)
-    video_dir = config.get('video_path', os.path.join(BASE_DIR, 'videos'))
-    os.makedirs(video_dir, exist_ok=True)
     
-    stats = {'total_found': 0, 'processed': 0, 'new': 0, 'matched_key': 0, 'matched_smart': 0, 'errors': 0, 'deleted_ghosts': 0, 'images_found_existing': 0, 'images_downloaded': 0, 'videos_found_existing': 0, 'videos_downloaded': 0, 'videos_download_fail': 0, 'new_by_platform': {}}
+    stats = {'total_found': 0, 'processed': 0, 'new': 0, 'matched_key': 0, 'matched_smart': 0, 'errors': 0, 'deleted_ghosts': 0, 'new_by_platform': {}}
 
     key_to_game_map = {}
     for game in games_dict.values():
@@ -75,7 +63,7 @@ def sync_gog_database(config, games_dict, worker_thread=None):
             gid = gid.strip()
             if gid: key_to_game_map[gid] = game
     
-    found_gog_keys = set()
+    found_galaxy_keys = set()
     processed_games_session = set()
 
     while True:
@@ -88,7 +76,7 @@ def sync_gog_database(config, games_dict, worker_thread=None):
          developers_json, publishers_json, original_images_json, all_releases_json, 
          product_name, ld_title, ld_summary, ld_release_date, ld_images) = row
 
-        found_gog_keys.add(releaseKey)
+        found_galaxy_keys.add(releaseKey)
 
         def safe_json_load(json_str):
             if not json_str: return None
@@ -135,20 +123,20 @@ def sync_gog_database(config, games_dict, worker_thread=None):
             if session_key in processed_games_session: continue
             processed_games_session.add(session_key)
 
-            gog_dev = meta_data.get('developer')
-            if not gog_dev:
+            galaxy_dev = meta_data.get('developer')
+            if not galaxy_dev:
                 d_data = safe_json_load(developers_json)
-                if isinstance(d_data, list): gog_dev = ", ".join(d_data)
+                if isinstance(d_data, list): galaxy_dev = ", ".join(d_data)
             
-            gog_pub = meta_data.get('publisher')
-            if not gog_pub:
+            galaxy_pub = meta_data.get('publisher')
+            if not galaxy_pub:
                 p_data = safe_json_load(publishers_json)
-                if isinstance(p_data, list): gog_pub = ", ".join(p_data)
+                if isinstance(p_data, list): galaxy_pub = ", ".join(p_data)
 
-            gog_year = None
-            if release_ts := meta_data.get('releaseTimestamp'): gog_year = datetime.utcfromtimestamp(release_ts).strftime('%Y')
+            galaxy_year = None
+            if release_ts := meta_data.get('releaseTimestamp'): galaxy_year = datetime.utcfromtimestamp(release_ts).strftime('%Y')
             elif ld_release_date:
-                try: gog_year = ld_release_date[:4]
+                try: galaxy_year = ld_release_date[:4]
                 except: pass
 
             game_obj = None
@@ -175,8 +163,8 @@ def sync_gog_database(config, games_dict, worker_thread=None):
 
                     local_dev = game.data.get('Developer', '').lower()
                     local_pub = game.data.get('Publisher', '').lower()
-                    if gog_dev and gog_dev.lower() in local_dev: score += 10
-                    elif gog_pub and gog_pub.lower() in local_pub: score += 10
+                    if galaxy_dev and galaxy_dev.lower() in local_dev: score += 10
+                    elif galaxy_pub and galaxy_pub.lower() in local_pub: score += 10
                     
                     local_year = game.data.get('Year_Folder', '')
                     if not local_year and game.data.get('Original_Release_Date'):
@@ -184,13 +172,13 @@ def sync_gog_database(config, games_dict, worker_thread=None):
                          except: pass
                     
                     year_mismatch = False
-                    if gog_year and local_year:
+                    if galaxy_year and local_year:
                         try:
-                            if abs(int(gog_year) - int(local_year)) > 3: year_mismatch = True
+                            if abs(int(galaxy_year) - int(local_year)) > 3: year_mismatch = True
                         except: pass
                     
                     if year_mismatch: score -= 50
-                    elif gog_year and local_year and gog_year == local_year: score += 10
+                    elif galaxy_year and local_year and galaxy_year == local_year: score += 10
 
                     if local_norm_title == norm_title: score += 20
                     if score > best_score:
@@ -199,21 +187,21 @@ def sync_gog_database(config, games_dict, worker_thread=None):
                 threshold = 60 if best_game and re.sub(r'[^a-z0-9]', '', best_game.data.get('Clean_Title', '').lower()) == norm_title else 70
                 if best_game and best_score >= threshold:
                     game_obj = best_game
-                    logging.info(f"    [GOG MATCH SMART] Game recognized by title (Score: {best_score}): '{title}' -> '{best_game.data.get('Clean_Title')}'")
+                    logging.info(f"    [GALAXY MATCH SMART] Game recognized by title (Score: {best_score}): '{title}' -> '{best_game.data.get('Clean_Title')}'")
                     stats['matched_smart'] += 1
             
             if not game_obj:
                 folder_name = get_safe_filename(title)
                 if not folder_name: folder_name = f"Unknown Game [{releaseKey}]"
                 if folder_name in games_dict: folder_name = f"{title} [{releaseKey}]"
-                logging.info(f"    [GOG NEW] Adding game: '{title}' ({platform})")
+                logging.info(f"    [GALAXY NEW] Adding game: '{title}' ({platform})")
                 game_obj = Game(config=config, Folder_Name=folder_name, Status_Flag='OK', Path_Root='')
                 stats['new'] += 1
                 stats['new_by_platform'][platform] = stats['new_by_platform'].get(platform, 0) + 1
 
             force_media_refresh = game_obj.data.get('Status_Flag') == 'NEW'
             if force_media_refresh:
-                logging.info(f"    [GOG REFRESH] 'NEW' status detected for '{title}'. Checking for missing media.")
+                logging.info(f"    [GALAXY REFRESH] 'NEW' status detected for '{title}'. Checking for missing media.")
             if game_obj.data.get('Status_Flag') == 'LOCKED':
                 logging.info(f"    [LOCKED] Skipping metadata update for protected game: {title}")
                 continue
@@ -242,8 +230,8 @@ def sync_gog_database(config, games_dict, worker_thread=None):
             if not summary: summary = ld_summary
             if summary: game_obj.data['Summary'] = summary
 
-            if gog_dev: game_obj.data['Developer'] = gog_dev
-            if gog_pub: game_obj.data['Publisher'] = gog_pub
+            if galaxy_dev: game_obj.data['Developer'] = galaxy_dev
+            if galaxy_pub: game_obj.data['Publisher'] = galaxy_pub
 
             genres = meta_data.get('genres')
             if genres:
@@ -256,13 +244,13 @@ def sync_gog_database(config, games_dict, worker_thread=None):
             release_date = None
             release_ts = meta_data.get('releaseDate') or meta_data.get('releaseTimestamp')
             if release_ts:
-                try: release_date = datetime.utcfromtimestamp(release_ts).strftime('%d/%m/%Y')
+                try: release_date = datetime.utcfromtimestamp(release_ts).strftime(config.get('date_format', '%d/%m/%Y'))
                 except: pass
             elif ld_release_date:
                 clean_date_str = ld_release_date.split('T')[0]
                 try:
                     dt = datetime.strptime(clean_date_str, '%Y-%m-%d')
-                    release_date = dt.strftime('%d/%m/%Y')
+                    release_date = dt.strftime(config.get('date_format', '%d/%m/%Y'))
                 except ValueError: release_date = ld_release_date
             if release_date: game_obj.data['Original_Release_Date'] = release_date
 
@@ -306,59 +294,7 @@ def sync_gog_database(config, games_dict, worker_thread=None):
 
             if video_url: game_obj.data['Trailer_Link'] = video_url
 
-            # --- C. Video Download (yt-dlp) & Physical Check ---
-            existing_video_name = game_obj.data.get('Path_Video')
-            existing_video_path = os.path.join(video_dir, os.path.basename(existing_video_name)) if existing_video_name else ''
-            video_exists_on_disk = bool(existing_video_name and os.path.exists(existing_video_path))
-            
-            if video_exists_on_disk: stats['videos_found_existing'] += 1
-
-            if not video_exists_on_disk:
-                for ext in VIDEO_EXTS:
-                    potential_path = os.path.join(video_dir, f"{safe_filename}{ext}")
-                    if os.path.exists(potential_path):
-                        game_obj.data['Path_Video'] = f"{safe_filename}{ext}"
-                        video_exists_on_disk = True
-                        stats['videos_found_existing'] += 1
-                        break
-
-            if worker_thread and worker_thread.isInterruptionRequested(): break
-
-            is_youtube = video_url and ('youtube.com' in video_url or 'youtu.be' in video_url)
-            is_downloadable_url = video_url and video_url.startswith('http') and not is_youtube
-
-            if is_downloadable_url and not video_exists_on_disk:
-                # WHY: Respect the Media Download config
-                if config.get('download_videos', False):
-                    if YT_DLP_AVAILABLE:
-                        try:
-                            logging.info(f"    [VIDEO] Found video URL, downloading with yt-dlp: {safe_filename} ...")
-                            def progress_hook(d):
-                                if worker_thread and worker_thread.isInterruptionRequested():
-                                    raise Exception("Download interrupted by user")
-                            ydl_opts = {
-                                'outtmpl': os.path.join(video_dir, f"{safe_filename}.%(ext)s"),
-                                'quiet': True,
-                                'no_warnings': True,
-                                'format': 'bestvideo+bestaudio/best', 
-                                'progress_hooks': [progress_hook],
-                            }
-                            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                                info = ydl.extract_info(video_url, download=True)
-                                filename = ydl.prepare_filename(info)
-                                if os.path.exists(filename):
-                                    game_obj.data['Path_Video'] = os.path.basename(filename)
-                                    game_obj.data['Has_Video'] = True
-                                    stats['videos_downloaded'] += 1
-                        except Exception as e:
-                            if "Download interrupted" in str(e): break
-                            stats['videos_download_fail'] += 1
-                    else:
-                        if not getattr(LibraryManager, '_yt_dlp_warning_logged', False):
-                            logging.warning("    [VIDEO] yt-dlp module not installed, skipping video downloads.")
-                            LibraryManager._yt_dlp_warning_logged = True
-
-            # --- D. Image Download & Physical Check ---
+            # --- D. Image URL Extraction ---
             cover_url = meta_data.get('image')
             if not cover_url:
                 orig_imgs = safe_json_load(original_images_json)
@@ -379,49 +315,12 @@ def sync_gog_database(config, games_dict, worker_thread=None):
                 # WHY: Always save the URL to the DB for asynchronous backfilling.
                 game_obj.data['Cover_URL'] = cover_url
                 
-                existing_image_name = game_obj.data.get('Image_Link')
-                existing_image_path = os.path.join(images_dir, os.path.basename(existing_image_name)) if existing_image_name else ''
-                image_exists_on_disk = bool(existing_image_name and os.path.exists(existing_image_path))
-
-                if image_exists_on_disk: stats['images_found_existing'] += 1
-
-                if not image_exists_on_disk:
-                    for check_ext in ['.jpg', '.png', '.jpeg', '.webp']:
-                        check_path = os.path.join(images_dir, f"{safe_filename}{check_ext}")
-                        if os.path.exists(check_path):
-                            game_obj.data['Image_Link'] = f"{safe_filename}{check_ext}"
-                            image_exists_on_disk = True
-                            stats['images_found_existing'] += 1
-                            break
-
-                if not image_exists_on_disk:
-                    try:
-                        path = urlparse(cover_url).path
-                        ext = os.path.splitext(path)[1]
-                        if not ext and 'gog.com' in cover_url: ext = '.webp'
-                        elif not ext: ext = '.jpg'
-                    except: ext = '.jpg'
-                    
-                    save_path = os.path.join(images_dir, f"{safe_filename}{ext}")
-                    
-                    # WHY: Respect the Media Download config
-                    if config.get('download_images', True):
-                        try:
-                            response = requests.get(cover_url, timeout=5)
-                            if response.status_code == 200:
-                                with open(save_path, 'wb') as f: f.write(response.content)
-                                game_obj.data['Image_Link'] = f"{safe_filename}{ext}"
-                                game_obj.data['Has_Image'] = True
-                                logging.info(f"    [IMAGE] Downloaded missing image: {safe_filename}{ext}")
-                                stats['images_downloaded'] += 1
-                        except Exception as e: pass
-
             # End of loop assignment
             if force_media_refresh: game_obj.data['Status_Flag'] = 'OK'
             games_dict[game_obj.data['Folder_Name']] = game_obj
             stats['processed'] += 1
         except Exception as e:
-            logging.error(f"    [GOG ERROR] Error processing game '{title}' (releaseKey: {releaseKey}): {e}")
+            logging.error(f"    [GALAXY ERROR] Error processing game '{title}' (releaseKey: {releaseKey}): {e}")
             stats['errors'] += 1
 
     con.close()
@@ -433,14 +332,14 @@ def sync_gog_database(config, games_dict, worker_thread=None):
                 game_ids = [x.strip() for x in game.data.get('game_ID', '').split(',') if x.strip()]
                 is_valid = False
                 for gid in game_ids:
-                    if gid in found_gog_keys:
+                    if gid in found_galaxy_keys:
                         is_valid = True
                         break
                 if not is_valid:
                     ghosts_to_delete.append(folder_name)
 
         for folder in ghosts_to_delete:
-            logging.info(f"    [GOG CLEANUP] Removing obsolete platform entry: {folder}")
+            logging.info(f"    [GALAXY CLEANUP] Removing obsolete platform entry: {folder}")
             del games_dict[folder]
             stats['deleted_ghosts'] += 1
 
@@ -449,8 +348,8 @@ def sync_gog_database(config, games_dict, worker_thread=None):
     if not platform_stats: platform_stats = "  (None)"
 
     report = (
-        "\n=== GOG SYNC REPORT ===\n"
-        f"Games found in GOG: {stats['total_found']}\n"
+        "\n=== GALAXY SYNC REPORT ===\n"
+        f"Games found in GALAXY: {stats['total_found']}\n"
         f"Games processed successfully: {stats['processed']}\n"
         f"-----------------------------------\n"
         f"New games added: {stats['new']}\n"

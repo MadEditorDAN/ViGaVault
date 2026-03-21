@@ -18,16 +18,3 @@ Let's discuss, no code.
 Games to fix :
 Doom project
 
-
-
-
-For each point, give your insight and some explanation of why/how it happened and how you fixed it.
-Remember to always : 
- - Update the language json files when needed. 
- - Comment the code and explain why each modification is done. 
- - Use DRY principle when applicable
- - Use the Single Responsibility Principle when applicable
- - Do not put all the code in the UI script, use all the other script as they were created forand if necessary create a new one.
- - Use the "smart refresh" and the "targeted update" when possible
- 
-Let's discuss, no code.

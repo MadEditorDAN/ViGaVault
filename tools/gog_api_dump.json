@@ -1,0 +1,2089 @@
+{
+    "1207659101": {
+        "catalog_api": {
+            "id": 1207659101,
+            "title": "Legacy of Kain: Blood Omen 2",
+            "purchase_link": "https://www.gog.com/en/checkout/manual/1207659101",
+            "slug": "legacy_of_kain_blood_omen_2",
+            "content_system_compatibility": {
+                "windows": true,
+                "osx": false,
+                "linux": false
+            },
+            "languages": {
+                "de": "Deutsch",
+                "en": "English"
+            },
+            "links": {
+                "purchase_link": "https://www.gog.com/en/checkout/manual/1207659101",
+                "product_card": "https://www.gog.com/en/game/legacy_of_kain_blood_omen_2",
+                "support": "https://www.gog.com/support/legacy_of_kain_blood_omen_2",
+                "forum": "https://www.gog.com/forum/legacy_of_kain_series"
+            },
+            "in_development": {
+                "active": false,
+                "until": null
+            },
+            "is_secret": false,
+            "is_installable": true,
+            "game_type": "game",
+            "is_pre_order": false,
+            "release_date": "2012-09-04T06:00:00+0300",
+            "images": {
+                "background": "//images-3.gog-statics.com/cc15502c7ed4dd978be8a8e9b6c5edc097731ab06d44e466aa17c7e370850329.jpg",
+                "logo": "//images-1.gog-statics.com/7ac78966e4f6ff659e56b8847c9e146c0624526542a2db57f734d865b768b83c_glx_logo.jpg",
+                "logo2x": "//images-2.gog-statics.com/7ac78966e4f6ff659e56b8847c9e146c0624526542a2db57f734d865b768b83c_glx_logo_2x.jpg",
+                "icon": "//images-2.gog-statics.com/ef28709a96cddd1f278eb2c62d5404079baba2291885af6895ea4b02e3252864.png",
+                "sidebarIcon": "//images-2.gog-statics.com/ef28709a96cddd1f278eb2c62d5404079baba2291885af6895ea4b02e3252864_sbicon.png",
+                "sidebarIcon2x": "//images-2.gog-statics.com/ef28709a96cddd1f278eb2c62d5404079baba2291885af6895ea4b02e3252864_sbicon_2x.png",
+                "menuNotificationAv": "//images-4.gog-statics.com/ef28709a96cddd1f278eb2c62d5404079baba2291885af6895ea4b02e3252864_menu_notification_av.png",
+                "menuNotificationAv2": "//images-1.gog-statics.com/ef28709a96cddd1f278eb2c62d5404079baba2291885af6895ea4b02e3252864_menu_notification_av2.png"
+            },
+            "dlcs": [],
+            "description": {
+                "lead": "400 years have passed since the vampire Kain damned the world in the original Blood Omen, choosing to rule the world in damnation rather than die for its salvation. Now Kain, who once controlled the land of Nosgoth with his vampire armies, finds his brethren slain and his dark powers stripped by a mysterious figure.",
+                "full": "400 years have passed since the vampire Kain damned the world in the original Blood Omen, choosing to rule the world in damnation rather than die for its salvation. Now Kain, who once controlled the land of Nosgoth with his vampire armies, finds his brethren slain and his dark powers stripped by a mysterious figure. To reclaim his rule and exact his vengeance, Kain must dispatch armies of zealot soldiers and overcome legions of demons in order to uncover the ominous plot that threatens the land he seeks to conquer.\n<br><br>\nBlood Omen 2, the second instalment in the Legacy of Kain Series, is a 3rd person 3D action/combat game in which you assume the role of the vampire Kain. A compelling story takes you through huge, lushly detailed 3D environments and challenges your skills in combat, puzzle solving, stealth and exploration. With each success, you’ll gain new dark gifts that will grant Kain the ability to access treacherous new areas to explore and the power to face stronger, more aggressive enemies. As you develop a stronger, more skilled vampire, you’ll be rewarded with dozens of dazzling in-game cinematic sequences that unfold the continuing epic of Nosgoth, and Kain’s attempts to ultimately rule over it.\n<br><br>\n<img src=\"http://items.gog.com/bloodomen2_ratngs.png\">",
+                "whats_cool_about_it": "Move through crowds unseen cloaked in stealth, travel stories above the peasant herds on which you feed leaping from rooftop to rooftop, and use mind-control on hapless fools to help you overcome vampire-proof inventions.\nUnleash your wrath in a lushly detailed, blood-chilling gothic environment that is not only gorgeous to the eye, but also alive with the soon to be dead.\nBeautifully choreographed combat with surgical precision as you engage armies of demons and humans alike."
+            },
+            "downloads": {
+                "installers": [
+                    {
+                        "id": "installer_windows_de",
+                        "name": "Legacy of Kain: Blood Omen 2",
+                        "os": "windows",
+                        "language": "de",
+                        "language_full": "Deutsch",
+                        "version": "1.0.2 Hotfix",
+                        "total_size": 1196425216,
+                        "files": [
+                            {
+                                "id": "de1installer0",
+                                "size": 1196425216,
+                                "downlink": "https://api.gog.com/products/1207659101/downlink/installer/de1installer0"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "installer_windows_en",
+                        "name": "Legacy of Kain: Blood Omen 2",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1.0.2 Hotfix",
+                        "total_size": 1199570944,
+                        "files": [
+                            {
+                                "id": "en1installer0",
+                                "size": 1199570944,
+                                "downlink": "https://api.gog.com/products/1207659101/downlink/installer/en1installer0"
+                            }
+                        ]
+                    }
+                ],
+                "patches": [],
+                "language_packs": [],
+                "bonus_content": [
+                    {
+                        "id": 18253,
+                        "name": "manual",
+                        "type": "manuals",
+                        "count": 1,
+                        "total_size": 1048576,
+                        "files": [
+                            {
+                                "id": 18253,
+                                "size": 1048576,
+                                "downlink": "https://api.gog.com/products/1207659101/downlink/product_bonus/18253"
+                            }
+                        ]
+                    },
+                    {
+                        "id": 18263,
+                        "name": "wallpaper",
+                        "type": "wallpapers",
+                        "count": 1,
+                        "total_size": 4194304,
+                        "files": [
+                            {
+                                "id": 18263,
+                                "size": 4194304,
+                                "downlink": "https://api.gog.com/products/1207659101/downlink/product_bonus/18263"
+                            }
+                        ]
+                    },
+                    {
+                        "id": 77673,
+                        "name": "manual (German)",
+                        "type": "manuals",
+                        "count": 1,
+                        "total_size": 1048576,
+                        "files": [
+                            {
+                                "id": 77673,
+                                "size": 1048576,
+                                "downlink": "https://api.gog.com/products/1207659101/downlink/product_bonus/77673"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "expanded_dlcs": [],
+            "related_products": []
+        },
+        "account_details_api": {
+            "title": "Legacy of Kain: Blood Omen 2",
+            "backgroundImage": "//images-3.gog-statics.com/cc15502c7ed4dd978be8a8e9b6c5edc097731ab06d44e466aa17c7e370850329",
+            "cdKey": "",
+            "textInformation": "",
+            "registryDownloadUrl": "",
+            "isRegistryKey": false,
+            "cdKeys": [],
+            "downloads": [
+                [
+                    "English",
+                    {
+                        "windows": [
+                            {
+                                "manualUrl": "/downloads/legacy_of_kain_blood_omen_2/en1installer0",
+                                "name": "Legacy of Kain: Blood Omen 2",
+                                "version": "1.0.2 Hotfix",
+                                "date": "",
+                                "size": "1.1 GB"
+                            }
+                        ]
+                    }
+                ],
+                [
+                    "Deutsch",
+                    {
+                        "windows": [
+                            {
+                                "manualUrl": "/downloads/legacy_of_kain_blood_omen_2/de1installer0",
+                                "name": "Legacy of Kain: Blood Omen 2",
+                                "version": "1.0.2 Hotfix",
+                                "date": "",
+                                "size": "1.1 GB"
+                            }
+                        ]
+                    }
+                ]
+            ],
+            "galaxyDownloads": [],
+            "extras": [
+                {
+                    "manualUrl": "/downloads/legacy_of_kain_blood_omen_2/18253",
+                    "name": "manual",
+                    "type": "manuals",
+                    "info": 1,
+                    "size": "1 MB"
+                },
+                {
+                    "manualUrl": "/downloads/legacy_of_kain_blood_omen_2/18263",
+                    "name": "wallpaper",
+                    "type": "wallpapers",
+                    "info": 1,
+                    "size": "4 MB"
+                },
+                {
+                    "manualUrl": "/downloads/legacy_of_kain_blood_omen_2/77673",
+                    "name": "manual (German)",
+                    "type": "manuals",
+                    "info": 1,
+                    "size": "1 MB"
+                }
+            ],
+            "dlcs": [],
+            "tags": [],
+            "isPreOrder": false,
+            "releaseTimestamp": 1346727600,
+            "messages": [],
+            "changelog": "<h4>Update (11 January 2018)</h4><ul>\n<li>Added a fix for the main menu not appearing in German for the German version of the game. </li>\n<li>We'd like to thank Zyankali for the solution!</li>\n</ul><hr><h4>Update (17 August 2017)</h4><ul>\n<li>We have added the German version of Legacy of Kain: Blood Omen 2 and the German manual for the game to everyone's accounts.</li>\n<li>We would also like to say &quot;Vielen Dank!&quot; to Gameinsider1986 who donated the German version of the game.</li>\n</ul>",
+            "forumLink": "https://embed.gog.com/forum/legacy_of_kain_series",
+            "isBaseProductMissing": false,
+            "missingBaseProduct": null,
+            "features": [],
+            "simpleGalaxyInstallers": [
+                {
+                    "path": "/downloads/legacy_of_kain_blood_omen_2/0b8aa569d265dd8de5d35d2ffe06a5f6",
+                    "os": "windows"
+                }
+            ]
+        }
+    },
+    "1098597871": {
+        "catalog_api": {
+            "id": 1098597871,
+            "title": "product_title_1098597871",
+            "purchase_link": "https://www.gog.com/en/checkout/manual/1098597871",
+            "slug": "legacy_of_kain_blood_omen_2_1098597871",
+            "content_system_compatibility": {
+                "windows": true,
+                "osx": false,
+                "linux": false
+            },
+            "languages": {
+                "de": "Deutsch",
+                "en": "English"
+            },
+            "links": {
+                "purchase_link": "https://www.gog.com/en/checkout/manual/1098597871",
+                "product_card": "https://www.gog.com/en/game/legacy_of_kain_blood_omen_2_1098597871",
+                "support": "https://www.gog.com/support/legacy_of_kain_blood_omen_2_1098597871",
+                "forum": "https://www.gog.com/forum/legacy_of_kain_series"
+            },
+            "in_development": {
+                "active": false,
+                "until": null
+            },
+            "is_secret": true,
+            "is_installable": true,
+            "game_type": "pack",
+            "is_pre_order": false,
+            "release_date": null,
+            "images": {
+                "background": "//images-3.gog-statics.com/cc15502c7ed4dd978be8a8e9b6c5edc097731ab06d44e466aa17c7e370850329.jpg",
+                "logo": "//images-1.gog-statics.com/7ac78966e4f6ff659e56b8847c9e146c0624526542a2db57f734d865b768b83c_glx_logo.jpg",
+                "logo2x": "//images-2.gog-statics.com/7ac78966e4f6ff659e56b8847c9e146c0624526542a2db57f734d865b768b83c_glx_logo_2x.jpg",
+                "icon": "//images-2.gog-statics.com/ef28709a96cddd1f278eb2c62d5404079baba2291885af6895ea4b02e3252864.png",
+                "sidebarIcon": "//images-2.gog-statics.com/ef28709a96cddd1f278eb2c62d5404079baba2291885af6895ea4b02e3252864_sbicon.png",
+                "sidebarIcon2x": "//images-2.gog-statics.com/ef28709a96cddd1f278eb2c62d5404079baba2291885af6895ea4b02e3252864_sbicon_2x.png",
+                "menuNotificationAv": "//images-4.gog-statics.com/ef28709a96cddd1f278eb2c62d5404079baba2291885af6895ea4b02e3252864_menu_notification_av.png",
+                "menuNotificationAv2": "//images-1.gog-statics.com/ef28709a96cddd1f278eb2c62d5404079baba2291885af6895ea4b02e3252864_menu_notification_av2.png"
+            },
+            "dlcs": [],
+            "description": {
+                "lead": "",
+                "full": "",
+                "whats_cool_about_it": ""
+            },
+            "downloads": {
+                "installers": [
+                    {
+                        "id": "installer_windows_de",
+                        "name": "product_title_1098597871",
+                        "os": "windows",
+                        "language": "de",
+                        "language_full": "Deutsch",
+                        "version": "1.0.2 Hotfix",
+                        "total_size": 1196425216,
+                        "files": [
+                            {
+                                "id": "de1installer0",
+                                "size": 1196425216,
+                                "downlink": "https://api.gog.com/products/1098597871/downlink/installer/de1installer0"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "installer_windows_en",
+                        "name": "product_title_1098597871",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1.0.2 Hotfix",
+                        "total_size": 1199570944,
+                        "files": [
+                            {
+                                "id": "en1installer0",
+                                "size": 1199570944,
+                                "downlink": "https://api.gog.com/products/1098597871/downlink/installer/en1installer0"
+                            }
+                        ]
+                    }
+                ],
+                "patches": [],
+                "language_packs": [],
+                "bonus_content": []
+            },
+            "expanded_dlcs": [],
+            "related_products": []
+        },
+        "account_details_api": []
+    },
+    "1302753134": {
+        "catalog_api": {
+            "id": 1302753134,
+            "title": "Chasm: The Rift",
+            "purchase_link": "https://www.gog.com/en/checkout/manual/1302753134",
+            "slug": "chasmtherift",
+            "content_system_compatibility": {
+                "windows": true,
+                "osx": false,
+                "linux": false
+            },
+            "languages": {
+                "br": "Português do Brasil",
+                "cn": "中文(简体)",
+                "de": "Deutsch",
+                "en": "English",
+                "es": "español",
+                "fr": "français",
+                "it": "italiano",
+                "jp": "日本語",
+                "ko": "한국어",
+                "pl": "polski",
+                "ru": "русский",
+                "uk": "yкраїнська"
+            },
+            "links": {
+                "purchase_link": "https://www.gog.com/en/checkout/manual/1302753134",
+                "product_card": "https://www.gog.com/en/game/chasmtherift",
+                "support": "https://www.gog.com/support/chasmtherift",
+                "forum": "https://www.gog.com/forum/chasm_the_rift"
+            },
+            "in_development": {
+                "active": false,
+                "until": null
+            },
+            "is_secret": false,
+            "is_installable": true,
+            "game_type": "game",
+            "is_pre_order": false,
+            "release_date": "2022-10-10T19:55:00+0300",
+            "images": {
+                "background": "//images-3.gog-statics.com/b965e865146384e3331330bd7537dca2371aae110374e967770a02a7b61c6652.jpg",
+                "logo": "//images-1.gog-statics.com/b0d4bf8b4f0bbf25b9246f8a6dde38c2fdfb3992d2fb6d9540dcea6fee8e7529_glx_logo.jpg",
+                "logo2x": "//images-3.gog-statics.com/b0d4bf8b4f0bbf25b9246f8a6dde38c2fdfb3992d2fb6d9540dcea6fee8e7529_glx_logo_2x.jpg",
+                "icon": "//images-1.gog-statics.com/e7fb13c1149d78e8cbbdf695daf777e45eccc4096afcfdd10023c9f595612404.png",
+                "sidebarIcon": "//images-3.gog-statics.com/e7fb13c1149d78e8cbbdf695daf777e45eccc4096afcfdd10023c9f595612404_sbicon.png",
+                "sidebarIcon2x": "//images-2.gog-statics.com/e7fb13c1149d78e8cbbdf695daf777e45eccc4096afcfdd10023c9f595612404_sbicon_2x.png",
+                "menuNotificationAv": "//images-3.gog-statics.com/e7fb13c1149d78e8cbbdf695daf777e45eccc4096afcfdd10023c9f595612404_menu_notification_av.png",
+                "menuNotificationAv2": "//images-1.gog-statics.com/e7fb13c1149d78e8cbbdf695daf777e45eccc4096afcfdd10023c9f595612404_menu_notification_av2.png"
+            },
+            "dlcs": [],
+            "description": {
+                "lead": "<div style=\"overflow: hidden;\">\n<a href=\"https://www.gog.com/game/chasmtherift_demo\">\n<img src=\"https://items.gog.com/chasmtherift/main_main_chasmtherift.png\" style=\"margin: 5px 15px 0 10px; float: left; width: 250px\"></a>\n<span style=\"display: block;\"><br><br>Chasm: The Rift DEMO is available \n<a href=\"https://www.",
+                "full": "<div style=\"overflow: hidden;\">\n<a href=\"https://www.gog.com/game/chasmtherift_demo\">\n<img src=\"https://items.gog.com/chasmtherift/main_main_chasmtherift.png\" style=\"margin: 5px 15px 0 10px; float: left; width: 250px\"></a>\n<span style=\"display: block;\"><br><br>Chasm: The Rift DEMO is available \n<a href=\"https://www.gog.com/game/chasmtherift_demo\"><b>here</b></a></span></div><br><hr><br>\n\n<h4>ABOUT</h4>Having its roots in 1997 and developed in Ukraine, Chasm: The Rift is one of the most thrilling and innovative FPS from this era and the first Eastern European boomer shooter ever made.<h4>THE STORY</h4>\nFeeling you are no longer alone, you turn, with just enough time to shoot, killing the mutation charging mercilessly toward you. You begin to sense an eerie feeling of fear in the air, but your skin crawls as you realize it's your own...What was that thing?\n<br>\n\n<br>\nAgain and again you shoot, battling more strange beasts; all grotesque mutations of creatures you once knew. Suddenly the inexplicable becomes clear. Time channels have formed in the Earth's atmosphere, turning once normal life forms into something they were never meant to be. As part of a special commando unit, you must not only ward off and eradicate the beasts, but destroy the time channels to finally rid the Earth of these deadly mutations.<h4>GAMEPLAY</h4>Along with a heart-pounding adventure through the Corridors of Time and the satisfaction of ripping limbs from hideous monsters with the iconic BladeGun, and an innovative weather system, the player will now be able to enjoy this late 90’s FPS classic with the comfort of modern PCs, now with full 4K support, improved sound design, achievements, and localised into twelve languages.<h4>GAME FEATURES</h4>\n- Blow off monsters' limbs even as they continue to attack with remaining appendages\n<br>\n- Different effects including water, rain, snow, wind, smoke, dust, sparks, explosions and distant fades\n<br>\n- Awesome array of weapons, including unique Blade Gun\n<br>\n- Enhanced graphics with full 4K support\n<br>\n- Improved sound design\n<br>\n\n<h4>BONUS</h4>\nThe original Chasm: The Rift version powered by DOSBox is included as a bonus.\n",
+                "whats_cool_about_it": ""
+            },
+            "downloads": {
+                "installers": [
+                    {
+                        "id": "installer_windows_en",
+                        "name": "Chasm: The Rift",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1.0.22",
+                        "total_size": 800063488,
+                        "files": [
+                            {
+                                "id": "en1installer0",
+                                "size": 800063488,
+                                "downlink": "https://api.gog.com/products/1302753134/downlink/installer/en1installer0"
+                            }
+                        ]
+                    }
+                ],
+                "patches": [],
+                "language_packs": [],
+                "bonus_content": []
+            },
+            "expanded_dlcs": [],
+            "related_products": []
+        },
+        "account_details_api": {
+            "title": "Chasm: The Rift",
+            "backgroundImage": "//images-3.gog-statics.com/b965e865146384e3331330bd7537dca2371aae110374e967770a02a7b61c6652",
+            "cdKey": "",
+            "textInformation": "",
+            "registryDownloadUrl": "",
+            "isRegistryKey": false,
+            "cdKeys": [],
+            "downloads": [
+                [
+                    "English",
+                    {
+                        "windows": [
+                            {
+                                "manualUrl": "/downloads/chasmtherift/en1installer0",
+                                "name": "Chasm: The Rift",
+                                "version": "1.0.22",
+                                "date": "",
+                                "size": "763 MB"
+                            }
+                        ]
+                    }
+                ]
+            ],
+            "galaxyDownloads": [],
+            "extras": [],
+            "dlcs": [],
+            "tags": [],
+            "isPreOrder": false,
+            "releaseTimestamp": 1665420900,
+            "messages": [],
+            "changelog": "<h4>Major Update #1 (18/05/2023)</h4><ul>\n<li>Implemented aim assist feature for controller input.</li>\n<li>Added configurable motion blur post effect into the game.</li>\n<li>Improved controls (e.g. more convenient turning and non-linear acceleration).</li>\n<li>Introduced a new custom difficulty level that allows individually set player damage, enemy damage and a number of spawning enemies based on different difficulty levels.</li>\n<li>Implemented new crosshair configuration (shape, size, color) and improved crosshair preview with animated background.</li>\n<li>Fixes the annoying inaccuracy of crosshair position and hit projection.</li>\n<li>Implemented dynamic protagonist picture, a feature that changes the protagonist's picture in the in-game HUD in accordance with health and picked-up devices during the game.</li>\n<li>Added the following accessibility configuration options: non-stylized font, non-stylized font color and size and a plain color channel mixer.</li>\n<li>Added Traditional Chinese language support.</li>\n<li>Added the &quot;Continue&quot; option to the main menu. This option loads the latest save slot.</li>\n<li>Improved mods support and prepared a guide to make it easier (friction variable)</li>\n<li>Moved addon levels loading to the main menu for extra levels.</li>\n<li>Improved the load time, all resources are loaded into the RAM.</li>\n<li>Improved &quot;menu&quot; keyboard navigation with additional bindings: W/A/S/D is used for navigation and sidebar configuration, SPACE is used for on/off configuration options.</li>\n<li>Added FPS lock configuration option.</li>\n</ul><hr><h4>Patch #3 (18/10/2022)</h4><ul>\n<li>fixed &quot;Pixelation&quot; setting not being saved/loaded correctly</li>\n<li>destroyed light sources no longer reset after the game load</li>\n<li>improved the super shotgun model</li>\n<li>introduced JSON files for in-game models in /data and /addon folders along with a brief readme on what it does</li>\n<li>updated localizations and some in-game text positioning</li>\n<li>'You found a secret area!' message now appears every time you visit a secret area</li>\n<li>Added an experimental setting &quot;FPS Limiter&quot; to the config file. Might cause issues if used together with the &quot;VSync&quot; setting</li>\n</ul><hr><h4>Patch #2 (14/10/2022)</h4><ul>\n<li>added a secret room counter to the Esc menu and a message when you unlock one</li>\n<li>added pixelization filter in the video settings</li>\n<li>fixed door glitch before the Phantom boss</li>\n<li>fixed lighting on level 14</li>\n<li>fixed soft lock on level 14</li>\n</ul><hr><h4>Patch #1 (12/10/2022)</h4><ul>\n<li>DirectX11 set as a default renderer due to observed issues with Vulkan on old hardware</li>\n<li>the game now generates chasm_confing.txt upon its launch</li>\n<li>improvements to weapons models and their render when invisible</li>\n<li>improvements to the monster's AI</li>\n<li>fixes to the game's behavior when changing active display</li>\n<li>fixed 'Inverted Look' setting</li>\n<li>several fixes across the levels (blockers, etc.)</li>\n<li>various stability improvements</li>\n</ul>",
+            "forumLink": "https://embed.gog.com/forum/chasm_the_rift",
+            "isBaseProductMissing": false,
+            "missingBaseProduct": null,
+            "features": [
+                "Achievements",
+                "Cloud saves",
+                "Overlay"
+            ],
+            "simpleGalaxyInstallers": [
+                {
+                    "path": "/downloads/chasmtherift/7d51cf8d92ee9754a3e44c50ae15453e",
+                    "os": "windows"
+                }
+            ]
+        }
+    },
+    "1196310490": {
+        "catalog_api": {
+            "id": 1196310490,
+            "title": "product_title_1196310490",
+            "purchase_link": "https://www.gog.com/en/checkout/manual/1196310490",
+            "slug": "chasmtherift_1196310490",
+            "content_system_compatibility": {
+                "windows": true,
+                "osx": false,
+                "linux": false
+            },
+            "languages": {
+                "br": "Português do Brasil",
+                "cn": "中文(简体)",
+                "de": "Deutsch",
+                "en": "English",
+                "es": "español",
+                "fr": "français",
+                "it": "italiano",
+                "jp": "日本語",
+                "ko": "한국어",
+                "pl": "polski",
+                "ru": "русский",
+                "uk": "yкраїнська"
+            },
+            "links": {
+                "purchase_link": "https://www.gog.com/en/checkout/manual/1196310490",
+                "product_card": "https://www.gog.com/en/game/chasmtherift_1196310490",
+                "support": "https://www.gog.com/support/chasmtherift_1196310490",
+                "forum": "https://www.gog.com/forum/chasm_the_rift"
+            },
+            "in_development": {
+                "active": false,
+                "until": null
+            },
+            "is_secret": true,
+            "is_installable": true,
+            "game_type": "pack",
+            "is_pre_order": false,
+            "release_date": null,
+            "images": {
+                "background": "//images-3.gog-statics.com/b965e865146384e3331330bd7537dca2371aae110374e967770a02a7b61c6652.jpg",
+                "logo": "//images-1.gog-statics.com/b0d4bf8b4f0bbf25b9246f8a6dde38c2fdfb3992d2fb6d9540dcea6fee8e7529_glx_logo.jpg",
+                "logo2x": "//images-3.gog-statics.com/b0d4bf8b4f0bbf25b9246f8a6dde38c2fdfb3992d2fb6d9540dcea6fee8e7529_glx_logo_2x.jpg",
+                "icon": "//images-1.gog-statics.com/e7fb13c1149d78e8cbbdf695daf777e45eccc4096afcfdd10023c9f595612404.png",
+                "sidebarIcon": "//images-3.gog-statics.com/e7fb13c1149d78e8cbbdf695daf777e45eccc4096afcfdd10023c9f595612404_sbicon.png",
+                "sidebarIcon2x": "//images-2.gog-statics.com/e7fb13c1149d78e8cbbdf695daf777e45eccc4096afcfdd10023c9f595612404_sbicon_2x.png",
+                "menuNotificationAv": "//images-3.gog-statics.com/e7fb13c1149d78e8cbbdf695daf777e45eccc4096afcfdd10023c9f595612404_menu_notification_av.png",
+                "menuNotificationAv2": "//images-1.gog-statics.com/e7fb13c1149d78e8cbbdf695daf777e45eccc4096afcfdd10023c9f595612404_menu_notification_av2.png"
+            },
+            "dlcs": [],
+            "description": {
+                "lead": "",
+                "full": "",
+                "whats_cool_about_it": ""
+            },
+            "downloads": {
+                "installers": [
+                    {
+                        "id": "installer_windows_en",
+                        "name": "product_title_1196310490",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1.0.22",
+                        "total_size": 800063488,
+                        "files": [
+                            {
+                                "id": "en1installer0",
+                                "size": 800063488,
+                                "downlink": "https://api.gog.com/products/1196310490/downlink/installer/en1installer0"
+                            }
+                        ]
+                    }
+                ],
+                "patches": [],
+                "language_packs": [],
+                "bonus_content": []
+            },
+            "expanded_dlcs": [],
+            "related_products": []
+        },
+        "account_details_api": []
+    },
+    "1578751750": {
+        "catalog_api": {
+            "id": 1578751750,
+            "title": "Mafia III: Definitive Edition",
+            "purchase_link": "https://www.gog.com/en/checkout/manual/1578751750",
+            "slug": "mafia_iii_definitive_edition",
+            "content_system_compatibility": {
+                "windows": true,
+                "osx": false,
+                "linux": false
+            },
+            "languages": {
+                "br": "Português do Brasil",
+                "cn": "中文(简体)",
+                "cz": "český",
+                "de": "Deutsch",
+                "en": "English",
+                "es": "español",
+                "es_mx": "Español (AL)",
+                "fr": "français",
+                "it": "italiano",
+                "jp": "日本語",
+                "ko": "한국어",
+                "pl": "polski",
+                "ru": "русский",
+                "zh": "中文(繁體)"
+            },
+            "links": {
+                "purchase_link": "https://www.gog.com/en/checkout/manual/1578751750",
+                "product_card": "https://www.gog.com/en/game/mafia_iii_definitive_edition",
+                "support": "https://www.gog.com/support/mafia_iii_definitive_edition",
+                "forum": "https://www.gog.com/forum/general"
+            },
+            "in_development": {
+                "active": false,
+                "until": null
+            },
+            "is_secret": false,
+            "is_installable": true,
+            "game_type": "game",
+            "is_pre_order": false,
+            "release_date": "2022-08-22T15:45:00+0300",
+            "images": {
+                "background": "//images-3.gog-statics.com/0d53085d2938507148fa2846178ab119ee57c87bcd9c22d0afc0b822bd389697.jpg",
+                "logo": "//images-1.gog-statics.com/675f7bf7c242b6c80cb8e91834d01cfc2bc0ac1bb47c7184c8ccf4966ca22423_glx_logo.jpg",
+                "logo2x": "//images-2.gog-statics.com/675f7bf7c242b6c80cb8e91834d01cfc2bc0ac1bb47c7184c8ccf4966ca22423_glx_logo_2x.jpg",
+                "icon": "//images-4.gog-statics.com/2980420cce8c853acb8c32187eddad2a44b4e5f2a26cb0880364e958526a2bbc.png",
+                "sidebarIcon": "//images-4.gog-statics.com/2980420cce8c853acb8c32187eddad2a44b4e5f2a26cb0880364e958526a2bbc_sbicon.png",
+                "sidebarIcon2x": "//images-3.gog-statics.com/2980420cce8c853acb8c32187eddad2a44b4e5f2a26cb0880364e958526a2bbc_sbicon_2x.png",
+                "menuNotificationAv": "//images-2.gog-statics.com/2980420cce8c853acb8c32187eddad2a44b4e5f2a26cb0880364e958526a2bbc_menu_notification_av.png",
+                "menuNotificationAv2": "//images-3.gog-statics.com/2980420cce8c853acb8c32187eddad2a44b4e5f2a26cb0880364e958526a2bbc_menu_notification_av2.png"
+            },
+            "dlcs": [],
+            "description": {
+                "lead": "<div style=\"overflow: hidden;\">\n<a href=\"https://www.gog.com/game/mafia_trilogy\"><img src=\"https://items.gog.com/mafia_trilogy/mafia_trilogy.png\" style=\"margin: 5px 15px 0 10px; float: left; width: 250px\"></a><span style=\"display: block;\"><br><br><b>Mafia III: Definitive Edition</b> is included in <a href=\"https://www.",
+                "full": "<div style=\"overflow: hidden;\">\n<a href=\"https://www.gog.com/game/mafia_trilogy\"><img src=\"https://items.gog.com/mafia_trilogy/mafia_trilogy.png\" style=\"margin: 5px 15px 0 10px; float: left; width: 250px\"></a><span style=\"display: block;\"><br><br><b>Mafia III: Definitive Edition</b> is included in <a href=\"https://www.gog.com/game/mafia_trilogy\"><b>Mafia Trilogy</b></a></span></div><br><hr><br>\n\n\nMafia III: Definitive Edition includes the main game, all Story DLC (Faster, Baby!, Stones Unturned, Sign of the Times) and Bonus Packs (Family Kick-Back Pack and Judge, Jury & Executioner Weapons Pack) bundled in one place for the first time.\n<br>\n<br>\nPart three of the Mafia crime saga - 1968, New Bordeaux, LA.\n<br>\nAfter years of combat in Vietnam, Lincoln Clay knows this truth: family isn’t who you’re born with, it’s who you die for. When his surrogate family is wiped out by the Italian Mafia, Lincoln builds a new family and blazes a path of revenge through the Mafioso responsible.<h4>NEW BORDEAUX, LA:</h4> A vast world ruled by the mob and detailed with the sights and sounds of the era<h4>A LETHAL ANTI-HERO:</h4>Be Lincoln Clay, orphan and Vietnam veteran hell bent on revenge for the deaths of his surrogate family<h4>REVENGE YOUR WAY:</h4>Choose your own play-style; brute force, blazing guns or stalk-and-kill tactics, to tear down the Mafia<h4>A NEW FAMILY ON THE ASHES OF THE OLD:</h4> Build a new criminal empire your way by deciding which lieutenants you reward, and which you betray\n\n<br><br>\n<p class=\"module\" style=\"padding: 15px; margin-top: 5px;\">\n<span style=\"font-weight: 600; display: block; padding-bottom: 2px;\">\nThe DRM-Free version of Mafia III: Definitive Edition does not support signing up for a 2K account, therefore 2K account bonus content and bonus content acquired for owning other Mafia titles on GOG are not available.  \n</span></p><br>",
+                "whats_cool_about_it": ""
+            },
+            "downloads": {
+                "installers": [
+                    {
+                        "id": "installer_windows_en",
+                        "name": "Mafia III: Definitive Edition",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1.0.1 GOG v2",
+                        "total_size": 54555312128,
+                        "files": [
+                            {
+                                "id": "en1installer0",
+                                "size": 2097152,
+                                "downlink": "https://api.gog.com/products/1578751750/downlink/installer/en1installer0"
+                            },
+                            {
+                                "id": "en1installer1",
+                                "size": 4291821568,
+                                "downlink": "https://api.gog.com/products/1578751750/downlink/installer/en1installer1"
+                            },
+                            {
+                                "id": "en1installer10",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1578751750/downlink/installer/en1installer10"
+                            },
+                            {
+                                "id": "en1installer11",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1578751750/downlink/installer/en1installer11"
+                            },
+                            {
+                                "id": "en1installer12",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1578751750/downlink/installer/en1installer12"
+                            },
+                            {
+                                "id": "en1installer13",
+                                "size": 3028287488,
+                                "downlink": "https://api.gog.com/products/1578751750/downlink/installer/en1installer13"
+                            },
+                            {
+                                "id": "en1installer2",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1578751750/downlink/installer/en1installer2"
+                            },
+                            {
+                                "id": "en1installer3",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1578751750/downlink/installer/en1installer3"
+                            },
+                            {
+                                "id": "en1installer4",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1578751750/downlink/installer/en1installer4"
+                            },
+                            {
+                                "id": "en1installer5",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1578751750/downlink/installer/en1installer5"
+                            },
+                            {
+                                "id": "en1installer6",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1578751750/downlink/installer/en1installer6"
+                            },
+                            {
+                                "id": "en1installer7",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1578751750/downlink/installer/en1installer7"
+                            },
+                            {
+                                "id": "en1installer8",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1578751750/downlink/installer/en1installer8"
+                            },
+                            {
+                                "id": "en1installer9",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1578751750/downlink/installer/en1installer9"
+                            }
+                        ]
+                    }
+                ],
+                "patches": [],
+                "language_packs": [],
+                "bonus_content": []
+            },
+            "expanded_dlcs": [],
+            "related_products": []
+        },
+        "account_details_api": {
+            "title": "Mafia III: Definitive Edition",
+            "backgroundImage": "//images-3.gog-statics.com/0d53085d2938507148fa2846178ab119ee57c87bcd9c22d0afc0b822bd389697",
+            "cdKey": "",
+            "textInformation": "",
+            "registryDownloadUrl": "",
+            "isRegistryKey": false,
+            "cdKeys": [],
+            "downloads": [
+                [
+                    "English",
+                    {
+                        "windows": [
+                            {
+                                "manualUrl": "/downloads/mafia_iii_definitive_edition/en1installer0",
+                                "name": "Mafia III: Definitive Edition (Part 1 of 14)",
+                                "version": "1.0.1 GOG v2",
+                                "date": "",
+                                "size": "2 MB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_iii_definitive_edition/en1installer1",
+                                "name": "Mafia III: Definitive Edition (Part 2 of 14)",
+                                "version": "1.0.1 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_iii_definitive_edition/en1installer2",
+                                "name": "Mafia III: Definitive Edition (Part 3 of 14)",
+                                "version": "1.0.1 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_iii_definitive_edition/en1installer3",
+                                "name": "Mafia III: Definitive Edition (Part 4 of 14)",
+                                "version": "1.0.1 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_iii_definitive_edition/en1installer4",
+                                "name": "Mafia III: Definitive Edition (Part 5 of 14)",
+                                "version": "1.0.1 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_iii_definitive_edition/en1installer5",
+                                "name": "Mafia III: Definitive Edition (Part 6 of 14)",
+                                "version": "1.0.1 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_iii_definitive_edition/en1installer6",
+                                "name": "Mafia III: Definitive Edition (Part 7 of 14)",
+                                "version": "1.0.1 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_iii_definitive_edition/en1installer7",
+                                "name": "Mafia III: Definitive Edition (Part 8 of 14)",
+                                "version": "1.0.1 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_iii_definitive_edition/en1installer8",
+                                "name": "Mafia III: Definitive Edition (Part 9 of 14)",
+                                "version": "1.0.1 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_iii_definitive_edition/en1installer9",
+                                "name": "Mafia III: Definitive Edition (Part 10 of 14)",
+                                "version": "1.0.1 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_iii_definitive_edition/en1installer10",
+                                "name": "Mafia III: Definitive Edition (Part 11 of 14)",
+                                "version": "1.0.1 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_iii_definitive_edition/en1installer11",
+                                "name": "Mafia III: Definitive Edition (Part 12 of 14)",
+                                "version": "1.0.1 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_iii_definitive_edition/en1installer12",
+                                "name": "Mafia III: Definitive Edition (Part 13 of 14)",
+                                "version": "1.0.1 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_iii_definitive_edition/en1installer13",
+                                "name": "Mafia III: Definitive Edition (Part 14 of 14)",
+                                "version": "1.0.1 GOG v2",
+                                "date": "",
+                                "size": "2.8 GB"
+                            }
+                        ]
+                    }
+                ]
+            ],
+            "galaxyDownloads": [],
+            "extras": [],
+            "dlcs": [],
+            "tags": [],
+            "isPreOrder": false,
+            "releaseTimestamp": 1661172300,
+            "messages": [],
+            "changelog": "<h4>1.0.1 GOG v2 (17 November 2025)</h4><ul><li>Fixed achievements not unlocking properly without Administrator privileges.</li></ul>",
+            "forumLink": "https://embed.gog.com/forum/general",
+            "isBaseProductMissing": false,
+            "missingBaseProduct": null,
+            "features": [
+                "Achievements",
+                "Cloud saves",
+                "Overlay"
+            ],
+            "simpleGalaxyInstallers": [
+                {
+                    "path": "/downloads/mafia_iii_definitive_edition/5a2962b3b9f42ba88387ae0d85730884",
+                    "os": "windows"
+                }
+            ]
+        }
+    },
+    "1449710114": {
+        "catalog_api": {
+            "id": 1449710114,
+            "title": "Mafia II: Definitive Edition",
+            "purchase_link": "https://www.gog.com/en/checkout/manual/1449710114",
+            "slug": "mafia_ii_definitive_edition_base",
+            "content_system_compatibility": {
+                "windows": true,
+                "osx": false,
+                "linux": false
+            },
+            "languages": {
+                "br": "Português do Brasil",
+                "cn": "中文(简体)",
+                "cz": "český",
+                "de": "Deutsch",
+                "en": "English",
+                "es": "español",
+                "es_mx": "Español (AL)",
+                "fr": "français",
+                "it": "italiano",
+                "jp": "日本語",
+                "ko": "한국어",
+                "pl": "polski",
+                "ru": "русский",
+                "zh": "中文(繁體)"
+            },
+            "links": {
+                "purchase_link": "https://www.gog.com/en/checkout/manual/1449710114",
+                "product_card": "https://www.gog.com/en/game/mafia_ii_definitive_edition_base",
+                "support": "https://www.gog.com/support/mafia_ii_definitive_edition_base",
+                "forum": "https://www.gog.com/forum/general"
+            },
+            "in_development": {
+                "active": false,
+                "until": null
+            },
+            "is_secret": false,
+            "is_installable": true,
+            "game_type": "game",
+            "is_pre_order": false,
+            "release_date": null,
+            "images": {
+                "background": "//images-4.gog-statics.com/2095dcbc80cf6859e6777dd06d3d322a81382133dd549ad41d6f57300759071e.jpg",
+                "logo": "//images-1.gog-statics.com/ec9894ec739bdfd6a68b6cf2d8a51138272f75a382fd703ece336bb89e7c49a9_glx_logo.jpg",
+                "logo2x": "//images-4.gog-statics.com/ec9894ec739bdfd6a68b6cf2d8a51138272f75a382fd703ece336bb89e7c49a9_glx_logo_2x.jpg",
+                "icon": "//images-1.gog-statics.com/bf4413eb67fcca1e1e34dcca53c4a8731fc4e4e318fa46bd8873b9b37f2b1016.png",
+                "sidebarIcon": "//images-2.gog-statics.com/bf4413eb67fcca1e1e34dcca53c4a8731fc4e4e318fa46bd8873b9b37f2b1016_sbicon.png",
+                "sidebarIcon2x": "//images-2.gog-statics.com/bf4413eb67fcca1e1e34dcca53c4a8731fc4e4e318fa46bd8873b9b37f2b1016_sbicon_2x.png",
+                "menuNotificationAv": "//images-3.gog-statics.com/bf4413eb67fcca1e1e34dcca53c4a8731fc4e4e318fa46bd8873b9b37f2b1016_menu_notification_av.png",
+                "menuNotificationAv2": "//images-3.gog-statics.com/bf4413eb67fcca1e1e34dcca53c4a8731fc4e4e318fa46bd8873b9b37f2b1016_menu_notification_av2.png"
+            },
+            "dlcs": [],
+            "description": {
+                "lead": "<h4>Includes main game and all DLC releases.</h4>\nPart two of the Mafia crime saga – 1940’s - 50’s Empire Bay, NY\n<br>\nRemastered in stunning HD detail, live the life of a gangster during the Golden-era of organized crime. War hero Vito Scaletta becomes entangled with the mob in hopes of paying his father’s debts.",
+                "full": "<h4>Includes main game and all DLC releases.</h4>\nPart two of the Mafia crime saga – 1940’s - 50’s Empire Bay, NY\n<br>\nRemastered in stunning HD detail, live the life of a gangster during the Golden-era of organized crime. War hero Vito Scaletta becomes entangled with the mob in hopes of paying his father’s debts. Alongside his buddy Joe, Vito works to prove himself, climbing the family ladder with crimes of larger reward, status and consequence.<h4>Golden-era Drama:</h4>Inspired by iconic mafia dramas, be immersed in the allure and impossible escape of life as a wise guy in the Mafia.<h4>Empire Bay, NY:</h4>Post-World War II Empire Bay, NY, a city sprawling with opportunity and where organized crime thrives on the booming industries of post-war America.<h4>The Complete & Remastered Favorite:</h4>For the first-time ever experience the Mafia II crime drama all in one package and presented in stunning HD detail. \n",
+                "whats_cool_about_it": ""
+            },
+            "downloads": {
+                "installers": [
+                    {
+                        "id": "installer_windows_en",
+                        "name": "Mafia II: Definitive Edition",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1.0",
+                        "total_size": 38499516416,
+                        "files": [
+                            {
+                                "id": "en1installer0",
+                                "size": 2097152,
+                                "downlink": "https://api.gog.com/products/1449710114/downlink/installer/en1installer0"
+                            },
+                            {
+                                "id": "en1installer1",
+                                "size": 4291821568,
+                                "downlink": "https://api.gog.com/products/1449710114/downlink/installer/en1installer1"
+                            },
+                            {
+                                "id": "en1installer2",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1449710114/downlink/installer/en1installer2"
+                            },
+                            {
+                                "id": "en1installer3",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1449710114/downlink/installer/en1installer3"
+                            },
+                            {
+                                "id": "en1installer4",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1449710114/downlink/installer/en1installer4"
+                            },
+                            {
+                                "id": "en1installer5",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1449710114/downlink/installer/en1installer5"
+                            },
+                            {
+                                "id": "en1installer6",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1449710114/downlink/installer/en1installer6"
+                            },
+                            {
+                                "id": "en1installer7",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1449710114/downlink/installer/en1installer7"
+                            },
+                            {
+                                "id": "en1installer8",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1449710114/downlink/installer/en1installer8"
+                            },
+                            {
+                                "id": "en1installer9",
+                                "size": 4148166656,
+                                "downlink": "https://api.gog.com/products/1449710114/downlink/installer/en1installer9"
+                            }
+                        ]
+                    }
+                ],
+                "patches": [],
+                "language_packs": [],
+                "bonus_content": []
+            },
+            "expanded_dlcs": [],
+            "related_products": []
+        },
+        "account_details_api": {
+            "title": "Mafia II: Definitive Edition",
+            "backgroundImage": "//images-1.gog-statics.com/2095dcbc80cf6859e6777dd06d3d322a81382133dd549ad41d6f57300759071e",
+            "cdKey": "",
+            "textInformation": "",
+            "registryDownloadUrl": "",
+            "isRegistryKey": false,
+            "cdKeys": [],
+            "downloads": [
+                [
+                    "English",
+                    {
+                        "windows": [
+                            {
+                                "manualUrl": "/downloads/mafia_ii_definitive_edition_base/en1installer0",
+                                "name": "Mafia II: Definitive Edition (Part 1 of 10)",
+                                "version": "1.0",
+                                "date": "",
+                                "size": "2 MB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_ii_definitive_edition_base/en1installer1",
+                                "name": "Mafia II: Definitive Edition (Part 2 of 10)",
+                                "version": "1.0",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_ii_definitive_edition_base/en1installer2",
+                                "name": "Mafia II: Definitive Edition (Part 3 of 10)",
+                                "version": "1.0",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_ii_definitive_edition_base/en1installer3",
+                                "name": "Mafia II: Definitive Edition (Part 4 of 10)",
+                                "version": "1.0",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_ii_definitive_edition_base/en1installer4",
+                                "name": "Mafia II: Definitive Edition (Part 5 of 10)",
+                                "version": "1.0",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_ii_definitive_edition_base/en1installer5",
+                                "name": "Mafia II: Definitive Edition (Part 6 of 10)",
+                                "version": "1.0",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_ii_definitive_edition_base/en1installer6",
+                                "name": "Mafia II: Definitive Edition (Part 7 of 10)",
+                                "version": "1.0",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_ii_definitive_edition_base/en1installer7",
+                                "name": "Mafia II: Definitive Edition (Part 8 of 10)",
+                                "version": "1.0",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_ii_definitive_edition_base/en1installer8",
+                                "name": "Mafia II: Definitive Edition (Part 9 of 10)",
+                                "version": "1.0",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_ii_definitive_edition_base/en1installer9",
+                                "name": "Mafia II: Definitive Edition (Part 10 of 10)",
+                                "version": "1.0",
+                                "date": "",
+                                "size": "3.9 GB"
+                            }
+                        ]
+                    }
+                ]
+            ],
+            "galaxyDownloads": [],
+            "extras": [],
+            "dlcs": [],
+            "tags": [],
+            "isPreOrder": false,
+            "releaseTimestamp": 0,
+            "messages": [],
+            "changelog": null,
+            "forumLink": "https://embed.gog.com/forum/general",
+            "isBaseProductMissing": false,
+            "missingBaseProduct": null,
+            "features": [
+                "Achievements",
+                "Cloud saves",
+                "Overlay"
+            ],
+            "simpleGalaxyInstallers": [
+                {
+                    "path": "/downloads/mafia_ii_definitive_edition_base/7bff004dd77d7810ffb6e6d5b8db4d76",
+                    "os": "windows"
+                }
+            ]
+        }
+    },
+    "1549667319": {
+        "catalog_api": {
+            "id": 1549667319,
+            "title": "product_title_1549667319",
+            "purchase_link": "https://www.gog.com/en/checkout/manual/1549667319",
+            "slug": "mafia_iii_definitive_edition_1549667319",
+            "content_system_compatibility": {
+                "windows": true,
+                "osx": false,
+                "linux": false
+            },
+            "languages": [],
+            "links": {
+                "purchase_link": "https://www.gog.com/en/checkout/manual/1549667319",
+                "product_card": "https://www.gog.com/en/game/mafia_iii_definitive_edition_1549667319",
+                "support": "https://www.gog.com/support/mafia_iii_definitive_edition_1549667319",
+                "forum": "https://www.gog.com/forum/general"
+            },
+            "in_development": {
+                "active": false,
+                "until": null
+            },
+            "is_secret": true,
+            "is_installable": true,
+            "game_type": "pack",
+            "is_pre_order": false,
+            "release_date": null,
+            "images": {
+                "background": "//images-3.gog-statics.com/0d53085d2938507148fa2846178ab119ee57c87bcd9c22d0afc0b822bd389697.jpg",
+                "logo": "//images-1.gog-statics.com/675f7bf7c242b6c80cb8e91834d01cfc2bc0ac1bb47c7184c8ccf4966ca22423_glx_logo.jpg",
+                "logo2x": "//images-2.gog-statics.com/675f7bf7c242b6c80cb8e91834d01cfc2bc0ac1bb47c7184c8ccf4966ca22423_glx_logo_2x.jpg",
+                "icon": "//images-4.gog-statics.com/2980420cce8c853acb8c32187eddad2a44b4e5f2a26cb0880364e958526a2bbc.png",
+                "sidebarIcon": "//images-4.gog-statics.com/2980420cce8c853acb8c32187eddad2a44b4e5f2a26cb0880364e958526a2bbc_sbicon.png",
+                "sidebarIcon2x": "//images-3.gog-statics.com/2980420cce8c853acb8c32187eddad2a44b4e5f2a26cb0880364e958526a2bbc_sbicon_2x.png",
+                "menuNotificationAv": "//images-2.gog-statics.com/2980420cce8c853acb8c32187eddad2a44b4e5f2a26cb0880364e958526a2bbc_menu_notification_av.png",
+                "menuNotificationAv2": "//images-3.gog-statics.com/2980420cce8c853acb8c32187eddad2a44b4e5f2a26cb0880364e958526a2bbc_menu_notification_av2.png"
+            },
+            "dlcs": [],
+            "description": {
+                "lead": "",
+                "full": "",
+                "whats_cool_about_it": ""
+            },
+            "downloads": {
+                "installers": [
+                    {
+                        "id": "installer_windows_en",
+                        "name": "product_title_1549667319",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1.0.1",
+                        "total_size": 54589915136,
+                        "files": [
+                            {
+                                "id": "en1installer0",
+                                "size": 2097152,
+                                "downlink": "https://api.gog.com/products/1549667319/downlink/installer/en1installer0"
+                            },
+                            {
+                                "id": "en1installer1",
+                                "size": 4291821568,
+                                "downlink": "https://api.gog.com/products/1549667319/downlink/installer/en1installer1"
+                            },
+                            {
+                                "id": "en1installer10",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1549667319/downlink/installer/en1installer10"
+                            },
+                            {
+                                "id": "en1installer11",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1549667319/downlink/installer/en1installer11"
+                            },
+                            {
+                                "id": "en1installer12",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1549667319/downlink/installer/en1installer12"
+                            },
+                            {
+                                "id": "en1installer13",
+                                "size": 3062890496,
+                                "downlink": "https://api.gog.com/products/1549667319/downlink/installer/en1installer13"
+                            },
+                            {
+                                "id": "en1installer2",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1549667319/downlink/installer/en1installer2"
+                            },
+                            {
+                                "id": "en1installer3",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1549667319/downlink/installer/en1installer3"
+                            },
+                            {
+                                "id": "en1installer4",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1549667319/downlink/installer/en1installer4"
+                            },
+                            {
+                                "id": "en1installer5",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1549667319/downlink/installer/en1installer5"
+                            },
+                            {
+                                "id": "en1installer6",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1549667319/downlink/installer/en1installer6"
+                            },
+                            {
+                                "id": "en1installer7",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1549667319/downlink/installer/en1installer7"
+                            },
+                            {
+                                "id": "en1installer8",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1549667319/downlink/installer/en1installer8"
+                            },
+                            {
+                                "id": "en1installer9",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1549667319/downlink/installer/en1installer9"
+                            }
+                        ]
+                    }
+                ],
+                "patches": [],
+                "language_packs": [],
+                "bonus_content": []
+            },
+            "expanded_dlcs": [],
+            "related_products": []
+        },
+        "account_details_api": []
+    },
+    "1993581340": {
+        "catalog_api": {
+            "id": 1993581340,
+            "title": "Mafia: Definitive Edition",
+            "purchase_link": "https://www.gog.com/en/checkout/manual/1993581340",
+            "slug": "mafia_definitive_edition",
+            "content_system_compatibility": {
+                "windows": true,
+                "osx": false,
+                "linux": false
+            },
+            "languages": {
+                "cn": "中文(简体)",
+                "cz": "český",
+                "de": "Deutsch",
+                "en": "English",
+                "es": "español",
+                "es_mx": "Español (AL)",
+                "fr": "français",
+                "it": "italiano",
+                "jp": "日本語",
+                "ko": "한국어",
+                "pl": "polski",
+                "pt": "português",
+                "ru": "русский",
+                "zh": "中文(繁體)"
+            },
+            "links": {
+                "purchase_link": "https://www.gog.com/en/checkout/manual/1993581340",
+                "product_card": "https://www.gog.com/en/game/mafia_definitive_edition",
+                "support": "https://www.gog.com/support/mafia_definitive_edition",
+                "forum": "https://www.gog.com/forum/mafia"
+            },
+            "in_development": {
+                "active": false,
+                "until": null
+            },
+            "is_secret": false,
+            "is_installable": true,
+            "game_type": "game",
+            "is_pre_order": false,
+            "release_date": "2022-08-22T15:45:00+0300",
+            "images": {
+                "background": "//images-4.gog-statics.com/28f060d593d9782fc13e3f06e08f7a1efd2c9d70eef249f45863afe2b0dcca4e.jpg",
+                "logo": "//images-4.gog-statics.com/7c0c8c9f4679cb22b49703c9fdc6a798ff291688d2b765cf5c27cf685cefcbd1_glx_logo.jpg",
+                "logo2x": "//images-3.gog-statics.com/7c0c8c9f4679cb22b49703c9fdc6a798ff291688d2b765cf5c27cf685cefcbd1_glx_logo_2x.jpg",
+                "icon": "//images-4.gog-statics.com/96d1aac5596e4e72d5642e7c986645f0e5fc546301c43792ad6afc6e7a415453.png",
+                "sidebarIcon": "//images-3.gog-statics.com/96d1aac5596e4e72d5642e7c986645f0e5fc546301c43792ad6afc6e7a415453_sbicon.png",
+                "sidebarIcon2x": "//images-4.gog-statics.com/96d1aac5596e4e72d5642e7c986645f0e5fc546301c43792ad6afc6e7a415453_sbicon_2x.png",
+                "menuNotificationAv": "//images-1.gog-statics.com/96d1aac5596e4e72d5642e7c986645f0e5fc546301c43792ad6afc6e7a415453_menu_notification_av.png",
+                "menuNotificationAv2": "//images-1.gog-statics.com/96d1aac5596e4e72d5642e7c986645f0e5fc546301c43792ad6afc6e7a415453_menu_notification_av2.png"
+            },
+            "dlcs": [],
+            "description": {
+                "lead": "<div style=\"overflow: hidden;\">\n<a href=\"https://www.gog.com/game/mafia_trilogy\"><img src=\"https://items.gog.com/mafia_trilogy/mafia_trilogy.png\" style=\"margin: 5px 15px 0 10px; float: left; width: 250px\"></a><span style=\"display: block;\"><br><br><b>Mafia: Definitive Edition</b> is included in <a href=\"https://www.",
+                "full": "<div style=\"overflow: hidden;\">\n<a href=\"https://www.gog.com/game/mafia_trilogy\"><img src=\"https://items.gog.com/mafia_trilogy/mafia_trilogy.png\" style=\"margin: 5px 15px 0 10px; float: left; width: 250px\"></a><span style=\"display: block;\"><br><br><b>Mafia: Definitive Edition</b> is included in <a href=\"https://www.gog.com/game/mafia_trilogy\"><b>Mafia Trilogy</b></a></span></div><br><hr><br>\n\nPart one of the Mafia crime saga - 1930s, Lost Heaven, IL<br>\nRe-made from the ground up, rise through the ranks of the Mafia during the Prohibition era of organized crime. After a run-in with the mob, cab driver Tommy Angelo is thrust into a deadly underworld. Initially uneasy about falling in with the Salieri crime family, Tommy soon finds that the rewards are too big to ignore.<br>\n<br>\n<b>Play a Mob Movie:</b><br>\nLive the life of a Prohibition-era gangster and rise through the ranks of the Mafia.<br>\n<br>\n<b>Lost Heaven, IL:</b><br>\nRecreated 1930's cityscape, filled with interwar architecture, cars and culture to see, hear and interact with.<br>\n<br>\n<b>Re-Made Classic:</b><br>\nFaithfully recreated, with expanded story, gameplay and original score. This is the Mafia you remembered and much more.\n<br><br>\n\n<p class=\"module\" style=\"padding: 15px; margin-top: 5px;\">\n<span style=\"font-weight: 600; display: block; padding-bottom: 2px;\">The DRM-Free version of Mafia: Definitive Edition does not support signing up for a 2K account, therefore 2K account bonus content and bonus content acquired for owning other Mafia titles on GOG are not available.</span></p><br>\n",
+                "whats_cool_about_it": ""
+            },
+            "downloads": {
+                "installers": [
+                    {
+                        "id": "installer_windows_en",
+                        "name": "Mafia: Definitive Edition",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1.0.3 GOG v2",
+                        "total_size": 37045141504,
+                        "files": [
+                            {
+                                "id": "en1installer0",
+                                "size": 1048576,
+                                "downlink": "https://api.gog.com/products/1993581340/downlink/installer/en1installer0"
+                            },
+                            {
+                                "id": "en1installer1",
+                                "size": 4292870144,
+                                "downlink": "https://api.gog.com/products/1993581340/downlink/installer/en1installer1"
+                            },
+                            {
+                                "id": "en1installer2",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1993581340/downlink/installer/en1installer2"
+                            },
+                            {
+                                "id": "en1installer3",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1993581340/downlink/installer/en1installer3"
+                            },
+                            {
+                                "id": "en1installer4",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1993581340/downlink/installer/en1installer4"
+                            },
+                            {
+                                "id": "en1installer5",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1993581340/downlink/installer/en1installer5"
+                            },
+                            {
+                                "id": "en1installer6",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1993581340/downlink/installer/en1installer6"
+                            },
+                            {
+                                "id": "en1installer7",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1993581340/downlink/installer/en1installer7"
+                            },
+                            {
+                                "id": "en1installer8",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1993581340/downlink/installer/en1installer8"
+                            },
+                            {
+                                "id": "en1installer9",
+                                "size": 2693791744,
+                                "downlink": "https://api.gog.com/products/1993581340/downlink/installer/en1installer9"
+                            }
+                        ]
+                    }
+                ],
+                "patches": [
+                    {
+                        "id": "en1patch0",
+                        "name": "Mafia: Definitive Edition (32Bit Installer)",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1.0.3 GOG v2",
+                        "total_size": 1048576,
+                        "files": [
+                            {
+                                "id": "en1patch0",
+                                "size": 1048576,
+                                "downlink": "https://api.gog.com/products/1993581340/downlink/patch/en1patch0"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "en1patch1",
+                        "name": "Mafia: Definitive Edition (32Bit Installer)",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1.0.3 GOG v2",
+                        "total_size": 4292870144,
+                        "files": [
+                            {
+                                "id": "en1patch1",
+                                "size": 4292870144,
+                                "downlink": "https://api.gog.com/products/1993581340/downlink/patch/en1patch1"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "en1patch2",
+                        "name": "Mafia: Definitive Edition (32Bit Installer)",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1.0.3 GOG v2",
+                        "total_size": 4293918720,
+                        "files": [
+                            {
+                                "id": "en1patch2",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1993581340/downlink/patch/en1patch2"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "en1patch3",
+                        "name": "Mafia: Definitive Edition (32Bit Installer)",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1.0.3 GOG v2",
+                        "total_size": 4293918720,
+                        "files": [
+                            {
+                                "id": "en1patch3",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1993581340/downlink/patch/en1patch3"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "en1patch4",
+                        "name": "Mafia: Definitive Edition (32Bit Installer)",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1.0.3 GOG v2",
+                        "total_size": 4293918720,
+                        "files": [
+                            {
+                                "id": "en1patch4",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1993581340/downlink/patch/en1patch4"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "en1patch5",
+                        "name": "Mafia: Definitive Edition (32Bit Installer)",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1.0.3 GOG v2",
+                        "total_size": 4293918720,
+                        "files": [
+                            {
+                                "id": "en1patch5",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1993581340/downlink/patch/en1patch5"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "en1patch6",
+                        "name": "Mafia: Definitive Edition (32Bit Installer)",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1.0.3 GOG v2",
+                        "total_size": 4293918720,
+                        "files": [
+                            {
+                                "id": "en1patch6",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1993581340/downlink/patch/en1patch6"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "en1patch7",
+                        "name": "Mafia: Definitive Edition (32Bit Installer)",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1.0.3 GOG v2",
+                        "total_size": 4293918720,
+                        "files": [
+                            {
+                                "id": "en1patch7",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1993581340/downlink/patch/en1patch7"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "en1patch8",
+                        "name": "Mafia: Definitive Edition (32Bit Installer)",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1.0.3 GOG v2",
+                        "total_size": 4293918720,
+                        "files": [
+                            {
+                                "id": "en1patch8",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1993581340/downlink/patch/en1patch8"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "en1patch9",
+                        "name": "Mafia: Definitive Edition (32Bit Installer)",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1.0.3 GOG v2",
+                        "total_size": 2667577344,
+                        "files": [
+                            {
+                                "id": "en1patch9",
+                                "size": 2667577344,
+                                "downlink": "https://api.gog.com/products/1993581340/downlink/patch/en1patch9"
+                            }
+                        ]
+                    }
+                ],
+                "language_packs": [],
+                "bonus_content": []
+            },
+            "expanded_dlcs": [],
+            "related_products": []
+        },
+        "account_details_api": {
+            "title": "Mafia: Definitive Edition",
+            "backgroundImage": "//images-4.gog-statics.com/28f060d593d9782fc13e3f06e08f7a1efd2c9d70eef249f45863afe2b0dcca4e",
+            "cdKey": "",
+            "textInformation": "",
+            "registryDownloadUrl": "",
+            "isRegistryKey": false,
+            "cdKeys": [],
+            "downloads": [
+                [
+                    "English",
+                    {
+                        "windows": [
+                            {
+                                "manualUrl": "/downloads/mafia_definitive_edition/en1installer0",
+                                "name": "Mafia: Definitive Edition (Part 1 of 10)",
+                                "version": "1.0.3 GOG v2",
+                                "date": "",
+                                "size": "1 MB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_definitive_edition/en1installer1",
+                                "name": "Mafia: Definitive Edition (Part 2 of 10)",
+                                "version": "1.0.3 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_definitive_edition/en1installer2",
+                                "name": "Mafia: Definitive Edition (Part 3 of 10)",
+                                "version": "1.0.3 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_definitive_edition/en1installer3",
+                                "name": "Mafia: Definitive Edition (Part 4 of 10)",
+                                "version": "1.0.3 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_definitive_edition/en1installer4",
+                                "name": "Mafia: Definitive Edition (Part 5 of 10)",
+                                "version": "1.0.3 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_definitive_edition/en1installer5",
+                                "name": "Mafia: Definitive Edition (Part 6 of 10)",
+                                "version": "1.0.3 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_definitive_edition/en1installer6",
+                                "name": "Mafia: Definitive Edition (Part 7 of 10)",
+                                "version": "1.0.3 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_definitive_edition/en1installer7",
+                                "name": "Mafia: Definitive Edition (Part 8 of 10)",
+                                "version": "1.0.3 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_definitive_edition/en1installer8",
+                                "name": "Mafia: Definitive Edition (Part 9 of 10)",
+                                "version": "1.0.3 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_definitive_edition/en1installer9",
+                                "name": "Mafia: Definitive Edition (Part 10 of 10)",
+                                "version": "1.0.3 GOG v2",
+                                "date": "",
+                                "size": "2.5 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_definitive_edition/en1patch0",
+                                "name": "Mafia: Definitive Edition (32Bit Installer)",
+                                "version": "1.0.3 GOG v2",
+                                "date": "",
+                                "size": "1 MB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_definitive_edition/en1patch1",
+                                "name": "Mafia: Definitive Edition (32Bit Installer)",
+                                "version": "1.0.3 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_definitive_edition/en1patch2",
+                                "name": "Mafia: Definitive Edition (32Bit Installer)",
+                                "version": "1.0.3 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_definitive_edition/en1patch3",
+                                "name": "Mafia: Definitive Edition (32Bit Installer)",
+                                "version": "1.0.3 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_definitive_edition/en1patch4",
+                                "name": "Mafia: Definitive Edition (32Bit Installer)",
+                                "version": "1.0.3 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_definitive_edition/en1patch5",
+                                "name": "Mafia: Definitive Edition (32Bit Installer)",
+                                "version": "1.0.3 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_definitive_edition/en1patch6",
+                                "name": "Mafia: Definitive Edition (32Bit Installer)",
+                                "version": "1.0.3 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_definitive_edition/en1patch7",
+                                "name": "Mafia: Definitive Edition (32Bit Installer)",
+                                "version": "1.0.3 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_definitive_edition/en1patch8",
+                                "name": "Mafia: Definitive Edition (32Bit Installer)",
+                                "version": "1.0.3 GOG v2",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/mafia_definitive_edition/en1patch9",
+                                "name": "Mafia: Definitive Edition (32Bit Installer)",
+                                "version": "1.0.3 GOG v2",
+                                "date": "",
+                                "size": "2.5 GB"
+                            }
+                        ]
+                    }
+                ]
+            ],
+            "galaxyDownloads": [],
+            "extras": [],
+            "dlcs": [],
+            "tags": [],
+            "isPreOrder": false,
+            "releaseTimestamp": 1661172300,
+            "messages": [],
+            "changelog": "<h4>1.0.3 GOG v2 (17 November 2025)</h4><ul><li>Fixed achievements not unlocking properly without Administrator privileges.</li></ul>",
+            "forumLink": "https://embed.gog.com/forum/mafia",
+            "isBaseProductMissing": false,
+            "missingBaseProduct": null,
+            "features": [
+                "Achievements",
+                "Overlay"
+            ],
+            "simpleGalaxyInstallers": [
+                {
+                    "path": "/downloads/mafia_definitive_edition/583ea3b4a6b4e63be3a898dd22784db8",
+                    "os": "windows"
+                }
+            ]
+        }
+    },
+    "1732383191": {
+        "catalog_api": {
+            "id": 1732383191,
+            "title": "ELDERBORN",
+            "purchase_link": "https://www.gog.com/en/checkout/manual/1732383191",
+            "slug": "elderborn",
+            "content_system_compatibility": {
+                "windows": true,
+                "osx": false,
+                "linux": false
+            },
+            "languages": {
+                "cn": "中文(简体)",
+                "de": "Deutsch",
+                "en": "English",
+                "es": "español",
+                "fr": "français",
+                "hu": "magyar",
+                "it": "italiano",
+                "pl": "polski",
+                "ru": "русский"
+            },
+            "links": {
+                "purchase_link": "https://www.gog.com/en/checkout/manual/1732383191",
+                "product_card": "https://www.gog.com/en/game/elderborn",
+                "support": "https://www.gog.com/support/elderborn",
+                "forum": "https://www.gog.com/forum/elderborn"
+            },
+            "in_development": {
+                "active": false,
+                "until": null
+            },
+            "is_secret": false,
+            "is_installable": true,
+            "game_type": "game",
+            "is_pre_order": false,
+            "release_date": "2020-01-30T19:50:00+0200",
+            "images": {
+                "background": "//images-2.gog-statics.com/078e1d56e38503099df0412c011135d92cfdbb68607fd0d74f02028d84708ae3.jpg",
+                "logo": "//images-2.gog-statics.com/60cc5813a427ac0546012d997f34f9a2bafe81b0cd5b82901816ce122a7c92e3_glx_logo.jpg",
+                "logo2x": "//images-1.gog-statics.com/60cc5813a427ac0546012d997f34f9a2bafe81b0cd5b82901816ce122a7c92e3_glx_logo_2x.jpg",
+                "icon": "//images-4.gog-statics.com/0bf66ab0e17a0098d1a90576f397958ae5e22a5598aee9d8d237b127e76ff518.png",
+                "sidebarIcon": "//images-3.gog-statics.com/0bf66ab0e17a0098d1a90576f397958ae5e22a5598aee9d8d237b127e76ff518_sbicon.png",
+                "sidebarIcon2x": "//images-3.gog-statics.com/0bf66ab0e17a0098d1a90576f397958ae5e22a5598aee9d8d237b127e76ff518_sbicon_2x.png",
+                "menuNotificationAv": "//images-1.gog-statics.com/0bf66ab0e17a0098d1a90576f397958ae5e22a5598aee9d8d237b127e76ff518_menu_notification_av.png",
+                "menuNotificationAv2": "//images-1.gog-statics.com/0bf66ab0e17a0098d1a90576f397958ae5e22a5598aee9d8d237b127e76ff518_menu_notification_av2.png"
+            },
+            "dlcs": {
+                "products": [
+                    {
+                        "id": 1226421297,
+                        "link": "https://api.gog.com/products/1226421297",
+                        "expanded_link": "https://api.gog.com/products/1226421297?expand=description,downloads,expanded_dlcs,related_products"
+                    }
+                ],
+                "all_products_url": "https://api.gog.com/products?ids=1226421297",
+                "expanded_all_products_url": "https://api.gog.com/products?ids=1226421297&expand=description,downloads,expanded_dlcs,related_products"
+            },
+            "description": {
+                "lead": "<video muted preload=\"auto\" loop autoplay=\"autoplay\" style=\"margin: auto;display:block;width:100%\">\n  <source src=\"https://items.gog.com/elderborn/mp4/elderborn1.mp4\" type=\"video/mp4\"></video>\n\n<br>\n<b>ELDERBORN</b> is a Metal Action Fantasy Slasher with brütal FPP melee combat and souls-like/RPG character progression.",
+                "full": "<video muted preload=\"auto\" loop autoplay=\"autoplay\" style=\"margin: auto;display:block;width:100%\">\n  <source src=\"https://items.gog.com/elderborn/mp4/elderborn1.mp4\" type=\"video/mp4\"></video>\n\n<br>\n<b>ELDERBORN</b> is a Metal Action Fantasy Slasher with brütal FPP melee combat and souls-like/RPG character progression. In the times of legend,  the barbarian tribes need a new dark messiah. The player becomes a merciless slayer who will uncover ancient secrets in the city of doom, and forge their own destiny. This ambitious indie game, five years in the making, combines old-school single-player feel, a classic heroic story, and modern level of skill-based challenge. All this and more creates an action-packed, engaging adventure that will last 8-10 hours in a single play-through. Prepare for:\n<br><br>\n<ul><li> Skill-based, <b>souls-like melee combat</b> in first person perspective, complete with 11 varied weapons to master\n<br>\n</li><li> Character <b>progression and skill system</b> that allows you to play the game in your very own way\n<br>\n</li><li> A <b>hand-crafted</b>, mysterious, and dangerous world to explore - catacombs, ancient, monolithic city, and more\n<br>\n</li><li> A large <b>selection of enemies</b>, each with their own fighting style, tricks, strengths, and weaknesses\n<br>\n</li><li> An epic and somewhat exotic original <b>heavy metal soundtrack</b> with an occasional electronic beat \n<br>\n</li><li> An unapologetic tribute to Robert E. Howard-esque <b>heroic fantasy</b> and the awesome pop-culture of the 80's and 90's</li></ul>\n<br>\nGet barbaric!",
+                "whats_cool_about_it": ""
+            },
+            "downloads": {
+                "installers": [
+                    {
+                        "id": "installer_windows_en",
+                        "name": "ELDERBORN",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1,09",
+                        "total_size": 2868903936,
+                        "files": [
+                            {
+                                "id": "en1installer0",
+                                "size": 1048576,
+                                "downlink": "https://api.gog.com/products/1732383191/downlink/installer/en1installer0"
+                            },
+                            {
+                                "id": "en1installer1",
+                                "size": 2867855360,
+                                "downlink": "https://api.gog.com/products/1732383191/downlink/installer/en1installer1"
+                            }
+                        ]
+                    }
+                ],
+                "patches": [
+                    {
+                        "id": "en1patch0",
+                        "name": "Patch (1,08 to 1,09)",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1,09",
+                        "total_size": 8388608,
+                        "files": [
+                            {
+                                "id": "en1patch0",
+                                "size": 8388608,
+                                "downlink": "https://api.gog.com/products/1732383191/downlink/patch/en1patch0"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "en1patch1",
+                        "name": "Patch (1,05 to 1,037)",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1,037",
+                        "total_size": 681574400,
+                        "files": [
+                            {
+                                "id": "en1patch1",
+                                "size": 681574400,
+                                "downlink": "https://api.gog.com/products/1732383191/downlink/patch/en1patch1"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "en1patch2",
+                        "name": "Patch (1.037 to 1,05)",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1,05",
+                        "total_size": 41943040,
+                        "files": [
+                            {
+                                "id": "en1patch2",
+                                "size": 41943040,
+                                "downlink": "https://api.gog.com/products/1732383191/downlink/patch/en1patch2"
+                            }
+                        ]
+                    }
+                ],
+                "language_packs": [],
+                "bonus_content": []
+            },
+            "expanded_dlcs": [],
+            "related_products": []
+        },
+        "account_details_api": {
+            "title": "ELDERBORN",
+            "backgroundImage": "//images-4.gog-statics.com/078e1d56e38503099df0412c011135d92cfdbb68607fd0d74f02028d84708ae3",
+            "cdKey": "",
+            "textInformation": "",
+            "registryDownloadUrl": "",
+            "isRegistryKey": false,
+            "cdKeys": [],
+            "downloads": [
+                [
+                    "English",
+                    {
+                        "windows": [
+                            {
+                                "manualUrl": "/downloads/elderborn/en1installer0",
+                                "name": "ELDERBORN (Part 1 of 2)",
+                                "version": "1,09",
+                                "date": "",
+                                "size": "1 MB"
+                            },
+                            {
+                                "manualUrl": "/downloads/elderborn/en1installer1",
+                                "name": "ELDERBORN (Part 2 of 2)",
+                                "version": "1,09",
+                                "date": "",
+                                "size": "2.7 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/elderborn/en1patch0",
+                                "name": "Patch (1,08 to 1,09)",
+                                "version": "1,09",
+                                "date": "",
+                                "size": "8 MB"
+                            },
+                            {
+                                "manualUrl": "/downloads/elderborn/en1patch1",
+                                "name": "Patch (1,05 to 1,037)",
+                                "version": "1,037",
+                                "date": "",
+                                "size": "650 MB"
+                            },
+                            {
+                                "manualUrl": "/downloads/elderborn/en1patch2",
+                                "name": "Patch (1.037 to 1,05)",
+                                "version": "1,05",
+                                "date": "",
+                                "size": "40 MB"
+                            }
+                        ]
+                    }
+                ]
+            ],
+            "galaxyDownloads": [],
+            "extras": [],
+            "dlcs": [],
+            "tags": [],
+            "isPreOrder": false,
+            "releaseTimestamp": 1580406600,
+            "messages": [],
+            "changelog": "<h4>Update 1.09 (24 August 2022)</h4><ul>\n<li>Did you know that you could do the ancient spear challenge by smacking the corpse? Well - now that's no longer possible. : ))</li>\n<li>Fixes to navmeshes on tower (chapter 2) - Priests should no longer be able to teleport outside the area (or clip into terrain, et caetera)</li>\n<li>The sfx's applied to audio when on low health: tweaked. They should be a little less extreme and distracting.</li>\n<li>Fixed mummy bandages sticking out of it's back</li>\n<li>Modified low HP blood effect intensity curve, fixed application of it's values to the effect proper</li>\n</ul>",
+            "forumLink": "https://embed.gog.com/forum/elderborn",
+            "isBaseProductMissing": false,
+            "missingBaseProduct": null,
+            "features": [
+                "Achievements",
+                "Cloud saves",
+                "Overlay"
+            ],
+            "simpleGalaxyInstallers": [
+                {
+                    "path": "/downloads/elderborn/1d4040e9ff67e6658f893839da9a9a96",
+                    "os": "windows"
+                },
+                {
+                    "path": "/downloads/elderborn/0f4caabc88312200754222f4fa9f00bb",
+                    "os": "windows"
+                }
+            ]
+        }
+    },
+    "1718917128": {
+        "catalog_api": {
+            "id": 1718917128,
+            "title": "ELDERBORN - Amazon Luna",
+            "purchase_link": "https://www.gog.com/en/checkout/manual/1718917128",
+            "slug": "elderborn_1718917128",
+            "content_system_compatibility": {
+                "windows": true,
+                "osx": false,
+                "linux": false
+            },
+            "languages": [],
+            "links": {
+                "purchase_link": "https://www.gog.com/en/checkout/manual/1718917128",
+                "product_card": "https://www.gog.com/en/game/elderborn_1718917128",
+                "support": "https://www.gog.com/support/elderborn_1718917128",
+                "forum": "https://www.gog.com/forum/elderborn"
+            },
+            "in_development": {
+                "active": false,
+                "until": null
+            },
+            "is_secret": true,
+            "is_installable": true,
+            "game_type": "pack",
+            "is_pre_order": false,
+            "release_date": null,
+            "images": {
+                "background": "//images-2.gog-statics.com/078e1d56e38503099df0412c011135d92cfdbb68607fd0d74f02028d84708ae3.jpg",
+                "logo": "//images-2.gog-statics.com/60cc5813a427ac0546012d997f34f9a2bafe81b0cd5b82901816ce122a7c92e3_glx_logo.jpg",
+                "logo2x": "//images-1.gog-statics.com/60cc5813a427ac0546012d997f34f9a2bafe81b0cd5b82901816ce122a7c92e3_glx_logo_2x.jpg",
+                "icon": "//images-4.gog-statics.com/0bf66ab0e17a0098d1a90576f397958ae5e22a5598aee9d8d237b127e76ff518.png",
+                "sidebarIcon": "//images-3.gog-statics.com/0bf66ab0e17a0098d1a90576f397958ae5e22a5598aee9d8d237b127e76ff518_sbicon.png",
+                "sidebarIcon2x": "//images-3.gog-statics.com/0bf66ab0e17a0098d1a90576f397958ae5e22a5598aee9d8d237b127e76ff518_sbicon_2x.png",
+                "menuNotificationAv": "//images-1.gog-statics.com/0bf66ab0e17a0098d1a90576f397958ae5e22a5598aee9d8d237b127e76ff518_menu_notification_av.png",
+                "menuNotificationAv2": "//images-1.gog-statics.com/0bf66ab0e17a0098d1a90576f397958ae5e22a5598aee9d8d237b127e76ff518_menu_notification_av2.png"
+            },
+            "dlcs": [],
+            "description": {
+                "lead": "ELDERBORN - Amazon Luna",
+                "full": "ELDERBORN - Amazon Luna",
+                "whats_cool_about_it": ""
+            },
+            "downloads": {
+                "installers": [],
+                "patches": [],
+                "language_packs": [],
+                "bonus_content": []
+            },
+            "expanded_dlcs": [],
+            "related_products": []
+        },
+        "account_details_api": []
+    },
+    "1158717618": {
+        "catalog_api": {
+            "id": 1158717618,
+            "title": "STAR WARS™: Bounty Hunter™",
+            "purchase_link": "https://www.gog.com/en/checkout/manual/1158717618",
+            "slug": "star_wars_bounty_hunter",
+            "content_system_compatibility": {
+                "windows": true,
+                "osx": false,
+                "linux": false
+            },
+            "languages": {
+                "cn": "中文(简体)",
+                "de": "Deutsch",
+                "en": "English",
+                "es": "español",
+                "fr": "français",
+                "it": "italiano",
+                "ru": "русский"
+            },
+            "links": {
+                "purchase_link": "https://www.gog.com/en/checkout/manual/1158717618",
+                "product_card": "https://www.gog.com/en/game/star_wars_bounty_hunter",
+                "support": "https://www.gog.com/support/star_wars_bounty_hunter",
+                "forum": "https://www.gog.com/forum/star_wars_bounty_hunter"
+            },
+            "in_development": {
+                "active": false,
+                "until": null
+            },
+            "is_secret": false,
+            "is_installable": true,
+            "game_type": "game",
+            "is_pre_order": false,
+            "release_date": "2024-08-01T09:55:00+0300",
+            "images": {
+                "background": "//images-2.gog-statics.com/abd36dd1c9cf4f980c81cd9f1a4507724966e077de72f493e4d8a0cc4df6878b.jpg",
+                "logo": "//images-3.gog-statics.com/2a415a46492cb67b52e93504ed0a0bc48ae76194411aafc0e60faf4fb8896452_glx_logo.jpg",
+                "logo2x": "//images-2.gog-statics.com/2a415a46492cb67b52e93504ed0a0bc48ae76194411aafc0e60faf4fb8896452_glx_logo_2x.jpg",
+                "icon": "//images-1.gog-statics.com/c7701da93619052c930e7b46bb166053940bad0a02b47998011c424210dd12e1.png",
+                "sidebarIcon": "//images-2.gog-statics.com/c7701da93619052c930e7b46bb166053940bad0a02b47998011c424210dd12e1_sbicon.png",
+                "sidebarIcon2x": "//images-3.gog-statics.com/c7701da93619052c930e7b46bb166053940bad0a02b47998011c424210dd12e1_sbicon_2x.png",
+                "menuNotificationAv": "//images-1.gog-statics.com/c7701da93619052c930e7b46bb166053940bad0a02b47998011c424210dd12e1_menu_notification_av.png",
+                "menuNotificationAv2": "//images-3.gog-statics.com/c7701da93619052c930e7b46bb166053940bad0a02b47998011c424210dd12e1_menu_notification_av2.png"
+            },
+            "dlcs": [],
+            "description": {
+                "lead": "<a href=\"http://www.gog.com/promo/play-on-luna\">\n<img src=\"https://items.gog.com/promobanners/amazon-luna.png\">\n</a><br><hr><br>\n\n<i><strong>Bring In Your Bounty, Dead or Alive</strong></i>\n<br>\n\n<br>\n<strong>Let the Hunt Begin</strong>\n<br>\nIn this classic third-person action-adventure, you'll become Jango Fett, Prime Clone of the Grand Army of the Republic, hired to capture a deranged Dark Jedi.",
+                "full": "<a href=\"http://www.gog.com/promo/play-on-luna\">\n<img src=\"https://items.gog.com/promobanners/amazon-luna.png\">\n</a><br><hr><br>\n\n<i><strong>Bring In Your Bounty, Dead or Alive</strong></i>\n<br>\n\n<br>\n<strong>Let the Hunt Begin</strong>\n<br>\nIn this classic third-person action-adventure, you'll become Jango Fett, Prime Clone of the Grand Army of the Republic, hired to capture a deranged Dark Jedi.\n<br>\n\n<br>\n<strong>Relive the Timeless Tale </strong>\n<br>\nExperience the legendary Bounty Hunter fantasy set before the events of  Star Wars: Episode II - Attack of the Clones. Face off against foes and maneuver through acrobatic battles in this adaption optimized for today's consoles and hardware.\n<br>\n\n<br>\n<strong>Armed to the Teeth</strong>\n<br>\nFight your way through the galaxy’s underbelly, equipped with Dual Blasters, your Flamethrower, Whipcord, and pure Mandalorian Rage.\n",
+                "whats_cool_about_it": ""
+            },
+            "downloads": {
+                "installers": [
+                    {
+                        "id": "installer_windows_en",
+                        "name": "STAR WARS™: Bounty Hunter™",
+                        "os": "windows",
+                        "language": "en",
+                        "language_full": "English",
+                        "version": "1.1_Patch_2_GOG",
+                        "total_size": 9547284480,
+                        "files": [
+                            {
+                                "id": "en1installer0",
+                                "size": 1048576,
+                                "downlink": "https://api.gog.com/products/1158717618/downlink/installer/en1installer0"
+                            },
+                            {
+                                "id": "en1installer1",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1158717618/downlink/installer/en1installer1"
+                            },
+                            {
+                                "id": "en1installer2",
+                                "size": 4293918720,
+                                "downlink": "https://api.gog.com/products/1158717618/downlink/installer/en1installer2"
+                            },
+                            {
+                                "id": "en1installer3",
+                                "size": 958398464,
+                                "downlink": "https://api.gog.com/products/1158717618/downlink/installer/en1installer3"
+                            }
+                        ]
+                    }
+                ],
+                "patches": [],
+                "language_packs": [],
+                "bonus_content": []
+            },
+            "expanded_dlcs": [],
+            "related_products": []
+        },
+        "account_details_api": {
+            "title": "STAR WARS™: Bounty Hunter™",
+            "backgroundImage": "//images-4.gog-statics.com/abd36dd1c9cf4f980c81cd9f1a4507724966e077de72f493e4d8a0cc4df6878b",
+            "cdKey": "",
+            "textInformation": "",
+            "registryDownloadUrl": "",
+            "isRegistryKey": false,
+            "cdKeys": [],
+            "downloads": [
+                [
+                    "English",
+                    {
+                        "windows": [
+                            {
+                                "manualUrl": "/downloads/star_wars_bounty_hunter/en1installer0",
+                                "name": "STAR WARS™: Bounty Hunter™ (Part 1 of 4)",
+                                "version": "1.1_Patch_2_GOG",
+                                "date": "",
+                                "size": "1 MB"
+                            },
+                            {
+                                "manualUrl": "/downloads/star_wars_bounty_hunter/en1installer1",
+                                "name": "STAR WARS™: Bounty Hunter™ (Part 2 of 4)",
+                                "version": "1.1_Patch_2_GOG",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/star_wars_bounty_hunter/en1installer2",
+                                "name": "STAR WARS™: Bounty Hunter™ (Part 3 of 4)",
+                                "version": "1.1_Patch_2_GOG",
+                                "date": "",
+                                "size": "4 GB"
+                            },
+                            {
+                                "manualUrl": "/downloads/star_wars_bounty_hunter/en1installer3",
+                                "name": "STAR WARS™: Bounty Hunter™ (Part 4 of 4)",
+                                "version": "1.1_Patch_2_GOG",
+                                "date": "",
+                                "size": "0.9 GB"
+                            }
+                        ]
+                    }
+                ]
+            ],
+            "galaxyDownloads": [],
+            "extras": [],
+            "dlcs": [],
+            "tags": [],
+            "isPreOrder": false,
+            "releaseTimestamp": 1722495300,
+            "messages": [],
+            "changelog": "<h4>Patch 2 Full Changelist:</h4><ul>\n<li>Fixed an issue where Jango would occasionally get stuck in a hanging animation when trying to roll down an exit.</li>\n<li>Fixed an issue where button inputs performed while in a cutscene would count as in-game inputs.</li>\n<li>Made various improvements to Mouse and Keyboard control functionality.</li>\n<li>Made various graphical improvements for all platforms.</li>\n<li>There are no longer invisible grabbable edges on Chapter 2, Level 3: Upper City.</li>\n</ul><hr><h4>Patch 1 Full Changelist:</h4><ul>\n<li>Addressed a bug where the controller would rumble when Montross uses his jetpack during the Chapter 6 boss fight.</li>\n<li>Credits will now properly play after the final cutscene.</li>\n<li>Updated the Controls Screen to correctly display &quot;Free Aim&quot; instead of &quot;First Person Mode.&quot;</li>\n<li>Fixed a crash that occurred after acquiring the jetpack for the first time.</li>\n<li>Improved camera focus for smoother vertical movement on controller.</li>\n<li>Adjusted default audio settings for a better experience.</li>\n<li>Updated parental control values to align with PEGI 16 rating for specific regions.</li>\n<li>Added new cheat codes that alter the number of continues in the game.</li>\n</ul>",
+            "forumLink": "https://embed.gog.com/forum/star_wars_bounty_hunter",
+            "isBaseProductMissing": false,
+            "missingBaseProduct": null,
+            "features": [
+                "Achievements",
+                "Cloud saves",
+                "Overlay"
+            ],
+            "simpleGalaxyInstallers": [
+                {
+                    "path": "/downloads/star_wars_bounty_hunter/534adc9285a1addc2f492dcc8a94f2ed",
+                    "os": "windows"
+                }
+            ]
+        }
+    }
+}

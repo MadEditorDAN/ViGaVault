@@ -39,26 +39,20 @@ class MediaManagerDialog(QDialog):
         checkbox_layout = QGridLayout()
         
         self.chk_image = QCheckBox(translator.tr("media_manager_col_image"))
-        self.chk_video = QCheckBox(translator.tr("media_manager_col_video"))
         self.chk_trailer = QCheckBox(translator.tr("media_manager_col_trailer"))
         self.chk_image.setChecked(True)
-        self.chk_video.setChecked(True)
         self.chk_trailer.setChecked(True)
         
         self.lbl_missing_img = QLabel("")
-        self.lbl_missing_vid = QLabel("")
         self.lbl_missing_trl = QLabel("")
         label_style = "font-style: italic;"
         self.lbl_missing_img.setStyleSheet(label_style)
-        self.lbl_missing_vid.setStyleSheet(label_style)
         self.lbl_missing_trl.setStyleSheet(label_style)
         
         checkbox_layout.addWidget(self.chk_image, 0, 0)
         checkbox_layout.addWidget(self.lbl_missing_img, 0, 1)
-        checkbox_layout.addWidget(self.chk_video, 1, 0)
-        checkbox_layout.addWidget(self.lbl_missing_vid, 1, 1)
-        checkbox_layout.addWidget(self.chk_trailer, 2, 0)
-        checkbox_layout.addWidget(self.lbl_missing_trl, 2, 1)
+        checkbox_layout.addWidget(self.chk_trailer, 1, 0)
+        checkbox_layout.addWidget(self.lbl_missing_trl, 1, 1)
         
         lbl_notice = QLabel(translator.tr("media_manager_notice"))
         lbl_notice.setWordWrap(True)
@@ -88,12 +82,10 @@ class MediaManagerDialog(QDialog):
         self.table.setRowCount(0)
         
         check_img = self.chk_image.isChecked()
-        check_vid = self.chk_video.isChecked()
         check_trl = self.chk_trailer.isChecked()
         
         headers = [translator.tr("media_manager_col_game"), translator.tr("media_manager_col_copy")]
         if check_img: headers.append(translator.tr("media_manager_col_image"))
-        if check_vid: headers.append(translator.tr("media_manager_col_video"))
         if check_trl: headers.append(translator.tr("media_manager_col_trailer"))
         headers.extend([translator.tr("media_manager_col_import"), "URL", ""])
         
@@ -108,7 +100,6 @@ class MediaManagerDialog(QDialog):
         header.setSectionResizeMode(len(headers) - 1, QHeaderView.ResizeToContents)
         
         missing_img_count = 0
-        missing_vid_count = 0
         missing_trl_count = 0
         
         missing_games = []
@@ -116,16 +107,13 @@ class MediaManagerDialog(QDialog):
             trailer_link = game.data.get('Trailer_Link', '')
             
             has_img = str(game.data.get('Has_Image')).lower() in ['true', '1']
-            has_vid = str(game.data.get('Has_Video')).lower() in ['true', '1']
             has_trl = bool(trailer_link and trailer_link.startswith('http'))
             
             if not has_img: missing_img_count += 1
-            if not has_vid: missing_vid_count += 1
             if not has_trl: missing_trl_count += 1
             
             is_missing = False
             if check_img and not has_img: is_missing = True
-            if check_vid and not has_vid: is_missing = True
             if check_trl and not has_trl: is_missing = True
             
             if is_missing:
@@ -133,13 +121,11 @@ class MediaManagerDialog(QDialog):
                     'folder': folder,
                     'title': game.data.get('Clean_Title', folder),
                     'has_img': has_img,
-                    'has_vid': has_vid,
                     'has_trl': has_trl,
                     'game_obj': game
                 })
         
         self.lbl_missing_img.setText(translator.tr("media_manager_missing_count", count=missing_img_count))
-        self.lbl_missing_vid.setText(translator.tr("media_manager_missing_count", count=missing_vid_count))
         self.lbl_missing_trl.setText(translator.tr("media_manager_missing_count", count=missing_trl_count))
         
         # WHY: Smart Refresh - Freeze layout, pre-allocate rows, and cache disk items to prevent a repaint avalanche.
@@ -148,11 +134,11 @@ class MediaManagerDialog(QDialog):
         folder_icon = QIcon("assets/folder.png") if os.path.exists("assets/folder.png") else None
         
         for row, game_info in enumerate(sorted(missing_games, key=lambda x: x['title'].lower())):
-            self.add_table_row(row, game_info, check_img, check_vid, check_trl, folder_icon)
+            self.add_table_row(row, game_info, check_img, check_trl, folder_icon)
             
         self.table.setUpdatesEnabled(True)
             
-    def add_table_row(self, row, game_info, check_img, check_vid, check_trl, folder_icon):
+    def add_table_row(self, row, game_info, check_img, check_trl, folder_icon):
         col_idx = 0
         item_name = QTableWidgetItem(game_info['title'])
         item_name.setData(Qt.UserRole, game_info['folder'])
@@ -172,13 +158,6 @@ class MediaManagerDialog(QDialog):
             self.table.setItem(row, col_idx, item_img)
             col_idx += 1
         
-        if check_vid:
-            item_vid = QTableWidgetItem("✔" if game_info['has_vid'] else "❌")
-            item_vid.setTextAlignment(Qt.AlignCenter)
-            item_vid.setForeground(QColor("green") if game_info['has_vid'] else QColor("red"))
-            self.table.setItem(row, col_idx, item_vid)
-            col_idx += 1
-            
         if check_trl:
             item_trl = QTableWidgetItem("✔" if game_info['has_trl'] else "❌")
             item_trl.setTextAlignment(Qt.AlignCenter)
@@ -207,7 +186,7 @@ class MediaManagerDialog(QDialog):
         btn_apply.setEnabled(False)
         url_input.textChanged.connect(lambda text, b=btn_apply, btn=btn_import: b.setEnabled(bool(text.strip()) or bool(btn.property("selected_file"))))
         btn_import.clicked.connect(lambda _, r=row, b=btn_import, ab=btn_apply: self.import_local_file(r, b, ab))
-        btn_apply.clicked.connect(lambda _, r=row, f=game_info['folder'], i_c=import_col_idx, u_c=url_col_idx, ab=btn_apply: self.apply_media(r, f, i_c, u_c, check_img, check_vid, check_trl, ab))
+        btn_apply.clicked.connect(lambda _, r=row, f=game_info['folder'], i_c=import_col_idx, u_c=url_col_idx, ab=btn_apply: self.apply_media(r, f, i_c, u_c, check_img, check_trl, ab))
         self.table.setCellWidget(row, col_idx, btn_apply)
 
     def import_local_file(self, row, btn, apply_btn):
@@ -215,14 +194,14 @@ class MediaManagerDialog(QDialog):
             self, 
             translator.tr("media_manager_import_dialog_title"), 
             "", 
-            "Media Files (*.jpg *.jpeg *.png *.webp *.mp4 *.mkv *.avi *.wmv *.webm)"
+            "Image Files (*.jpg *.jpeg *.png *.webp)"
         )
         if file_path:
             btn.setProperty("selected_file", file_path)
             btn.setStyleSheet("background-color: #4CAF50;")
             apply_btn.setEnabled(True)
 
-    def apply_media(self, row, folder_name, import_col, url_col, check_img, check_vid, check_trl, btn_apply=None):
+    def apply_media(self, row, folder_name, import_col, url_col, check_img, check_trl, btn_apply=None):
         btn_import = self.table.cellWidget(row, import_col)
         url_input = self.table.cellWidget(row, url_col)
         
@@ -235,7 +214,6 @@ class MediaManagerDialog(QDialog):
         if not game: return
             
         img_exts = ['.jpg', '.jpeg', '.png', '.webp']
-        vid_exts = ['.mp4', '.mkv', '.avi', '.wmv', '.webm']
         
         is_youtube = False
         if url and ('youtube.com' in url or 'youtu.be' in url): is_youtube = True
@@ -244,7 +222,6 @@ class MediaManagerDialog(QDialog):
         if local_file:
             ext = os.path.splitext(local_file)[1].lower()
             if ext in img_exts: local_type = 'image'
-            elif ext in vid_exts: local_type = 'video'
             
         url_type = None
         if url:
@@ -256,11 +233,10 @@ class MediaManagerDialog(QDialog):
                 url_type = 'trailer'
             else:
                 import re
-                match = re.search(r'\.(jpg|jpeg|png|webp|mp4|mkv|avi|wmv|webm)\b', url, re.IGNORECASE)
+                match = re.search(r'\.(jpg|jpeg|png|webp)\b', url, re.IGNORECASE)
                 if match:
                     ext = match.group(0).lower()
                     if ext in img_exts: url_type = 'image'
-                    elif ext in vid_exts: url_type = 'video'
                 else:
                     QMessageBox.warning(self, "Error", translator.tr("media_manager_err_invalid_ext"))
                     return
@@ -285,18 +261,13 @@ class MediaManagerDialog(QDialog):
         try:
             if use_local:
                 ext = os.path.splitext(use_local)[1].lower()
-                is_img = ext in img_exts
-                dest_dir = self.manager.config.get('image_path', os.path.join(BASE_DIR, 'images')) if is_img else self.manager.config.get('video_path', os.path.join(BASE_DIR, 'videos'))
+                dest_dir = self.manager.config.get('image_path', os.path.join(BASE_DIR, 'images'))
                 os.makedirs(dest_dir, exist_ok=True)
                 dest_path = os.path.join(dest_dir, f"{safe_filename}{ext}")
                 
                 shutil.copy2(use_local, dest_path)
-                if is_img: 
-                    game.data['Image_Link'] = f"{safe_filename}{ext}"
-                    game.data['Has_Image'] = True
-                else: 
-                    game.data['Path_Video'] = f"{safe_filename}{ext}"
-                    game.data['Has_Video'] = True
+                game.data['Image_Link'] = f"{safe_filename}{ext}"
+                game.data['Has_Image'] = True
                 changes_made = True
                 
             if use_url:
@@ -305,10 +276,9 @@ class MediaManagerDialog(QDialog):
                     changes_made = True
                 else:
                     import re
-                    match = re.search(r'\.(jpg|jpeg|png|webp|mp4|mkv|avi|wmv|webm)\b', use_url, re.IGNORECASE)
+                    match = re.search(r'\.(jpg|jpeg|png|webp)\b', use_url, re.IGNORECASE)
                     ext = match.group(0).lower()
-                    is_img = ext in img_exts
-                    dest_dir = self.manager.config.get('image_path', os.path.join(BASE_DIR, 'images')) if is_img else self.manager.config.get('video_path', os.path.join(BASE_DIR, 'videos'))
+                    dest_dir = self.manager.config.get('image_path', os.path.join(BASE_DIR, 'images'))
                     os.makedirs(dest_dir, exist_ok=True)
                     dest_path = os.path.join(dest_dir, f"{safe_filename}{ext}")
                     
@@ -317,12 +287,8 @@ class MediaManagerDialog(QDialog):
                     if response.status_code == 200:
                         with open(dest_path, 'wb') as f:
                             shutil.copyfileobj(response.raw, f)
-                        if is_img: 
-                            game.data['Image_Link'] = f"{safe_filename}{ext}"
-                            game.data['Has_Image'] = True
-                        else: 
-                            game.data['Path_Video'] = f"{safe_filename}{ext}"
-                            game.data['Has_Video'] = True
+                        game.data['Image_Link'] = f"{safe_filename}{ext}"
+                        game.data['Has_Image'] = True
                         changes_made = True
                     else:
                         QMessageBox.warning(self, "Download Failed", f"HTTP {response.status_code}")
@@ -337,23 +303,13 @@ class MediaManagerDialog(QDialog):
 
             # WHY: Target update without reloading the entire UI.
             new_data = game.to_dict()
-            idx = self.parent_window.master_df.index[self.parent_window.master_df['Folder_Name'] == folder_name].tolist()
-            if idx:
-                # WHY: Dynamically check the Pandas column dtype. Prevents warnings when injecting strings into pure boolean columns.
-                for k, v in new_data.items():
-                    if k in self.parent_window.master_df.columns:
-                        self.parent_window.master_df.at[idx[0], k] = bool(v) if self.parent_window.master_df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
-            c_idx = self.parent_window.current_df.index[self.parent_window.current_df['Folder_Name'] == folder_name].tolist()
-            if c_idx:
-                for k, v in new_data.items():
-                    if k in self.parent_window.current_df.columns:
-                        self.parent_window.current_df.at[c_idx[0], k] = bool(v) if self.parent_window.current_df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
+            if hasattr(self.parent_window, 'library_controller'):
+                self.parent_window.library_controller.patch_memory_df(folder_name, new_data)
                 
             if hasattr(self.parent_window, 'list_controller'):
                 self.parent_window.list_controller.update_single_card(folder_name, force_media_reload=True)
             
             has_img = str(game.data.get('Has_Image')).lower() in ['true', '1']
-            has_vid = str(game.data.get('Has_Video')).lower() in ['true', '1']
             trailer_link = game.data.get('Trailer_Link', '')
             has_trl = bool(trailer_link and trailer_link.startswith('http'))
             
@@ -362,12 +318,6 @@ class MediaManagerDialog(QDialog):
                 item_img = self.table.item(row, col_idx)
                 item_img.setText("✔" if has_img else "❌")
                 item_img.setForeground(QColor("green") if has_img else QColor("red"))
-                col_idx += 1
-                
-            if check_vid:
-                item_vid = self.table.item(row, col_idx)
-                item_vid.setText("✔" if has_vid else "❌")
-                item_vid.setForeground(QColor("green") if has_vid else QColor("red"))
                 col_idx += 1
                 
             if check_trl:

@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QListView, QWidget,
 from PySide6.QtCore import Qt, QTimer, QThreadPool, Slot
 from PySide6.QtGui import QFont
 
-from ViGaVault_utils import setup_logging, translator, apply_theme, MAIN_WINDOW_SIZE
+from ViGaVault_utils import setup_logging, translator, apply_theme, MAIN_WINDOW_SIZE, DEFAULT_DISPLAY_SETTINGS
 from ViGaVault_widgets import Sidebar
 
 from controllers import MenuController, LibraryController, ListController, FilterController, ScanController
@@ -22,7 +22,7 @@ class MainWindow(QMainWindow):
         self.resize(*MAIN_WINDOW_SIZE)
         self.is_startup = True
         self.sort_desc = True
-        self.display_settings = {'image': 200, 'button': 45, 'text': 22}
+        self.display_settings = DEFAULT_DISPLAY_SETTINGS.copy()
         self.thread_pool = QThreadPool()
         
         
@@ -69,6 +69,14 @@ class MainWindow(QMainWindow):
         self.master_df['temp_sort_date'] = pd.to_datetime([])
         self.master_df['temp_sort_title'] = []
         
+        global_settings = {}
+        if os.path.exists("settings.json"):
+            try:
+                with open("settings.json", "r", encoding='utf-8') as f:
+                    global_settings = json.load(f)
+            except: pass
+            
+        self.date_format_str = global_settings.get("date_format", "DD/MM/YYYY")
         # WHY: Instantiate Controllers
         self.menu_controller = MenuController(self)
         self.library_controller = LibraryController(self)
@@ -92,15 +100,18 @@ class MainWindow(QMainWindow):
             if saved_anchor:
                 self.pending_anchor_folder = saved_anchor
         else:
-            self.sidebar.combo_sort.setCurrentIndex(1)
+            self.sidebar.combo_sort.setCurrentIndex(0)
 
     # =================================================================================
     # WHY: Proxy Methods limit coupling issues and safely override the 
     # deprecated monolithic functions left over in this file.
     # =================================================================================
     def request_filter_update(self): self.filter_controller.request_filter_update()
+    def approve_reviews(self): self.library_controller.approve_reviews()
     def toggle_sort_order(self): self.filter_controller.toggle_sort_order()
     def start_full_scan(self): self.scan_controller.start_full_scan()
+    def open_scan_settings(self): self.scan_controller.open_scan_settings()
+    def close_scan_settings(self): self.scan_controller.close_scan_settings()
     def on_manual_search_trigger(self): self.scan_controller.on_manual_search_trigger()
     def apply_inline_selection(self): self.scan_controller.apply_inline_selection()
     def cancel_inline_scan(self): self.scan_controller.cancel_inline_scan()

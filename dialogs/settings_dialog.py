@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QW
                                QFileDialog, QGridLayout, QScrollArea, QFrame, QMessageBox, QSizePolicy)
 from PySide6.QtCore import Qt
 
-from ViGaVault_utils import BASE_DIR, get_library_settings_file, translator, DIALOG_STD_SIZE, center_window
+from ViGaVault_utils import BASE_DIR, get_library_settings_file, translator, DIALOG_STD_SIZE, center_window, DEFAULT_DISPLAY_SETTINGS
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None):
@@ -20,8 +20,8 @@ class SettingsDialog(QDialog):
         self.btn_apply = None
 
         # WHY: Apply user-requested size limits.
-        self.IMG_SIZES = [175, 200, 225, 250, 275, 300]
-        self.BTN_SIZES = [25, 30, 35, 40, 45, 50, 55]
+        self.IMG_SIZES = [150, 175, 200, 225, 250, 275, 300]
+        self.BTN_SIZES = [35, 40, 45, 50, 55, 60, 65]
         self.TXT_SIZES = [14, 16, 18, 20, 22, 24, 26]
 
         self.resize(*DIALOG_STD_SIZE)
@@ -75,13 +75,26 @@ class SettingsDialog(QDialog):
         layout_theme.addWidget(self.combo_theme)
         layout.addWidget(grp_theme)
         
-        grp_lang = QGroupBox(translator.tr("settings_display_language"))
-        layout_lang = QVBoxLayout(grp_lang)
+        grp_reg = QGroupBox(translator.tr("settings_display_regional"))
+        layout_reg = QHBoxLayout(grp_reg)
+        
+        col_lang = QVBoxLayout()
+        col_lang.addWidget(QLabel(translator.tr("settings_display_language")))
         self.combo_lang = QComboBox()
         self.combo_lang.addItems(["English", "French", "German", "Spanish", "Italian"])
         self.combo_lang.currentIndexChanged.connect(self.mark_changed)
-        layout_lang.addWidget(self.combo_lang)
-        layout.addWidget(grp_lang)
+        col_lang.addWidget(self.combo_lang)
+        
+        col_date = QVBoxLayout()
+        col_date.addWidget(QLabel(translator.tr("settings_display_date_format")))
+        self.combo_date = QComboBox()
+        self.combo_date.addItems(["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"])
+        self.combo_date.currentIndexChanged.connect(self.mark_changed)
+        col_date.addWidget(self.combo_date)
+        
+        layout_reg.addLayout(col_lang)
+        layout_reg.addLayout(col_date)
+        layout.addWidget(grp_reg)
         
         grp_sizes = QGroupBox(translator.tr("settings_display_sizes_group"))
         layout_sizes = QFormLayout(grp_sizes)
@@ -145,14 +158,14 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(self.tab_folders)
         
         self.chk_scan_local = QCheckBox(translator.tr("settings_folders_scan_local"))
-        self.chk_scan_local.setChecked(True)
+        self.chk_scan_local.setChecked(False)
         self.chk_scan_local.toggled.connect(self.mark_changed)
         self.chk_scan_local.toggled.connect(self.toggle_local_scan_options)
         layout.addWidget(self.chk_scan_local)
 
         grp_root = QGroupBox(translator.tr("settings_folders_root_group"))
         layout_root = QFormLayout(grp_root)
-        self.root_path_input = QLineEdit(r"\\madhdd02\Software\GAMES")
+        self.root_path_input = QLineEdit("")
         self.root_path_input.textChanged.connect(self.mark_changed)
         self.btn_browse_root = QPushButton("...")
         self.btn_browse_root.setFixedWidth(40)
@@ -353,27 +366,27 @@ class SettingsDialog(QDialog):
     def setup_data_tab(self):
         layout = QVBoxLayout(self.tab_data)
 
-        grp_gog = QGroupBox(translator.tr("settings_data_gog_group"))
-        layout_gog = QGridLayout(grp_gog)
+        grp_galaxy = QGroupBox(translator.tr("settings_data_galaxy_group"))
+        layout_galaxy = QGridLayout(grp_galaxy)
         
-        self.chk_enable_gog = QCheckBox(translator.tr("settings_data_gog_checkbox"))
-        self.chk_enable_gog.toggled.connect(self.toggle_gog_input)
+        self.chk_enable_galaxy = QCheckBox(translator.tr("settings_data_galaxy_checkbox"))
+        self.chk_enable_galaxy.toggled.connect(self.toggle_galaxy_input)
 
-        self.gog_db_input = QLineEdit()
-        self.gog_db_input.textChanged.connect(self.mark_changed)
+        self.galaxy_db_input = QLineEdit()
+        self.galaxy_db_input.textChanged.connect(self.mark_changed)
         default_path = os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db')
-        self.gog_db_input.setText(default_path)
-        self.chk_enable_gog.toggled.connect(self.mark_changed)
+        self.galaxy_db_input.setText(default_path)
+        self.chk_enable_galaxy.toggled.connect(self.mark_changed)
         
-        self.btn_browse_gog = QPushButton("...")
-        self.btn_browse_gog.setFixedWidth(40)
-        self.btn_browse_gog.clicked.connect(self.browse_gog_db)
+        self.btn_browse_galaxy = QPushButton("...")
+        self.btn_browse_galaxy.setFixedWidth(40)
+        self.btn_browse_galaxy.clicked.connect(self.browse_galaxy_db)
         
-        layout_gog.addWidget(self.chk_enable_gog, 0, 0)
-        layout_gog.addWidget(self.gog_db_input, 0, 1)
-        layout_gog.addWidget(self.btn_browse_gog, 0, 2)
+        layout_galaxy.addWidget(self.chk_enable_galaxy, 0, 0)
+        layout_galaxy.addWidget(self.galaxy_db_input, 0, 1)
+        layout_galaxy.addWidget(self.btn_browse_galaxy, 0, 2)
         
-        layout.addWidget(grp_gog)
+        layout.addWidget(grp_galaxy)
         
         grp_media = QGroupBox(translator.tr("settings_data_media_group"))
         # WHY: A QGridLayout with setColumnStretch aligns all items perfectly across rows, 
@@ -392,18 +405,6 @@ class SettingsDialog(QDialog):
         self.chk_download_images.toggled.connect(self.mark_changed)
         layout_media.addWidget(self.chk_download_images, 0, 3)
         
-        layout_media.addWidget(QLabel(translator.tr("settings_data_media_videos_path")), 1, 0)
-        self.video_path_input = QLineEdit()
-        self.video_path_input.textChanged.connect(self.mark_changed)
-        layout_media.addWidget(self.video_path_input, 1, 1)
-        self.btn_browse_video = QPushButton("...")
-        self.btn_browse_video.setFixedWidth(40)
-        self.btn_browse_video.clicked.connect(self.browse_video_path)
-        layout_media.addWidget(self.btn_browse_video, 1, 2)
-        self.chk_download_videos = QCheckBox(translator.tr("settings_data_media_download_videos"))
-        self.chk_download_videos.toggled.connect(self.mark_changed)
-        layout_media.addWidget(self.chk_download_videos, 1, 3)
-        
         layout_media.setColumnStretch(1, 1)
         
         layout.addWidget(grp_media)
@@ -413,21 +414,17 @@ class SettingsDialog(QDialog):
         dir_path = QFileDialog.getExistingDirectory(self, "Select Root Folder", self.root_path_input.text())
         if dir_path: self.root_path_input.setText(os.path.normpath(dir_path))
 
-    def browse_gog_db(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select GOG Database", self.gog_db_input.text(), "SQLite DB (*.db);;All Files (*.*)")
-        if file_path: self.gog_db_input.setText(file_path)
+    def browse_galaxy_db(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select Galaxy Database", self.galaxy_db_input.text(), "SQLite DB (*.db);;All Files (*.*)")
+        if file_path: self.galaxy_db_input.setText(file_path)
 
     def browse_image_path(self):
         dir_path = QFileDialog.getExistingDirectory(self, "Select Images Folder", self.image_path_input.text())
         if dir_path: self.image_path_input.setText(os.path.normpath(dir_path))
 
-    def browse_video_path(self):
-        dir_path = QFileDialog.getExistingDirectory(self, "Select Videos Folder", self.video_path_input.text())
-        if dir_path: self.video_path_input.setText(os.path.normpath(dir_path))
-
-    def toggle_gog_input(self, checked):
-        self.gog_db_input.setEnabled(checked)
-        self.btn_browse_gog.setEnabled(checked)
+    def toggle_galaxy_input(self, checked):
+        self.galaxy_db_input.setEnabled(checked)
+        self.btn_browse_galaxy.setEnabled(checked)
 
     def load_settings(self):
         global_settings = {}
@@ -453,28 +450,31 @@ class SettingsDialog(QDialog):
         saved_theme_key = global_settings.get("theme", "System")
         self.combo_theme.setCurrentText(theme_map.get(saved_theme_key, translator.tr("theme_system")))
         self.combo_lang.setCurrentText(global_settings.get("language", "English"))
+        
+        self.combo_date.setCurrentText(global_settings.get("date_format", "DD/MM/YYYY"))
+        self.initial_date = global_settings.get("date_format", "DD/MM/YYYY")
 
-        saved_img_size = global_settings.get("card_image_size", 200)
+        saved_img_size = global_settings.get("card_image_size", DEFAULT_DISPLAY_SETTINGS['image'])
         img_index = self.IMG_SIZES.index(min(self.IMG_SIZES, key=lambda x:abs(x-saved_img_size)))
         self.slider_img_size.setValue(img_index)
 
-        saved_btn_size = global_settings.get("card_button_size", 45)
+        saved_btn_size = global_settings.get("card_button_size", DEFAULT_DISPLAY_SETTINGS['button'])
         btn_index = self.BTN_SIZES.index(min(self.BTN_SIZES, key=lambda x:abs(x-saved_btn_size)))
         self.slider_btn_size.setValue(btn_index)
 
-        saved_txt_size = global_settings.get("card_text_size", 22)
+        saved_txt_size = global_settings.get("card_text_size", DEFAULT_DISPLAY_SETTINGS['text'])
         txt_index = self.TXT_SIZES.index(min(self.TXT_SIZES, key=lambda x:abs(x-saved_txt_size)))
         self.slider_text_size.setValue(txt_index)
         self.update_preview_labels()
 
-        self.root_path_input.setText(lib_settings.get("root_path", r"\\madhdd02\Software\GAMES"))
+        self.root_path_input.setText(lib_settings.get("root_path", ""))
         
         local_config = lib_settings.get("local_scan_config", {})
-        self.chk_scan_local.setChecked(local_config.get("enable_local_scan", True))
+        self.chk_scan_local.setChecked(local_config.get("enable_local_scan", False))
         self.toggle_local_scan_options(self.chk_scan_local.isChecked())
         self.chk_ignore_hidden.setChecked(local_config.get("ignore_hidden", True))
         
-        self.current_scan_mode = local_config.get("scan_mode", "advanced")
+        self.current_scan_mode = local_config.get("scan_mode", "simple")
         self.combo_global_type.setCurrentText(local_config.get("global_type", "Genre"))
         self.chk_global_filter.setChecked(local_config.get("global_filter", True))
 
@@ -483,12 +483,12 @@ class SettingsDialog(QDialog):
         
         self.populate_folders_list(local_config.get("folder_rules", {}))
         
-        self.chk_enable_gog.setChecked(lib_settings.get("enable_gog_db", True))
-        self.gog_db_input.setText(lib_settings.get("gog_db_path", self.gog_db_input.text()))
-        self.toggle_gog_input(self.chk_enable_gog.isChecked())
+        self.chk_enable_galaxy.setChecked(lib_settings.get("enable_galaxy_db", False))
+        self.galaxy_db_input.setText(lib_settings.get("galaxy_db_path", self.galaxy_db_input.text()))
+        self.toggle_galaxy_input(self.chk_enable_galaxy.isChecked())
         
         # WHY: Ensure the dialog reads the saved state from disk on open.
-        self.chk_download_images.setChecked(lib_settings.get("download_images", True))
+        self.chk_download_images.setChecked(lib_settings.get("download_images", False))
         default_image_path = os.path.join(BASE_DIR, "images")
         self.image_path_input.setText(lib_settings.get("image_path", default_image_path))
         self.original_image_path = self.image_path_input.text()
@@ -496,16 +496,12 @@ class SettingsDialog(QDialog):
         # WHY: "Dirty Flags" initialization. We save the starting states of purely cosmetic variables.
         self.initial_theme = global_settings.get("theme", "System")
         self.initial_lang = global_settings.get("language", "English")
-        self.initial_img_size = global_settings.get("card_image_size", 200)
-        self.initial_btn_size = global_settings.get("card_button_size", 45)
-        self.initial_txt_size = global_settings.get("card_text_size", 22)
-        self.initial_gog = lib_settings.get("enable_gog_db", True)
-        self.initial_local = lib_settings.get("local_scan_config", {}).get("enable_local_scan", True)
-        
-        self.chk_download_videos.setChecked(lib_settings.get("download_videos", False))
-        default_video_path = os.path.join(BASE_DIR, "videos")
-        self.video_path_input.setText(lib_settings.get("video_path", default_video_path))
-        self.original_video_path = self.video_path_input.text()
+        self.initial_img_size = global_settings.get("card_image_size", DEFAULT_DISPLAY_SETTINGS['image'])
+        self.initial_btn_size = global_settings.get("card_button_size", DEFAULT_DISPLAY_SETTINGS['button'])
+        self.initial_txt_size = global_settings.get("card_text_size", DEFAULT_DISPLAY_SETTINGS['text'])
+        self.initial_galaxy = lib_settings.get("enable_galaxy_db", False)
+        self.initial_gog_web = lib_settings.get("sidebar_chk_gog_web", False)
+        self.initial_local = lib_settings.get("local_scan_config", {}).get("enable_local_scan", False)
         
         # WHY: Disable the apply button after loading state programmatically.
         self.btn_apply.setEnabled(False)
@@ -525,12 +521,13 @@ class SettingsDialog(QDialog):
         }
         global_settings["theme"] = theme_map_rev.get(self.combo_theme.currentText(), "System")
         global_settings["language"] = self.combo_lang.currentText()
+        global_settings["date_format"] = self.combo_date.currentText()
         global_settings["card_image_size"] = self.IMG_SIZES[self.slider_img_size.value()]
         global_settings["card_button_size"] = self.BTN_SIZES[self.slider_btn_size.value()]
         global_settings["card_text_size"] = self.TXT_SIZES[self.slider_text_size.value()]
         
         # WHY: Targeted Cleanup - Scrub local library data out of the global settings file.
-        local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "scan_new", "filter_states", "filter_expansion", "sidebar_chk_gog", "sidebar_chk_local", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_gog_db", "gog_db_path", "download_images", "download_videos", "image_path", "video_path"]
+        local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "scan_new", "filter_states", "filter_expansion", "sidebar_chk_galaxy", "sidebar_chk_gog_web", "sidebar_chk_local", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_galaxy_db", "galaxy_db_path", "download_images", "download_videos", "image_path", "video_path"]
         for k in local_keys: global_settings.pop(k, None)
         
         try:
@@ -572,10 +569,9 @@ class SettingsDialog(QDialog):
             "folder_rules": folder_rules
         }
         
-        lib_settings["enable_gog_db"] = self.chk_enable_gog.isChecked()
-        lib_settings["gog_db_path"] = self.gog_db_input.text()
+        lib_settings["enable_galaxy_db"] = self.chk_enable_galaxy.isChecked()
+        lib_settings["galaxy_db_path"] = self.galaxy_db_input.text()
         lib_settings["download_images"] = self.chk_download_images.isChecked()
-        lib_settings["download_videos"] = self.chk_download_videos.isChecked()
         
         new_image_path = self.image_path_input.text()
         lib_settings["image_path"] = new_image_path
@@ -591,22 +587,6 @@ class SettingsDialog(QDialog):
             if reply == QMessageBox.Yes:
                 self.move_media_files(self.original_image_path, new_image_path, "image")
         self.original_image_path = new_image_path
-        
-        new_video_path = self.video_path_input.text()
-        lib_settings["video_path"] = new_video_path
-        
-        if new_video_path != self.original_video_path and os.path.exists(self.original_video_path):
-            reply = QMessageBox.question(self, "Move Video Files?",
-                f"The video folder has changed from:\n{self.original_video_path}\nto:\n{new_video_path}\n\n"
-                "Do you want to move existing video files to the new location?\n\n"
-                "YES: Moves files to the new location.\n"
-                "NO: Does NOT move files (Links may break until you move files manually).",
-                QMessageBox.Yes | QMessageBox.No)
-            
-            if reply == QMessageBox.Yes:
-                self.move_media_files(self.original_video_path, new_video_path, "video")
-        
-        self.original_video_path = new_video_path
         
         try:
             with open(lib_settings_file, "w", encoding='utf-8') as f:
@@ -639,15 +619,17 @@ class SettingsDialog(QDialog):
         theme_map_rev = {translator.tr("theme_system"): "System", translator.tr("theme_dark"): "Dark", translator.tr("theme_light"): "Light"}
         new_theme = theme_map_rev.get(self.combo_theme.currentText(), "System")
         new_lang = self.combo_lang.currentText()
+        new_date = self.combo_date.currentText()
         new_img = self.IMG_SIZES[self.slider_img_size.value()]
         new_btn = self.BTN_SIZES[self.slider_btn_size.value()]
         new_txt = self.TXT_SIZES[self.slider_text_size.value()]
         
-        if new_theme != self.initial_theme or new_lang != self.initial_lang:
+        if new_theme != self.initial_theme or new_lang != self.initial_lang or new_date != self.initial_date:
             if self.parent_window and hasattr(self.parent_window, 'reload_global_settings'):
                 self.parent_window.reload_global_settings()
                 self.initial_theme = new_theme
                 self.initial_lang = new_lang
+                self.initial_date = new_date
                 
         if new_img != self.initial_img_size or new_btn != self.initial_btn_size or new_txt != self.initial_txt_size:
             if self.parent_window and hasattr(self.parent_window, 'list_controller'):
@@ -656,18 +638,22 @@ class SettingsDialog(QDialog):
                 self.initial_btn_size = new_btn
                 self.initial_txt_size = new_txt
                 
-        new_gog = self.chk_enable_gog.isChecked()
+        new_galaxy = self.chk_enable_galaxy.isChecked()
+        new_gog_web = self.parent_window.sidebar.chk_scan_gog_web.isChecked() if self.parent_window else self.initial_gog_web
         new_local = self.chk_scan_local.isChecked()
         
         # WHY: Dynamically push disabled states back to the quick-toggles in the sidebar
-        if new_gog != self.initial_gog or new_local != self.initial_local:
+        if new_galaxy != self.initial_galaxy or new_local != self.initial_local or new_gog_web != self.initial_gog_web:
             if self.parent_window and hasattr(self.parent_window, 'sidebar'):
-                self.parent_window.sidebar.chk_scan_gog.setEnabled(new_gog)
-                if not new_gog: self.parent_window.sidebar.chk_scan_gog.setChecked(False)
+                self.parent_window.sidebar.chk_scan_galaxy.setEnabled(new_galaxy)
+                if not new_galaxy: self.parent_window.sidebar.chk_scan_galaxy.setChecked(False)
                 self.parent_window.sidebar.chk_scan_local.setEnabled(new_local)
                 if not new_local: self.parent_window.sidebar.chk_scan_local.setChecked(False)
-            self.initial_gog = new_gog
-            self.initial_local = new_local
+            self.initial_galaxy = new_galaxy
+            self.initial_gog_web = new_gog_web
+            
+        if self.parent_window and hasattr(self.parent_window, 'library_controller'):
+            self.parent_window.library_controller.refresh_scan_folders_ui()
             
         # WHY: State successfully committed.
         self.btn_apply.setEnabled(False)

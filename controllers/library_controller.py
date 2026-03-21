@@ -5,11 +5,11 @@ import logging
 from datetime import datetime
 import pandas as pd
 from PySide6.QtCore import QObject, Slot, QByteArray, Qt, QPoint
-from PySide6.QtWidgets import QFileDialog, QMessageBox, QApplication
+from PySide6.QtWidgets import QFileDialog, QMessageBox, QApplication, QCheckBox
 
 from backend.library import LibraryManager
 from ViGaVault_utils import (get_db_path, get_library_settings_file, build_scanner_config, 
-                             get_platform_config, apply_theme, translator)
+                             get_platform_config, apply_theme, translator, DEFAULT_DISPLAY_SETTINGS)
 from ViGaVault_utils import get_image_path, get_video_path
 from ViGaVault_workers import DbLoaderWorker, StartupSyncWorker
 from dialogs import ConflictDialog
@@ -41,6 +41,23 @@ class LibraryController(QObject):
                 return self.mw.list_widget.model().data(self.mw.list_widget.model().index(row + 1, 0), Qt.UserRole + 1)
             return self.mw.list_widget.model().data(first_index, Qt.UserRole + 1)
         return None
+
+    def update_status_checkboxes_state(self):
+        """WHY: Single Responsibility Principle - Actively inspects the database to grey out options that have no results."""
+        if not hasattr(self.mw, 'master_df') or self.mw.master_df.empty: return
+            
+        # WHY: Include both strictly new games AND games that failed the metadata fetch (NEEDS_ATTENTION)
+        # under the "Show NEW" toggle umbrella so they don't become permanently invisible ghosts.
+        has_new = 'NEW' in self.mw.master_df['Status_Flag'].values or 'NEEDS_ATTENTION' in self.mw.master_df['Status_Flag'].values
+        has_review = 'REVIEW' in self.mw.master_df['Status_Flag'].values
+        
+        self.mw.sidebar.chk_show_new.setEnabled(has_new)
+        self.mw.sidebar.chk_show_review.setEnabled(has_review)
+        self.mw.sidebar.btn_approve_review.setEnabled(has_review)
+        
+        # Uncheck instantly if there are no more results to prevent a blank UI
+        if not has_new and self.mw.sidebar.chk_show_new.isChecked(): self.mw.sidebar.chk_show_new.setChecked(False)
+        if not has_review and self.mw.sidebar.chk_show_review.isChecked(): self.mw.sidebar.chk_show_review.setChecked(False)
 
     def update_library_info(self):
         lib_name = os.path.basename(get_db_path()).replace('.csv', '')
@@ -74,10 +91,10 @@ class LibraryController(QObject):
                     
                     lib_settings_path = os.path.splitext(filePath)[0] + ".json"
                     default_lib_settings = {
-                        "root_path": r"\\madhdd02\Software\GAMES",
-                        "local_scan_config": {"ignore_hidden": True, "scan_mode": "advanced", "global_type": "Genre", "folder_rules": {}},
-                        "gog_db_path": os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db'),
-                        "enable_gog_db": True, "sort_desc": True, "sort_index": 1, "scan_new": False, "filter_states": {}, "filter_expansion": {}
+                        "root_path": "",
+                        "local_scan_config": {"enable_local_scan": False, "ignore_hidden": True, "scan_mode": "simple", "global_type": "Genre", "global_filter": True, "folder_rules": {}},
+                        "galaxy_db_path": os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db'),
+                        "enable_galaxy_db": False, "download_images": False, "download_videos": False, "sort_desc": True, "sort_index": 0, "scan_new": False, "filter_states": {}, "filter_expansion": {}
                     }
                     with open(lib_settings_path, "w", encoding='utf-8') as f:
                         json.dump(default_lib_settings, f, indent=4)
@@ -131,17 +148,24 @@ class LibraryController(QObject):
 
         self.mw.sidebar.combo_sort.blockSignals(True)
         self.mw.sidebar.chk_show_new.blockSignals(True)
+        self.mw.sidebar.chk_show_review.blockSignals(True)
 
         self.mw.sort_desc = lib_settings.get("sort_desc", True)
-        self.mw.sidebar.combo_sort.setCurrentIndex(lib_settings.get("sort_index", 1))
+        self.mw.sidebar.combo_sort.setCurrentIndex(lib_settings.get("sort_index", 0))
         self.mw.sidebar.search_bar.setText(lib_settings.get("search_text", ""))
         self.mw.sidebar.chk_show_new.setChecked(lib_settings.get("scan_new", False))
         self.mw.sidebar.update_sort_button(self.mw.sort_desc)
 
         self.mw.sidebar.combo_sort.blockSignals(False)
         self.mw.sidebar.chk_show_new.blockSignals(False)
+        self.mw.sidebar.chk_show_review.blockSignals(False)
+        self.update_status_checkboxes_state()
 
         self.update_library_info()
+        
+        # WHY: Generate the dynamic folder checkboxes strictly AFTER the specific library context 
+        # is fully loaded. This guarantees the correct VGVDB.json rules are applied on boot and when switching libraries!
+        self.refresh_scan_folders_ui()
 
         if self.mw.is_startup:
             self.mw.filter_controller.start_filter_worker()
@@ -157,6 +181,21 @@ class LibraryController(QObject):
     @Slot(bool)
     def on_startup_sync_finished(self, changes_made):
         if changes_made: self.refresh_data()
+
+    def patch_memory_df(self, folder_name, new_data):
+        """WHY: DRY Principle - Centralizes the Pandas memory patching logic to ensure type safety and prevent FutureWarnings."""
+        for df_name in ['master_df', 'current_df']:
+            if hasattr(self.mw, df_name):
+                df = getattr(self.mw, df_name)
+                idx = df.index[df['Folder_Name'] == folder_name].tolist()
+                if idx:
+                    for k, v in new_data.items():
+                        if k in df.columns:
+                            # WHY: Pre-cast columns to object to prevent Pandas from throwing FutureWarnings 
+                            # when injecting strings into columns it previously inferred as pure int/float.
+                            if df[k].dtype not in [bool, object]:
+                                df[k] = df[k].astype(object)
+                            df.at[idx[0], k] = bool(v) if df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
 
     def save_database(self):
         logging.info("Manual save requested.")
@@ -184,6 +223,34 @@ class LibraryController(QObject):
             logging.error(f"Failed to save database: {e}")
             QMessageBox.critical(self.mw, "Error", f"Could not save the library: {e}")
 
+    def approve_reviews(self):
+        """WHY: Instantly converts all pending REVIEW games into OK status and synchronizes the UI."""
+        manager = LibraryManager(build_scanner_config())
+        manager.load_db()
+        changes_made = False
+        for folder, game in manager.games.items():
+            if game.data.get('Status_Flag') == 'REVIEW':
+                game.data['Status_Flag'] = 'OK'
+                changes_made = True
+                
+        if changes_made:
+            while True:
+                try:
+                    manager.save_db()
+                    break
+                except PermissionError:
+                    reply = QMessageBox.warning(self.mw, "File Locked", translator.tr("msg_file_locked", db_path=get_db_path()), QMessageBox.Ok | QMessageBox.Cancel)
+                    if reply == QMessageBox.Cancel: return
+
+            if 'Status_Flag' in self.mw.master_df.columns:
+                self.mw.master_df.loc[self.mw.master_df['Status_Flag'] == 'REVIEW', 'Status_Flag'] = 'OK'
+            if 'Status_Flag' in self.mw.current_df.columns:
+                self.mw.current_df.loc[self.mw.current_df['Status_Flag'] == 'REVIEW', 'Status_Flag'] = 'OK'
+
+            self.update_status_checkboxes_state()
+            self.mw.list_controller.update_visible_widgets()
+            logging.info("Approved all games pending review.")
+
     def update_game_data(self, folder_name, new_data):
         manager = LibraryManager(build_scanner_config())
         manager.load_db()
@@ -207,19 +274,8 @@ class LibraryController(QObject):
         # WHY: Patch Memory and Trigger Targeted Update instead of Hard Reload
         # Extract the final dictionary from the Game object AFTER media renaming has occurred
         final_data = game_obj.to_dict()
-        
-        idx = self.mw.master_df.index[self.mw.master_df['Folder_Name'] == folder_name].tolist()
-        if idx:
-            # WHY: Dynamically check the Pandas column dtype. Prevents warnings when injecting strings into pure boolean columns.
-            for k, v in final_data.items():
-                if k in self.mw.master_df.columns:
-                    self.mw.master_df.at[idx[0], k] = bool(v) if self.mw.master_df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
-            
-        c_idx = self.mw.current_df.index[self.mw.current_df['Folder_Name'] == folder_name].tolist()
-        if c_idx:
-            for k, v in final_data.items():
-                if k in self.mw.current_df.columns:
-                    self.mw.current_df.at[c_idx[0], k] = bool(v) if self.mw.current_df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
+        self.patch_memory_df(folder_name, final_data)
+        self.update_status_checkboxes_state()
             
         self.mw.list_controller.update_single_card(folder_name, force_media_reload=True)
         self.save_settings()
@@ -264,19 +320,11 @@ class LibraryController(QObject):
         
         # WHY: Soft-refresh logic (Memory Patch + Visually deleting the sacrificed card)
         new_data_a = game_a.to_dict()
-        idx_a = self.mw.master_df.index[self.mw.master_df['Folder_Name'] == folder_a].tolist()
-        if idx_a:
-            for k, v in new_data_a.items():
-                if k in self.mw.master_df.columns:
-                    self.mw.master_df.at[idx_a[0], k] = bool(v) if self.mw.master_df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
-        c_idx_a = self.mw.current_df.index[self.mw.current_df['Folder_Name'] == folder_a].tolist()
-        if c_idx_a:
-            for k, v in new_data_a.items():
-                if k in self.mw.current_df.columns:
-                    self.mw.current_df.at[c_idx_a[0], k] = bool(v) if self.mw.current_df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
+        self.patch_memory_df(folder_a, new_data_a)
             
         self.mw.master_df = self.mw.master_df[self.mw.master_df['Folder_Name'] != folder_b]
         self.mw.current_df = self.mw.current_df[self.mw.current_df['Folder_Name'] != folder_b]
+        self.update_status_checkboxes_state()
 
         self.mw.list_controller.update_single_card(folder_a, force_media_reload=True)
         self.mw.list_controller.remove_single_card(folder_b)
@@ -290,16 +338,7 @@ class LibraryController(QObject):
         if game:
             for k, v in flags_dict.items(): game.data[k] = v
             manager.save_db()
-            idx = self.mw.master_df.index[self.mw.master_df['Folder_Name'] == folder_name].tolist()
-            if idx:
-                for k, v in flags_dict.items():
-                    if k in self.mw.master_df.columns:
-                        self.mw.master_df.at[idx[0], k] = bool(v) if self.mw.master_df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
-            c_idx = self.mw.current_df.index[self.mw.current_df['Folder_Name'] == folder_name].tolist()
-            if c_idx:
-                for k, v in flags_dict.items():
-                    if k in self.mw.current_df.columns:
-                        self.mw.current_df.at[c_idx[0], k] = bool(v) if self.mw.current_df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
+            self.patch_memory_df(folder_name, flags_dict)
 
     def delete_game(self, folder_name):
         """
@@ -328,6 +367,7 @@ class LibraryController(QObject):
         self.mw.master_df = self.mw.master_df[self.mw.master_df['Folder_Name'] != folder_name]
         self.mw.current_df = self.mw.current_df[self.mw.current_df['Folder_Name'] != folder_name]
         self.mw.list_controller.remove_single_card(folder_name)
+        self.update_status_checkboxes_state()
         self.save_settings()
         logging.info(f"Deleted game and media completely: {folder_name}")
 
@@ -384,7 +424,7 @@ class LibraryController(QObject):
         global_settings.update({"geometry": self.mw.saveGeometry().toBase64().data().decode()})
         
         # WHY: Targeted Cleanup - Scrub local library data out of the global settings file to fix legacy data bleed.
-        local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "scan_new", "filter_states", "filter_expansion", "sidebar_chk_gog", "sidebar_chk_local", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_gog_db", "gog_db_path", "download_images", "download_videos", "image_path", "video_path"]
+        local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "scan_new", "filter_states", "filter_expansion", "sidebar_chk_galaxy", "sidebar_chk_gog_web", "sidebar_chk_local", "sidebar_chk_folders", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_galaxy_db", "galaxy_db_path", "download_images", "download_videos", "image_path", "video_path"]
         for k in local_keys: global_settings.pop(k, None)
         
         try:
@@ -419,6 +459,8 @@ class LibraryController(QObject):
                 group = item.widget()
                 saved_expansion[group.title] = group.toggle_btn.isChecked()
 
+        checked_folders = [f for f, chk in self.mw.sidebar.chk_scan_folders.items() if chk.isChecked()]
+
         lib_settings.update({
             "sort_desc": self.mw.sort_desc,
             "sort_index": self.mw.sidebar.combo_sort.currentIndex(),
@@ -427,8 +469,10 @@ class LibraryController(QObject):
             "scan_new": self.mw.sidebar.chk_show_new.isChecked(),
             "filter_states": filter_states,
             "filter_expansion": saved_expansion,
-            "sidebar_chk_gog": self.mw.sidebar.chk_scan_gog.isChecked(),
-            "sidebar_chk_local": self.mw.sidebar.chk_scan_local.isChecked()
+            "sidebar_chk_galaxy": self.mw.sidebar.chk_scan_galaxy.isChecked(),
+            "sidebar_chk_gog_web": self.mw.sidebar.chk_scan_gog_web.isChecked(),
+            "sidebar_chk_local": self.mw.sidebar.chk_scan_local.isChecked(),
+            "sidebar_chk_folders": checked_folders
         })
 
         if "platform_map" not in lib_settings:
@@ -463,12 +507,12 @@ class LibraryController(QObject):
             self.mw.sort_desc = lib_settings.get("sort_desc", True)
             self.mw.sidebar.update_sort_button(self.mw.sort_desc)
             
-            self.mw.display_settings['image'] = global_settings.get("card_image_size", 200)
-            self.mw.display_settings['button'] = global_settings.get("card_button_size", 45)
-            self.mw.display_settings['text'] = global_settings.get("card_text_size", 22)
+            self.mw.display_settings['image'] = global_settings.get("card_image_size", DEFAULT_DISPLAY_SETTINGS['image'])
+            self.mw.display_settings['button'] = global_settings.get("card_button_size", DEFAULT_DISPLAY_SETTINGS['button'])
+            self.mw.display_settings['text'] = global_settings.get("card_text_size", DEFAULT_DISPLAY_SETTINGS['text'])
             
             self.mw.sidebar.combo_sort.blockSignals(True)
-            idx = lib_settings.get("sort_index", 1)
+            idx = lib_settings.get("sort_index", 0)
             if 0 <= idx < self.mw.sidebar.combo_sort.count(): self.mw.sidebar.combo_sort.setCurrentIndex(idx)
             self.mw.sidebar.search_bar.setText(lib_settings.get("search_text", ""))
             
@@ -501,21 +545,67 @@ class LibraryController(QObject):
             
             self.mw.sidebar.chk_show_new.blockSignals(False)
             
+            enable_galaxy = lib_settings.get("enable_galaxy_db", False)
+            enable_local = lib_settings.get("local_scan_config", {}).get("enable_local_scan", False)
+            
             # WHY: Sync the scan panel's quick-toggle checkboxes with the global configuration.
             # If a feature is disabled in the main settings, it is correctly greyed out and forced off here.
-            enable_gog = lib_settings.get("enable_gog_db", True)
-            enable_local = lib_settings.get("local_scan_config", {}).get("enable_local_scan", True)
-            self.mw.sidebar.chk_scan_gog.setEnabled(enable_gog)
-            if not enable_gog: self.mw.sidebar.chk_scan_gog.setChecked(False)
-            else: self.mw.sidebar.chk_scan_gog.setChecked(lib_settings.get("sidebar_chk_gog", True))
+            self.mw.sidebar.chk_scan_galaxy.setEnabled(enable_galaxy)
+            if not enable_galaxy: self.mw.sidebar.chk_scan_galaxy.setChecked(False)
+            else: self.mw.sidebar.chk_scan_galaxy.setChecked(lib_settings.get("sidebar_chk_galaxy", False))
+            self.mw.sidebar.chk_scan_gog_web.setChecked(lib_settings.get("sidebar_chk_gog_web", False))
             self.mw.sidebar.chk_scan_local.setEnabled(enable_local)
             if not enable_local: self.mw.sidebar.chk_scan_local.setChecked(False)
-            else: self.mw.sidebar.chk_scan_local.setChecked(lib_settings.get("sidebar_chk_local", True))
+            else: self.mw.sidebar.chk_scan_local.setChecked(lib_settings.get("sidebar_chk_local", False))
             
             return lib_settings.get("anchor_folder")
         except Exception as e:
             print(f"Error loading settings: {e}")
             return None
+
+    def refresh_scan_folders_ui(self):
+        """WHY: Single Responsibility - Dynamically regenerates the UI checkboxes representing the Local Folder Rules."""
+        # WHY: Rely on the unified config builder to ensure settings are correctly resolved, even if the user hasn't explicitly saved them yet.
+        config = build_scanner_config()
+        folder_rules = config.get("local_scan_config", {}).get("folder_rules", {})
+        
+        lib_settings_file = get_library_settings_file()
+        lib_settings = {}
+        if os.path.exists(lib_settings_file):
+            try:
+                with open(lib_settings_file, "r", encoding='utf-8') as f:
+                    lib_settings = json.load(f)
+            except: pass
+            
+        was_saved = "sidebar_chk_folders" in lib_settings
+        saved_checked = lib_settings.get("sidebar_chk_folders", [])
+        
+        for chk in self.mw.sidebar.chk_scan_folders.values():
+            self.mw.sidebar.layout_scan_local.removeWidget(chk)
+            chk.deleteLater()
+        self.mw.sidebar.chk_scan_folders.clear()
+        
+        row, col = 1, 0
+        master_checked = self.mw.sidebar.chk_scan_local.isChecked()
+        for folder in sorted(folder_rules.keys()):
+            rule = folder_rules[folder]
+            # WHY: Only display the checkbox if the folder is actually designated to be scanned in the Advanced settings.
+            if not rule.get("scan", False):
+                continue
+                
+            chk = QCheckBox(folder)
+            chk.setChecked(folder in saved_checked if was_saved else True)
+            chk.setEnabled(master_checked)
+            self.mw.sidebar.layout_scan_local.addWidget(chk, row, col)
+            self.mw.sidebar.chk_scan_folders[folder] = chk
+            col += 1
+            if col > 1:
+                col = 0
+                row += 1
+            
+        # WHY: Push the grid items to the top to prevent them from floating vertically in the center.
+        target_row = row if col == 0 else row + 1
+        self.mw.sidebar.layout_scan_local.setRowStretch(target_row, 1)
 
     def refresh_data(self):
         # WHY: Automatically preserve the user's scroll position during mid-session refreshes 
@@ -538,6 +628,38 @@ class LibraryController(QObject):
         if translator.language != global_settings.get("language", "English"):
             translator.load_language(global_settings.get("language", "English"))
             self.retranslate_ui()
+            
+        # WHY: Check Date Format Migration. If the user changed their regional date format,
+        # we must instantly migrate the physical CSV database to prevent mismatched sorting loops.
+        new_format_str = global_settings.get("date_format", "DD/MM/YYYY")
+        old_format_str = getattr(self.mw, 'date_format_str', "DD/MM/YYYY")
+        
+        if new_format_str != old_format_str:
+            from ViGaVault_utils import get_date_format_mapping
+            old_format = get_date_format_mapping().get(old_format_str, "%d/%m/%Y")
+            new_format = get_date_format_mapping().get(new_format_str, "%d/%m/%Y")
+            
+            manager = LibraryManager(build_scanner_config())
+            manager.load_db()
+            changes_made = False
+            
+            for folder, game in manager.games.items():
+                old_date = game.data.get('Original_Release_Date', '')
+                if old_date:
+                    try:
+                        # Strictly convert only if it perfectly matches the old format
+                        dt = datetime.strptime(old_date, old_format)
+                        game.data['Original_Release_Date'] = dt.strftime(new_format)
+                        changes_made = True
+                    except Exception:
+                        pass # Ignore if it's just a year like "2020" or completely unparseable
+                        
+            if changes_made:
+                manager.save_db()
+                logging.info(f"Successfully migrated database dates from {old_format_str} to {new_format_str}.")
+            
+            self.mw.date_format_str = new_format_str
+            self.refresh_data()
             
         self.mw.sidebar.refresh_styles()
         

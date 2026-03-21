@@ -18,6 +18,7 @@ LOG_DIR = os.path.join(BASE_DIR, "logs")
 # WHY: DRY Principle - Centralizes standard window sizes for easy global modification.
 MAIN_WINDOW_SIZE = (1600, 900)
 DIALOG_STD_SIZE = (1280, 720)
+DEFAULT_DISPLAY_SETTINGS = {'image': 225, 'button': 50, 'text': 20}
 
 def center_window(window, parent=None):
     """WHY: Ensures all dialogs explicitly spawn perfectly centered on the screen or relative to their parent window."""
@@ -128,7 +129,7 @@ def get_image_path():
 def get_root_path():
     """Returns the configured root path from the library's settings."""
     settings_path = get_library_settings_file()
-    default_path = r"\\madhdd02\Software\GAMES"
+    default_path = ""
     if os.path.exists(settings_path):
         try:
             with open(settings_path, "r", encoding='utf-8') as f:
@@ -178,9 +179,11 @@ def get_platform_config():
 def get_local_scan_config():
     """Loads local scan configuration from settings.json."""
     default_config = {
+        "enable_local_scan": False,
         "ignore_hidden": True,
-        "scan_mode": "advanced",
+        "scan_mode": "simple",
         "global_type": "Genre",
+        "global_filter": True,
         "folder_rules": {}
     }
     settings_path = get_library_settings_file()
@@ -196,6 +199,14 @@ def get_local_scan_config():
             pass
     return default_config
 
+def get_date_format_mapping():
+    """WHY: Maps human-readable UI formats to strict Python datetime strftime formats."""
+    return {
+        "DD/MM/YYYY": "%d/%m/%Y",
+        "MM/DD/YYYY": "%m/%d/%Y",
+        "YYYY-MM-DD": "%Y-%m-%d"
+    }
+
 def build_scanner_config():
     """Builds the comprehensive configuration dict required by LibraryManager."""
     p_map, p_ignore = get_platform_config()
@@ -205,19 +216,23 @@ def build_scanner_config():
     if not os.path.exists(settings_path):
         settings_path = global_settings_path
         
-    enable_gog = True
-    gog_path = os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db')
-    download_images = True
+    enable_galaxy = False
+    galaxy_path = os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db')
+    download_images = False
     download_videos = False
+    date_format_str = "DD/MM/YYYY"
     if os.path.exists(settings_path):
         try:
             with open(settings_path, "r", encoding='utf-8') as f:
                 settings = json.load(f)
-                enable_gog = settings.get("enable_gog_db", True)
-                gog_path = settings.get("gog_db_path", gog_path)
-                download_images = settings.get("download_images", True)
+                enable_galaxy = settings.get("enable_galaxy_db", False)
+                galaxy_path = settings.get("galaxy_db_path", galaxy_path)
+                download_images = settings.get("download_images", False)
                 download_videos = settings.get("download_videos", False)
+                date_format_str = settings.get("date_format", "DD/MM/YYYY")
         except: pass
+
+    date_format = get_date_format_mapping().get(date_format_str, "%d/%m/%Y")
 
     return {
         'db_file': get_db_path(),
@@ -227,10 +242,12 @@ def build_scanner_config():
         'platform_map': p_map,
         'ignored_prefixes': p_ignore,
         'local_scan_config': get_local_scan_config(),
-        'enable_gog_db': enable_gog,
-        'gog_db_path': gog_path,
+        'enable_galaxy_db': enable_galaxy,
+        'galaxy_db_path': galaxy_path,
         'download_images': download_images,
-        'download_videos': download_videos
+        'download_videos': download_videos,
+        'date_format_str': date_format_str,
+        'date_format': date_format
     }
 
 def setup_logging():

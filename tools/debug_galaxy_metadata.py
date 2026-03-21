@@ -7,17 +7,17 @@ import io
 # Force UTF-8 encoding for the Windows console
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-def debug_gog_metadata():
-    gog_db_path = os.path.join(os.environ['ProgramData'], 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db')
+def debug_galaxy_metadata():
+    galaxy_db_path = os.path.join(os.environ['ProgramData'], 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db')
     
-    if not os.path.exists(gog_db_path):
-        print(f"ERROR: Database not found at: {gog_db_path}")
+    if not os.path.exists(galaxy_db_path):
+        print(f"ERROR: Database not found at: {galaxy_db_path}")
         return
 
-    print(f"--- GOG PLATFORM DISCOVERY ---\n")
+    print(f"--- GALAXY PLATFORM DISCOVERY ---\n")
     
     try:
-        conn = sqlite3.connect(f'file:{gog_db_path}?mode=ro', uri=True)
+        conn = sqlite3.connect(f'file:{galaxy_db_path}?mode=ro', uri=True)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
@@ -85,4 +85,4 @@ def debug_gog_metadata():
             conn.close()
 
 if __name__ == "__main__":
-    debug_gog_metadata()
+    debug_galaxy_metadata()

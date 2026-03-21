@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QScrollArea, Q
                                QApplication, QStyle, QTextBrowser)
 from PySide6.QtCore import Qt
 
-from ViGaVault_utils import translator, DIALOG_STD_SIZE, center_window
+from ViGaVault_utils import translator, DIALOG_STD_SIZE, center_window, build_scanner_config
 
 class ProgressBarDelegate(QStyledItemDelegate):
     """
@@ -77,6 +77,16 @@ class StatisticsDialog(QDialog):
         btn_close.clicked.connect(self.accept)
         layout.addWidget(btn_close, 0, Qt.AlignRight)
 
+    def _get_parsed_dates(self, df_col):
+        """WHY: Centralizes safe date parsing logic matching the core Database Loader."""
+        date_fmt = build_scanner_config().get('date_format', '%d/%m/%Y')
+        dates = pd.to_datetime(df_col, format=date_fmt, errors='coerce')
+        mask = dates.isna() & (df_col != '')
+        if mask.any():
+            fallback = pd.to_datetime(df_col.loc[mask], errors='coerce')
+            dates.update(fallback)
+        return dates
+
     def create_kpi_section(self):
         widget = QGroupBox()
         boxes_layout = QHBoxLayout(widget)
@@ -140,7 +150,8 @@ class StatisticsDialog(QDialog):
         stats_data.append(("tools_stats_top_col", get_top_count('Collection')))
         stats_data.append(("tools_stats_unique_devs", get_unique_count('Developer')))
         
-        years = pd.to_datetime(self.df['Original_Release_Date'], errors='coerce', dayfirst=True).dt.year if 'Original_Release_Date' in self.df.columns else pd.Series(dtype=int)
+        parsed_dates = self._get_parsed_dates(self.df['Original_Release_Date']) if 'Original_Release_Date' in self.df.columns else pd.Series(dtype='datetime64[ns]')
+        years = parsed_dates.dt.year
         if not years.dropna().empty:
             yc = years.value_counts()
             stats_data.append(("tools_stats_best_year", f"{int(yc.idxmax())} ({yc.max()})"))
@@ -151,16 +162,16 @@ class StatisticsDialog(QDialog):
         media_pct = round((has_img / total_games * 100) if total_games else 0, 1)
         stats_data.append(("tools_stats_media_comp", f"{media_pct}% ({has_img})"))
 
-        has_trailer = len(self.df[(self.df['Trailer_Link'].astype(str).str.strip() != '') | (self.df['Path_Video'].astype(str).str.strip() != '')]) if 'Trailer_Link' in self.df.columns else 0
+        has_trailer = len(self.df[self.df['Trailer_Link'].astype(str).str.strip() != '']) if 'Trailer_Link' in self.df.columns else 0
         stats_data.append(("tools_stats_trailer_hoarder", has_trailer))
 
         indie_count = self.df['Genre'].astype(str).str.contains('Indie', case=False, na=False).sum() if 'Genre' in self.df.columns else 0
         stats_data.append(("tools_stats_indie_games", indie_count))
         
         if 'Original_Release_Date' in self.df.columns:
-            valid_dates = self.df[pd.to_datetime(self.df['Original_Release_Date'], errors='coerce', dayfirst=True).notna()].copy()
+            valid_dates = self.df[parsed_dates.notna()].copy()
             if not valid_dates.empty:
-                valid_dates['DateObj'] = pd.to_datetime(valid_dates['Original_Release_Date'], errors='coerce', dayfirst=True)
+                valid_dates['DateObj'] = parsed_dates[parsed_dates.notna()]
                 sorted_dates = valid_dates.sort_values('DateObj')
                 oldest = sorted_dates.iloc[0]
                 newest = sorted_dates.iloc[-1]
@@ -293,7 +304,7 @@ class StatisticsDialog(QDialog):
         # WHY: Add padding to prevent the inner table from touching the QGroupBox frame.
         layout.setContentsMargins(10, 15, 10, 10)
         
-        years = pd.to_datetime(self.df['Original_Release_Date'], errors='coerce', dayfirst=True).dt.year
+        years = self._get_parsed_dates(self.df['Original_Release_Date']).dt.year
         year_counts = years.dropna().astype(int).value_counts().sort_index()
         
         table = QTableWidget()

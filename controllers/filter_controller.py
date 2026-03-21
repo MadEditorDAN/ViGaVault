@@ -71,13 +71,11 @@ class FilterController(QObject):
         group.checkbox_layout.setColumnStretch(1, 1)
         
         if title in ["Platforms", "Genre", "Collection"]:
-            btn_all = QPushButton("All")
-            btn_none = QPushButton("None")
-            btn_all.clicked.connect(lambda: self.set_filter_group_state(col_name, True))
-            btn_none.clicked.connect(lambda: self.set_filter_group_state(col_name, False))
-            group.btns_layout.addWidget(btn_all)
-            group.btns_layout.addWidget(btn_none)
-            self.filter_buttons[col_name] = (btn_all, btn_none)
+            group.btn_all.show()
+            group.btn_none.show()
+            group.btn_all.clicked.connect(lambda: self.set_filter_group_state(col_name, True))
+            group.btn_none.clicked.connect(lambda: self.set_filter_group_state(col_name, False))
+            self.filter_buttons[col_name] = (group.btn_all, group.btn_none)
         
         values = set()
         if hasattr(self.mw, 'master_df') and not self.mw.master_df.empty and col_name in self.mw.master_df.columns:
@@ -169,6 +167,7 @@ class FilterController(QObject):
             'sort_col': sort_col_map[self.mw.sidebar.combo_sort.currentIndex()],
             'sort_desc': self.mw.sort_desc,
             'scan_new': self.mw.sidebar.chk_show_new.isChecked(),
+            'scan_review': self.mw.sidebar.chk_show_review.isChecked(),
         }
 
         self.filter_worker = FilterWorker(self.mw.master_df, params)
