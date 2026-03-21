@@ -9,8 +9,8 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, Q
                              QPushButton, QScrollArea, QFrame, QSizePolicy, QCheckBox, 
                              QLineEdit, QComboBox, QListWidget, QListWidgetItem, 
                              QMessageBox, QGroupBox, QApplication, QAbstractItemView, QMenu, QToolButton)
-from PySide6.QtCore import Qt, QSize, QEvent
-from PySide6.QtGui import QIcon, QPixmap, QFont
+from PySide6.QtCore import Qt, QSize, QEvent, QTimer
+from PySide6.QtGui import QIcon, QPixmap, QFont, QFontMetrics
 
 from ViGaVault_utils import translator, get_image_path, get_root_path, DEFAULT_DISPLAY_SETTINGS
 from dialogs import ActionDialog
@@ -118,10 +118,11 @@ class Sidebar(QWidget):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
-        self.setFixedWidth(350)
+        # WHY: Removed FixedWidth to allow resizing. Set minimum to ~1/5 of an 800px window.
+        self.setMinimumWidth(280)
         # WHY: Decouple the Sidebar's internal vertical math from the Main Window. 
         # This acts as a circuit breaker, preventing Qt from aggressively locking the window's minimum height based on hidden panel elements.
-        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Ignored)
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Ignored)
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(5, 5, 5, 5)
         
@@ -421,6 +422,29 @@ class Sidebar(QWidget):
         self.act_search_pub.triggered.connect(lambda: self.set_search_target("Publisher", "search_ph_publisher"))
         self.act_search_sum.triggered.connect(lambda: self.set_search_target("Summary", "search_ph_summary"))
 
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # WHY: Ping the controller to potentially repack the grid columns based on new width.
+        if hasattr(self, 'parent') and hasattr(self.parent, 'filter_controller'):
+            self.parent.filter_controller.reflow_filters()
+        self.adjust_scan_log_font()
+
+    def adjust_scan_log_font(self):
+        """WHY: Dynamically calculates the perfect pixel size required to fit exactly 80 monospace characters in the list width."""
+        viewport_width = self.scan_results.viewport().width()
+        if viewport_width < 50: return
+        
+        font = QFont("Consolas")
+        font.setStyleHint(QFont.Monospace)
+        best_size = 6
+        for size in range(24, 5, -1):
+            font.setPixelSize(size)
+            fm = QFontMetrics(font)
+            if fm.horizontalAdvance("X" * 80) <= viewport_width - 15: # 15px buffer for padding
+                best_size = size
+                break
+        self.scan_results.setStyleSheet(f"font-family: Consolas, 'Courier New', monospace; font-size: {best_size}px;")
+
     def set_search_target(self, target, ph_key):
         """Dynamically swaps the placeholder text and triggers an instant refilter."""
         self.search_target = target
@@ -528,6 +552,8 @@ class GameCard(QWidget):
         # --- COLUMN 2 (METADATA) ---
         self.metadata_frame = QFrame()
         self.metadata_frame.setStyleSheet("border-right: 1px solid palette(dark);")
+        # WHY: Strictly lock the metadata column to 500px so it never squishes or wraps text awkwardly.
+        self.metadata_frame.setFixedWidth(500)
         metadata_col = QVBoxLayout(self.metadata_frame)
         metadata_col.setContentsMargins(10, 0, 10, 0) 
         metadata_col.setSpacing(2)
@@ -586,7 +612,8 @@ class GameCard(QWidget):
             self.info_labels.append(label)
             
         metadata_col.addStretch()
-        main_layout.addWidget(self.metadata_frame, stretch=2)
+        # WHY: Removed stretch factor completely. The summary column will now exclusively absorb all UI resizing.
+        main_layout.addWidget(self.metadata_frame)
 
         # --- COLUMN 3 (SCROLLABLE SUMMARY) ---
         self.summary_frame = QFrame()
@@ -627,7 +654,7 @@ class GameCard(QWidget):
         
         self.summary_scroll.setWidget(self.scroll_content)
         summary_col.addWidget(self.summary_scroll)
-        main_layout.addWidget(self.summary_frame, stretch=3)
+        main_layout.addWidget(self.summary_frame, stretch=5)
 
         # --- COLUMN 4 (ACTIONS) ---
         self.trailer_link = game_data.get('Trailer_Link', '')

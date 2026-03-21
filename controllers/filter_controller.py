@@ -12,6 +12,8 @@ class FilterController(QObject):
         self.mw = main_window
         self.dynamic_filters = {}
         self.filter_buttons = {}
+        self.filter_groups = {}
+        self.filter_groups = {}
 
     def populate_dynamic_filters(self, saved_state=None, saved_expansion=None):
         layout = self.mw.sidebar.filters_layout
@@ -69,6 +71,7 @@ class FilterController(QObject):
         group = CollapsibleFilterGroup(title, parent_layout)
         group.checkbox_layout.setColumnStretch(0, 1)
         group.checkbox_layout.setColumnStretch(1, 1)
+        self.filter_groups[col_name] = group
         
         if title in ["Platforms", "Genre", "Collection"]:
             group.btn_all.show()
@@ -104,6 +107,29 @@ class FilterController(QObject):
         parent_layout.addWidget(group)
         
         if is_expanded: group.toggle_btn.setChecked(True)
+
+    def reflow_filters(self):
+        """WHY: Single Responsibility Principle - Repacks checkboxes into dynamically calculated columns based on available UI space."""
+        if not hasattr(self.mw, 'sidebar') or not hasattr(self.mw.sidebar, 'filters_container'): return
+        width = self.mw.sidebar.filters_container.width()
+        
+        # WHY: Calculate optimal columns based on 140px minimum comfortable width per checkbox. Min 2, Max 4.
+        cols = max(2, min(4, width // 140))
+        if getattr(self, 'current_cols', 0) == cols: return
+        self.current_cols = cols
+        
+        for col_name, group in self.filter_groups.items():
+            checkboxes = self.dynamic_filters.get(col_name, [])
+            if not checkboxes: continue
+            
+            while group.checkbox_layout.count():
+                group.checkbox_layout.takeAt(0)
+                
+            row, col = 0, 0
+            for chk in checkboxes:
+                group.checkbox_layout.addWidget(chk, row, col)
+                col = 0 if col + 1 >= cols else col + 1
+                if col == 0: row += 1
 
     def set_filter_group_state(self, col_name, state):
         if col_name in self.dynamic_filters:

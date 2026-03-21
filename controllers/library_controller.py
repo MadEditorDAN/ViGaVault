@@ -423,6 +423,9 @@ class LibraryController(QObject):
 
         global_settings.update({"geometry": self.mw.saveGeometry().toBase64().data().decode()})
         
+        # WHY: Extract the precise pixel width of both zones inside the QSplitter to persist user layout preference.
+        global_settings.update({"splitter_sizes": self.mw.splitter.sizes()})
+        
         # WHY: Targeted Cleanup - Scrub local library data out of the global settings file to fix legacy data bleed.
         local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "scan_new", "filter_states", "filter_expansion", "sidebar_chk_galaxy", "sidebar_chk_gog_web", "sidebar_chk_local", "sidebar_chk_folders", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_galaxy_db", "galaxy_db_path", "download_images", "download_videos", "image_path", "video_path"]
         for k in local_keys: global_settings.pop(k, None)
@@ -441,7 +444,7 @@ class LibraryController(QObject):
              except: pass
 
         # WHY: Targeted Cleanup - Scrub global OS data out of the local library settings file.
-        global_keys = ["geometry", "theme", "language", "card_image_size", "card_button_size", "card_text_size", "db_path"]
+        global_keys = ["geometry", "theme", "language", "card_image_size", "card_button_size", "card_text_size", "db_path", "splitter_sizes"]
         for k in global_keys: lib_settings.pop(k, None)
 
         filter_states = {}
@@ -504,6 +507,9 @@ class LibraryController(QObject):
             if "geometry" in global_settings:
                 # WHY: The JSON stores a base64 string. We must decode it back to a binary QByteArray for Qt.
                 self.mw.restoreGeometry(QByteArray.fromBase64(global_settings["geometry"].encode('utf-8')))
+            if "splitter_sizes" in global_settings:
+                # WHY: Restore the internal layout boundary before generating the visible lists.
+                self.mw.splitter.setSizes(global_settings["splitter_sizes"])
             self.mw.sort_desc = lib_settings.get("sort_desc", True)
             self.mw.sidebar.update_sort_button(self.mw.sort_desc)
             

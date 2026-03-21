@@ -44,7 +44,7 @@ class ActionDialog(QDialog):
         
         fields_to_disable = ['Folder_Name', 'Status_Flag', 'Image_Link', 'Platforms']
         # WHY: Explicitly exclude internal system flags and media paths so they don't clutter the generic text zone.
-        fields_to_exclude = ['Trailer_Link', 'game_ID', 'Image_Link', 'temp_sort_date', 'temp_sort_title', 'Path_Root', 'Year_Folder', 'Is_Local', 'Has_Image', 'Has_Video', 'Cover_URL', 'Path_Video']
+        fields_to_exclude = ['Trailer_Link', 'game_ID', 'Image_Link', 'temp_sort_date', 'temp_sort_title', 'temp_sort_index', 'Path_Root', 'Year_Folder', 'Is_Local', 'Has_Image', 'Has_Video', 'Cover_URL', 'Path_Video']
         fmt_str = build_scanner_config().get('date_format_str', 'DD/MM/YYYY')
 
         for field, value in self.original_data.items():

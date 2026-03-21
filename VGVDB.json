@@ -133,9 +133,6 @@
     "sidebar_chk_galaxy": true,
     "sidebar_chk_gog_web": true,
     "sidebar_chk_folders": [
-        "GAMES",
-        "GAMES COMPIL",
-        "GAMES VR",
-        "_TEMP"
+        "GAMES"
     ]
 }

@@ -6,7 +6,7 @@ import pandas as pd
 import os
 import json
 from PySide6.QtWidgets import (QApplication, QMainWindow, QListView, QWidget, 
-                               QHBoxLayout, QAbstractItemView)
+                               QVBoxLayout, QSplitter, QAbstractItemView)
 from PySide6.QtCore import Qt, QTimer, QThreadPool, Slot
 from PySide6.QtGui import QFont
 
@@ -46,7 +46,12 @@ class MainWindow(QMainWindow):
         
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        main_layout = QHBoxLayout(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # WHY: Use a QSplitter to allow the user to manually adjust the boundary between the list and the sidebar.
+        self.splitter = QSplitter(Qt.Horizontal)
+        main_layout.addWidget(self.splitter)
         
         self.list_widget = QListView()
         self.list_widget.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
@@ -59,12 +64,17 @@ class MainWindow(QMainWindow):
             QListView::item:selected { background-color: palette(highlight); border-radius: 3px; }
         """)
         
-        main_layout.addWidget(self.list_widget, stretch=3)
+        self.splitter.addWidget(self.list_widget)
         
         # 3. Sidebar (right, takes 1/4 of the space)
         # The entire design (filters + scan) is handled in the Sidebar class
         self.sidebar = Sidebar(self)
-        main_layout.addWidget(self.sidebar, stretch=1)
+        self.splitter.addWidget(self.sidebar)
+        
+        # WHY: Establish the initial 1/4 layout ratio. The resizeEvent mathematically enforces the 1/3 maximum.
+        self.splitter.setSizes([1200, 400])
+        self.splitter.setCollapsible(0, False)
+        self.splitter.setCollapsible(1, False)
         
         # Initialize empty DataFrame required for filters logic before DB loads
         self.master_df = pd.DataFrame(columns=['Clean_Title', 'Platforms', 'Original_Release_Date', 'Status_Flag', 'Path_Root', 'Folder_Name'])
@@ -90,6 +100,8 @@ class MainWindow(QMainWindow):
         self.background_loader.timeout.connect(self.list_controller.load_more_items)
         self.filter_timer.timeout.connect(self.filter_controller.start_filter_worker)
         self.list_widget.verticalScrollBar().valueChanged.connect(self.list_controller.check_scroll_load)
+        # WHY: Trigger live card resizing dynamically when the user drags the QSplitter boundary.
+        self.splitter.splitterMoved.connect(self.list_controller.update_item_sizes)
 
         # Run Initialization
         self.menu_controller.create_menu_bar()
@@ -134,6 +146,9 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.list_controller.update_item_sizes()
+        
+        # WHY: Enforce the maximum width of the sidebar dynamically to exactly 1/3 of the main window width.
+        self.sidebar.setMaximumWidth(self.width() // 3)
 
 if __name__ == "__main__":
     setup_logging()
