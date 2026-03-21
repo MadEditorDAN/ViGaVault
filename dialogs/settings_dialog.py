@@ -35,10 +35,6 @@ class SettingsDialog(QDialog):
         self.setup_display_tab()
         self.tabs.addTab(self.tab_display, translator.tr("settings_tab_display"))
         
-        self.tab_folders = QWidget()
-        self.setup_folders_tab()
-        self.tabs.addTab(self.tab_folders, translator.tr("settings_tab_folders"))
-        
         self.tab_data = QWidget()
         self.setup_data_tab()
         self.tabs.addTab(self.tab_data, translator.tr("settings_tab_data"))
@@ -153,93 +149,6 @@ class SettingsDialog(QDialog):
         self.lbl_img_size.setText(f"{self.IMG_SIZES[self.slider_img_size.value()]} px")
         self.lbl_btn_size.setText(f"{self.BTN_SIZES[self.slider_btn_size.value()]} px")
         self.lbl_text_size.setText(f"{self.TXT_SIZES[self.slider_text_size.value()]} px")
-
-    def setup_folders_tab(self):
-        layout = QVBoxLayout(self.tab_folders)
-        
-        self.chk_scan_local = QCheckBox(translator.tr("settings_folders_scan_local"))
-        self.chk_scan_local.setChecked(False)
-        self.chk_scan_local.toggled.connect(self.mark_changed)
-        self.chk_scan_local.toggled.connect(self.toggle_local_scan_options)
-        layout.addWidget(self.chk_scan_local)
-
-        grp_root = QGroupBox(translator.tr("settings_folders_root_group"))
-        layout_root = QFormLayout(grp_root)
-        self.root_path_input = QLineEdit("")
-        self.root_path_input.textChanged.connect(self.mark_changed)
-        self.btn_browse_root = QPushButton("...")
-        self.btn_browse_root.setFixedWidth(40)
-        self.btn_browse_root.clicked.connect(self.browse_root_path)
-        
-        path_layout = QHBoxLayout()
-        path_layout.addWidget(self.root_path_input)
-        path_layout.addWidget(self.btn_browse_root)
-        
-        layout_root.addRow(translator.tr("settings_folders_main_path"), path_layout)
-        layout.addWidget(grp_root)
-        
-        grp_structure = QGroupBox(translator.tr("settings_folders_structure_group"))
-        self.struct_layout = QVBoxLayout(grp_structure)
-        
-        self.chk_ignore_hidden = QCheckBox(translator.tr("settings_folders_ignore_hidden"))
-        self.chk_ignore_hidden.toggled.connect(self.mark_changed)
-        self.struct_layout.addWidget(self.chk_ignore_hidden)
-
-        self.mode_simple_widget = QWidget()
-        simple_layout = QVBoxLayout(self.mode_simple_widget)
-        simple_layout.setContentsMargins(0, 10, 0, 0)
-        
-        lbl_simple = QLabel(translator.tr("settings_folders_simple_mode_label"))
-        lbl_simple.setStyleSheet("font-weight: bold; color: #4CAF50;")
-        simple_layout.addWidget(lbl_simple)
-        
-        form_simple = QFormLayout()
-        self.combo_global_type = QComboBox()
-        self.combo_global_type.addItems(["Direct (Root -> Games)", "Genre", "Collection", "Publisher", "Developer", "Year", "Other", "None"])
-        self.combo_global_type.currentIndexChanged.connect(self.mark_changed)
-        form_simple.addRow(translator.tr("settings_folders_simple_mode_content"), self.combo_global_type)
-        
-        self.chk_global_filter = QCheckBox(translator.tr("settings_folders_simple_mode_add_filter"))
-        self.chk_global_filter.toggled.connect(self.mark_changed)
-        form_simple.addRow("", self.chk_global_filter)
-        simple_layout.addLayout(form_simple)
-        
-        self.btn_switch_advanced = QPushButton(translator.tr("settings_folders_simple_mode_switch_btn"))
-        self.btn_switch_advanced.clicked.connect(self.switch_to_advanced)
-        simple_layout.addWidget(self.btn_switch_advanced)
-        simple_layout.addStretch()
-        
-        self.struct_layout.addWidget(self.mode_simple_widget)
-
-        self.mode_advanced_widget = QWidget()
-        adv_layout = QVBoxLayout(self.mode_advanced_widget)
-        adv_layout.setContentsMargins(0, 10, 0, 0)
-        
-        lbl_adv = QLabel(translator.tr("settings_folders_adv_mode_label"))
-        lbl_adv.setStyleSheet("font-weight: bold; color: #2196F3;")
-        adv_layout.addWidget(lbl_adv)
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        
-        self.levels_container = QWidget()
-        self.folders_grid = QGridLayout(self.levels_container)
-        self.folders_grid.setAlignment(Qt.AlignTop)
-        self.folders_grid.setContentsMargins(0, 0, 0, 0)
-        
-        scroll.setWidget(self.levels_container)
-        adv_layout.addWidget(scroll)
-
-        btn_layout = QHBoxLayout()
-        self.btn_switch_simple = QPushButton(translator.tr("settings_folders_adv_mode_switch_btn"))
-        self.btn_switch_simple.clicked.connect(self.switch_to_simple)
-        btn_layout.addWidget(self.btn_switch_simple)
-        btn_layout.addStretch()
-        adv_layout.addLayout(btn_layout)
-        
-        self.struct_layout.addWidget(self.mode_advanced_widget)
-        layout.addWidget(grp_structure, 1)
 
     def toggle_local_scan_options(self, checked):
         self.root_path_input.setEnabled(checked)
@@ -408,7 +317,90 @@ class SettingsDialog(QDialog):
         layout_media.setColumnStretch(1, 1)
         
         layout.addWidget(grp_media)
-        layout.addStretch()
+        
+        self.chk_scan_local = QCheckBox(translator.tr("settings_folders_scan_local"))
+        self.chk_scan_local.setChecked(False)
+        self.chk_scan_local.toggled.connect(self.mark_changed)
+        self.chk_scan_local.toggled.connect(self.toggle_local_scan_options)
+        layout.addWidget(self.chk_scan_local)
+
+        grp_root = QGroupBox(translator.tr("settings_folders_root_group"))
+        layout_root = QFormLayout(grp_root)
+        self.root_path_input = QLineEdit("")
+        self.root_path_input.textChanged.connect(self.mark_changed)
+        self.btn_browse_root = QPushButton("...")
+        self.btn_browse_root.setFixedWidth(40)
+        self.btn_browse_root.clicked.connect(self.browse_root_path)
+        
+        path_layout = QHBoxLayout()
+        path_layout.addWidget(self.root_path_input)
+        path_layout.addWidget(self.btn_browse_root)
+        
+        layout_root.addRow(translator.tr("settings_folders_main_path"), path_layout)
+        layout.addWidget(grp_root)
+        
+        grp_structure = QGroupBox(translator.tr("settings_folders_structure_group"))
+        self.struct_layout = QVBoxLayout(grp_structure)
+        
+        self.chk_ignore_hidden = QCheckBox(translator.tr("settings_folders_ignore_hidden"))
+        self.chk_ignore_hidden.toggled.connect(self.mark_changed)
+        self.struct_layout.addWidget(self.chk_ignore_hidden)
+
+        self.mode_simple_widget = QWidget()
+        simple_layout = QVBoxLayout(self.mode_simple_widget)
+        simple_layout.setContentsMargins(0, 10, 0, 0)
+        
+        lbl_simple = QLabel(translator.tr("settings_folders_simple_mode_label"))
+        lbl_simple.setStyleSheet("font-weight: bold; color: #4CAF50;")
+        simple_layout.addWidget(lbl_simple)
+        
+        form_simple = QFormLayout()
+        self.combo_global_type = QComboBox()
+        self.combo_global_type.addItems(["Direct (Root -> Games)", "Genre", "Collection", "Publisher", "Developer", "Year", "Other", "None"])
+        self.combo_global_type.currentIndexChanged.connect(self.mark_changed)
+        form_simple.addRow(translator.tr("settings_folders_simple_mode_content"), self.combo_global_type)
+        
+        self.chk_global_filter = QCheckBox(translator.tr("settings_folders_simple_mode_add_filter"))
+        self.chk_global_filter.toggled.connect(self.mark_changed)
+        form_simple.addRow("", self.chk_global_filter)
+        simple_layout.addLayout(form_simple)
+        
+        self.btn_switch_advanced = QPushButton(translator.tr("settings_folders_simple_mode_switch_btn"))
+        self.btn_switch_advanced.clicked.connect(self.switch_to_advanced)
+        simple_layout.addWidget(self.btn_switch_advanced)
+        simple_layout.addStretch()
+        
+        self.struct_layout.addWidget(self.mode_simple_widget)
+
+        self.mode_advanced_widget = QWidget()
+        adv_layout = QVBoxLayout(self.mode_advanced_widget)
+        adv_layout.setContentsMargins(0, 10, 0, 0)
+        
+        lbl_adv = QLabel(translator.tr("settings_folders_adv_mode_label"))
+        lbl_adv.setStyleSheet("font-weight: bold; color: #2196F3;")
+        adv_layout.addWidget(lbl_adv)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        
+        self.levels_container = QWidget()
+        self.folders_grid = QGridLayout(self.levels_container)
+        self.folders_grid.setAlignment(Qt.AlignTop)
+        self.folders_grid.setContentsMargins(0, 0, 0, 0)
+        
+        scroll.setWidget(self.levels_container)
+        adv_layout.addWidget(scroll)
+
+        btn_layout = QHBoxLayout()
+        self.btn_switch_simple = QPushButton(translator.tr("settings_folders_adv_mode_switch_btn"))
+        self.btn_switch_simple.clicked.connect(self.switch_to_simple)
+        btn_layout.addWidget(self.btn_switch_simple)
+        btn_layout.addStretch()
+        adv_layout.addLayout(btn_layout)
+        
+        self.struct_layout.addWidget(self.mode_advanced_widget)
+        layout.addWidget(grp_structure, 1)
 
     def browse_root_path(self):
         dir_path = QFileDialog.getExistingDirectory(self, "Select Root Folder", self.root_path_input.text())

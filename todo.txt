@@ -7,10 +7,11 @@ TO DO MAYBE :
 
 Bug/Features :
 
-- Game manager, with Batch game edit, Batch game delete. List the games in a table with the following columns release date/name/platfoms/filter category 1/filter category 2, etc.../developper/publisher. On top of each column put listbox with the content of the below column (like excel filter box) and for the name a text box. If you type in it, it search the game starting with what you type and the list dynamically shrink to that selection.
+-Create a new windows called by the menu tools/Game manager.In that windows we will find a Batch game edit, Batch game delete. 
+In that windows, List the games in a table with the following columns: release date/name/platfoms/filter category 1/filter category 2, etc.../developper/publisher. On top of each column put listbox with the content of the below column, when you select an entry it filter on that entry, and you can select multiple entries  (like the excel filter box).
+On top of the name column, a text box. If you type in it, it search the game containing what you typed, and the list dynamically shrink to that selection. 
 If you select something in the upper listbox it filter the below list to what you selected.
-
-And a custom word list you can use to filter the gamelist on (goodie, dlc,...)
+Also, and a custom word list user can create to filter the gamelist on (goodie, dlc,...) so non games get removed from the list. Also change the main counter total in the sidebar and remove those excluded games from the count.
 
 -In settings, put everything that is in the tab "Local copies" in the tab "Local sources" under the current content. and Remove the tab "Local Copies"
 -In settings, create a tab Platforms Manager, move the platform manager in that tab, to do so reduce the size of everything in the platform manager to a "normal text size" remove the gamepad icon and next to each platform name put in smaller text copyright owners of each brand. leave a little space between each connect button.
@@ -18,3 +19,5 @@ And a custom word list you can use to filter the gamelist on (goodie, dlc,...)
 TO DO : 
 
 When adding a platform, first do a full Data Discovery Dump with a separate script to assess the data we can recover from that platform. Get all the metadata, all the image url's and files and all the video url's. Analyse the results and select the data/files to import.
+
+When a game is discovered on any platforms, use igdb after if even only one metadata is missing, and only after, set the status to OK.
