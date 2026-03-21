@@ -10,7 +10,6 @@ def get_igdb_access_token():
     params = {"client_id": IGDB_CLIENT_ID, "client_secret": IGDB_CLIENT_SECRET, "grant_type": "client_credentials"}
     response = requests.post(url, params=params)
     if response.status_code == 200:
-        logging.info("    [API AUTH] IGDB token successfully generated.")
         return response.json().get("access_token")
     else:
         logging.error(f"    [API AUTH ERROR] Token failure: {response.text}")

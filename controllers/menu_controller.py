@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QMessageBox, QApplication
 from PySide6.QtGui import QAction, QPalette
 
 from ViGaVault_utils import translator
-from dialogs import PlatformManagerDialog, MediaManagerDialog, StatisticsDialog, SettingsDialog, DocumentationDialog, MetadataManagerDialog
+from dialogs import MediaManagerDialog, StatisticsDialog, SettingsDialog, DocumentationDialog, MetadataManagerDialog
 
 class MenuController(QObject):
     def __init__(self, main_window):
@@ -48,10 +48,6 @@ class MenuController(QObject):
         action_metadata_manager.triggered.connect(self.show_metadata_manager)
         tools_menu.addAction(action_metadata_manager)
         
-        action_platforms = QAction(translator.tr("menu_tools_platform_manager"), self.mw)
-        action_platforms.triggered.connect(self.show_platform_manager)
-        tools_menu.addAction(action_platforms)
-        
         action_stats = QAction(translator.tr("menu_tools_stats"), self.mw)
         action_stats.triggered.connect(self.show_statistics)
         tools_menu.addAction(action_stats)
@@ -71,14 +67,6 @@ class MenuController(QObject):
             QMessageBox.warning(self.mw, "Warning", translator.tr("msg_wait_for_scan"))
             return
         dlg = SettingsDialog(self.mw)
-        dlg.exec()
-
-    def show_platform_manager(self):
-        # WHY: Block platform manager access during a full scan to prevent concurrent database modifications.
-        if self.mw.full_scan_in_progress:
-            QMessageBox.warning(self.mw, "Warning", translator.tr("msg_wait_for_scan"))
-            return
-        dlg = PlatformManagerDialog(self.mw)
         dlg.exec()
 
     def show_media_manager(self):

@@ -6,7 +6,7 @@
         "Battle.net",
         "Epic Games Store"
     ],
-    "search_text": "",
+    "search_text": "death",
     "scroll_value": 164084,
     "chk_new": false,
     "chk_a_tester": false,
@@ -125,14 +125,17 @@
     },
     "image_path": "D:\\ViGaVault\\Images",
     "download_images": true,
-    "anchor_folder": "Field of Glory II Medieval",
+    "anchor_folder": "Death Stranding 2 On The Beach",
     "sidebar_chk_gog": true,
     "sidebar_chk_local": true,
     "enable_galaxy_db": true,
     "galaxy_db_path": "C:\\ProgramData\\GOG.com\\Galaxy\\storage\\galaxy-2.0.db",
-    "sidebar_chk_galaxy": false,
-    "sidebar_chk_gog_web": false,
+    "sidebar_chk_galaxy": true,
+    "sidebar_chk_gog_web": true,
     "sidebar_chk_folders": [
-        "GAMES"
+        "GAMES",
+        "GAMES COMPIL",
+        "GAMES VR",
+        "_TEMP"
     ]
 }

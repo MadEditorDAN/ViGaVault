@@ -72,7 +72,6 @@ class ScanController(QObject):
         self.mw.sidebar.btn_confirm.hide()
         self.mw.sidebar.btn_cancel.setText(translator.tr("sidebar_btn_stop"))
         self.mw.sidebar.scan_results.clear()
-        self.mw.sidebar.scan_results.addItem(translator.tr("sidebar_log_scan_start"))
 
         try: self.mw.sidebar.btn_cancel.clicked.disconnect()
         except: pass
@@ -117,7 +116,6 @@ class ScanController(QObject):
         self.mw.sidebar.chk_scan_local.setEnabled(True)
 
         if self.mw.sidebar.scan_panel.isVisible():
-            self.mw.sidebar.scan_results.addItem(translator.tr("sidebar_log_scan_finish"))
             self.mw.sidebar.scan_results.scrollToBottom()
             self.mw.sidebar.btn_cancel.setText(translator.tr("btn_close"))
             try: self.mw.sidebar.btn_cancel.clicked.disconnect()

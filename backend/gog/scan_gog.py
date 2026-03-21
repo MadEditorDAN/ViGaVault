@@ -26,7 +26,7 @@ def scan_gog_account(config, games_dict, worker_thread=None):
     else:
         logging.warning("[GOG.COM] Could not refresh token. Attempting to use the existing one.")
 
-    logging.info("--- START OF GOG.COM CLOUD SCAN ---")
+    logging.info(f"\n{' GOG SCAN ':=^80}")
 
     try:
         # WHY: Use the official Bearer token authorization instead of flaky web cookies to bypass Cloudflare.
@@ -95,27 +95,19 @@ def scan_gog_account(config, games_dict, worker_thread=None):
     def print_report():
         stats['failed'] = stats['new_to_fetch'] - stats['matched_smart'] - stats['new_added']
         report = (
-            "\n=== GOG.COM CLOUD SCAN REPORT ===\n"
-            f"Games found in Cloud: {stats['total_cloud']}\n"
-            f"Games already in DB (Exact ID): {stats['already_in_db']}\n"
-            f"-----------------------------------\n"
-            f"Games to resolve: {stats['new_to_fetch']}\n"
-            f"  -> Smart Matched (Merged): {stats['matched_smart']}\n"
-            f"  -> Brand New (Downloaded): {stats['new_added']}\n"
-            f"  -> Failed / Skipped: {stats['failed']}\n"
-            f"==================================="
+            f"{' REPORT ':=^80}\n"
+            f"Total Cloud    : {stats['total_cloud']}\n"
+            f"Already in DB  : {stats['already_in_db']}\n"
+            f"New Added      : {stats['new_added']}\n"
+            f"Smart Merged   : {stats['matched_smart']}\n"
+            f"Errors / Skips : {stats['failed']}\n"
+            f"{'='*80}"
         )
         logging.info(report)
-
-    logging.info(f"[GOG.COM] Found {stats['total_cloud']} owned games in the cloud.")
-    logging.info(f"[GOG.COM] {stats['already_in_db']} games are already in your database.")
 
     if not new_ids:
         print_report()
         return changes_made
-
-    logging.info(f"[GOG.COM] {len(new_ids)} new games to fetch. Starting download...")
-    logging.info("-" * 80)
 
     for gog_id in new_ids:
         if worker_thread and worker_thread.isInterruptionRequested():
@@ -159,7 +151,6 @@ def scan_gog_account(config, games_dict, worker_thread=None):
         threshold = 60 if best_game and re.sub(r'[^a-z0-9]', '', best_game.data.get('Clean_Title', '').lower()) == norm_title else 70
         
         if best_game and best_score >= threshold:
-            logging.info(f"    [GOG MATCH SMART] Game recognized by title (Score: {best_score}): '{title_clean}' -> '{best_game.data.get('Clean_Title')}'")
             
             current_ids = set(x.strip() for x in best_game.data.get('game_ID', '').split(',') if x.strip())
             current_ids.add(str(gog_id))
@@ -169,6 +160,11 @@ def scan_gog_account(config, games_dict, worker_thread=None):
             if 'Local Copy' in p_set: p_set.remove('Local Copy')
             p_set.add('GOG')
             best_game.data['Platforms'] = ", ".join(sorted(list(p_set)))
+            
+            img_str = "Yes" if best_game.data.get('Image_Link') else "No "
+            trl_str = "Yes" if best_game.data.get('Trailer_Link') else "No "
+            action_title = f"Merged : {title_clean}"
+            logging.info(f"|{action_title[:56]:<56}| Img: {img_str[:3]:<3} | Trl: {trl_str[:3]:<3} |")
             
             stats['matched_smart'] += 1
             changes_made = True
@@ -256,9 +252,9 @@ def scan_gog_account(config, games_dict, worker_thread=None):
         games_dict[folder_name] = game_obj
         changes_made = True
 
-        # WHY: Tabular Logging Format perfectly aligns columns for clean, readable console output.
-        log_title = (title_clean[:37] + '...') if len(title_clean) > 40 else title_clean.ljust(40)
-        logging.info(f"[GOG.COM] {log_title} | Img: {img_ok} | Vid: No  | Data: Yes")
+        action_title = f"Added : {title_clean}"
+        logging.info(f"|{action_title[:56]:<56}| Img: {img_ok[:3]:<3} | Trl: No  |")
+        
         stats['new_added'] += 1
 
     print_report()

@@ -33,34 +33,53 @@ class LibraryManager:
                 self.games[game_data['Folder_Name']] = Game(config=self.config, **game_data)
 
     def scan_full(self, worker_thread=None):
-        logging.info("=== STARTING FULL INTELLIGENT SCAN ===")
-        if self.config.get("enable_galaxy_db", True):
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        logging.info(f"[{now_str}] \n{' FULL INTELLIGENT SCAN STARTED ':=^80}")
+        
+        do_galaxy = self.config.get("enable_galaxy_db", True)
+        do_gog = self.config.get("enable_gog_web", False)
+        local_cfg = self.config.get('local_scan_config', {})
+        do_local = local_cfg.get("enable_local_scan", True)
+        target_folders = local_cfg.get("target_folders")
+        
+        # WHY: Display a clean, strictly formatted 80-column checklist mirroring user settings.
+        checklist = f"{' PRE-SCAN CHECKLIST ':-^80}\n"
+        checklist += f"Galaxy Sync     : {'ON' if do_galaxy else 'OFF'}\n"
+        checklist += f"GOG.com Web     : {'ON' if do_gog else 'OFF'}\n"
+        if do_local:
+            checklist += "Local Folders   : ON\n"
+            if target_folders is not None and len(target_folders) > 0:
+                for tf in sorted(target_folders):
+                    checklist += f"                : {tf}\n"
+            else:
+                checklist += "                : All Folders\n"
+        else:
+            checklist += "Local Folders   : OFF\n"
+        checklist += f"Images Download : {'ON' if self.config.get('download_images', True) else 'OFF'}"
+        logging.info(checklist + "\n")
+
+        if do_galaxy:
             sync_galaxy_database(self.config, self.games, worker_thread=worker_thread)
             self.save_db()
             if worker_thread and worker_thread.isInterruptionRequested(): return
-        else:
-            logging.info("--- GALAXY SYNC DISABLED FOR THIS SCAN ---")
         
-        if self.config.get("enable_gog_web", False):
+        if do_gog:
             gog_changes = scan_gog_account(self.config, self.games, worker_thread=worker_thread)
             if gog_changes: self.save_db()
             if worker_thread and worker_thread.isInterruptionRequested(): return
-        else:
-            logging.info("--- GOG.COM WEB SCAN DISABLED FOR THIS SCAN ---")
 
-        local_config = self.config.get('local_scan_config', {})
-        if local_config.get("enable_local_scan", True):
+        if do_local:
             token = get_igdb_access_token()
             scan_local_system(self.config, self.games, token, worker_thread=worker_thread)
             self.save_db()
             if worker_thread and worker_thread.isInterruptionRequested(): return
-        else:
-            logging.info("--- LOCAL SCAN DISABLED FOR THIS SCAN ---")
         
         self.sync_media_flags_batch()
         # WHY: Run the self-healing backfill loop after standard processing finishes.
         self.process_pending_downloads(worker_thread=worker_thread)
-        logging.info("=== FULL SCAN FINISHED ===")
+        
+        end_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        logging.info(f"{' FULL INTELLIGENT SCAN FINISHED ':=^80}\n[{end_str}]\n")
 
     def scan_single_game(self, game_name, manual_search_term=None):
         token = get_igdb_access_token()
@@ -133,7 +152,7 @@ class LibraryManager:
         Scans the library for missing media that has a stored URL and downloads it
         if global settings have been re-enabled, completely saving API calls.
         """
-        logging.info("--- STARTING MEDIA BACKFILL ---")
+        logging.info(f"\n{' MEDIA BACKFILL ENGINE ':=^80}")
         images_dir = self.config.get('image_path', os.path.join(BASE_DIR, 'images'))
         dl_images = self.config.get('download_images', True)
 
@@ -170,8 +189,8 @@ class LibraryManager:
                                 cover_url_raw = "https:" + best_match['cover']['url'].replace('t_thumb', 't_cover_big')
                                 game.data['Cover_URL'] = cover_url_raw
                                 game.data['Status_Flag'] = 'REVIEW'
+                                log_act = "IGDB Cover"
                                 changes_made = True
-                                logging.info(f"    [BACKFILL IGDB] Harvested cover URL for: {folder}")
 
                 if cover_url_raw:
                     # WHY: Split by '|' to support a fallback chain of URLs. 
@@ -202,9 +221,13 @@ class LibraryManager:
                                     shutil.copyfileobj(response.raw, f)
                                 game.data['Image_Link'] = f"{safe_filename}{ext}"
                                 game.data['Has_Image'] = True
+                                log_act = "Cover DL"
                                 changes_made = True
-                                logging.info(f"    [BACKFILL] Downloaded missing cover for: {folder}")
                                 break # Stop trying fallbacks once we succeed!
                         except Exception as e: pass
+
+            if 'log_act' in locals() and log_act:
+                action_title = f"{log_act} : {folder}"
+                logging.info(f"|{action_title[:56]:<56}| Img: Yes | Trl: --- |")
 
         if changes_made: self.save_db()

@@ -261,7 +261,8 @@ def setup_logging():
     log_file = os.path.join(LOG_DIR, f"scan_{timestamp}.log")
     logging.basicConfig(
         level=logging.INFO, 
-        format='%(asctime)s [%(levelname)s] %(message)s', 
+        # WHY: Removed standard %(asctime)s to allow perfectly aligned ASCII art and tables in both the UI and the physical text file.
+        format='%(message)s', 
         handlers=[
             logging.FileHandler(log_file, encoding='utf-8'), 
             logging.StreamHandler()

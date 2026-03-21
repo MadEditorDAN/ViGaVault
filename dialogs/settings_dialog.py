@@ -5,7 +5,8 @@ import logging
 import shutil
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget, QFormLayout, 
                                QComboBox, QSlider, QLabel, QCheckBox, QGroupBox, QLineEdit, QPushButton, 
-                               QFileDialog, QGridLayout, QScrollArea, QFrame, QMessageBox, QSizePolicy)
+                               QFileDialog, QGridLayout, QScrollArea, QFrame, QMessageBox, QSizePolicy,
+                               QTableWidget, QHeaderView, QAbstractItemView)
 from PySide6.QtCore import Qt
 
 from ViGaVault_utils import BASE_DIR, get_library_settings_file, translator, DIALOG_STD_SIZE, center_window, DEFAULT_DISPLAY_SETTINGS
@@ -38,6 +39,10 @@ class SettingsDialog(QDialog):
         self.tab_data = QWidget()
         self.setup_data_tab()
         self.tabs.addTab(self.tab_data, translator.tr("settings_tab_data"))
+        
+        self.tab_platforms = QWidget()
+        self.setup_platforms_tab()
+        self.tabs.addTab(self.tab_platforms, translator.tr("settings_tab_platforms"))
         
         btn_layout = QHBoxLayout()
         self.btn_apply = QPushButton(translator.tr("settings_btn_apply"))
@@ -271,6 +276,112 @@ class SettingsDialog(QDialog):
                 "inject_enabled": chk_inject, "inject_field": combo_inject, "inject_value": txt_inject
             }
             row += 1
+
+    def setup_platforms_tab(self):
+        layout = QVBoxLayout(self.tab_platforms)
+        
+        group = QGroupBox(translator.tr("tools_platform_header"))
+        g_layout = QVBoxLayout(group)
+        
+        self.platform_table = QTableWidget()
+        self.platform_table.setColumnCount(2)
+        self.platform_table.horizontalHeader().setVisible(False)
+        self.platform_table.verticalHeader().setVisible(False)
+        self.platform_table.setSelectionMode(QAbstractItemView.NoSelection)
+        self.platform_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.platform_table.setShowGrid(False)
+        self.platform_table.setAlternatingRowColors(True)
+        self.platform_table.setStyleSheet("QTableWidget { alternate-background-color: palette(alternate-base); }")
+        
+        self.platform_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)          # Name + Copyright
+        self.platform_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents) # Button
+        
+        platforms = [
+            ("gog", "GOG", "© CD Projekt"), 
+            ("epic", "Epic Games Store", "© Epic Games"), 
+            ("steam", "Steam", "© Valve Corporation"),
+            ("amazon", "Amazon", "© Amazon.com, Inc."), 
+            ("uplay", "Uplay", "© Ubisoft"), 
+            ("battlenet", "Battle.net", "© Blizzard Entertainment"),
+            ("origin", "Origin", "© Electronic Arts"), 
+            ("itch", "itch.io", "© Itch Corp"), 
+            ("xbox", "Xbox", "© Microsoft"), 
+            ("psn", "PSN", "© Sony Interactive Entertainment")
+        ]
+        
+        self.platform_table.setRowCount(len(platforms))
+        # WHY: Height 55 perfectly fits the native button size + the 5px spacer margins without looking cramped.
+        self.platform_table.verticalHeader().setDefaultSectionSize(55)
+        
+        for row, (p_id, p_name, p_copy) in enumerate(platforms):
+            # WHY: Format as Rich Text HTML to enforce typography rules (Bold title, small grey copyright) in a single widget.
+            lbl_name = QLabel(f"<b>{p_name}</b> &nbsp;&nbsp;<span style='color:gray; font-size:10px;'>{p_copy}</span>")
+            lbl_name.setTextFormat(Qt.RichText)
+            lbl_name.setContentsMargins(15, 0, 0, 0)
+            self.platform_table.setCellWidget(row, 0, lbl_name)
+            
+            is_connected = False
+            if p_id == "gog":
+                from backend.gog.login_gog import is_gog_connected
+                is_connected = is_gog_connected()
+            
+            btn_connect = QPushButton()
+            self.update_platform_btn_ui(btn_connect, is_connected)
+            
+            btn_connect.clicked.connect(lambda _, pid=p_id, b=btn_connect: self.handle_platform_action(pid, b))
+            btn_connect.setFixedWidth(120)
+            
+            # WHY: Wrap the button inside a QWidget with a Layout to force physical margins (spacing) 
+            # between the buttons in the QTableWidget's tight cell structure.
+            btn_container = QWidget()
+            btn_layout = QHBoxLayout(btn_container)
+            btn_layout.setContentsMargins(0, 5, 15, 5) 
+            btn_layout.addWidget(btn_connect)
+            
+            self.platform_table.setCellWidget(row, 1, btn_container)
+            
+        g_layout.addWidget(self.platform_table)
+        layout.addWidget(group)
+
+    def update_platform_btn_ui(self, btn, is_connected):
+        """WHY: Smart Refresh - Instantly toggles the UI state of a single button without redrawing the table."""
+        if is_connected:
+            btn.setText(translator.tr("tools_platform_btn_disconnect"))
+            btn.setStyleSheet("color: #C62828; font-weight: bold;")
+        else:
+            btn.setText(translator.tr("tools_platform_btn_connect"))
+            btn.setStyleSheet("")
+
+    def handle_platform_action(self, platform_id, btn):
+        try:
+            from dialogs.login_browser_dialog import LoginBrowserDialog 
+        except ImportError:
+            QMessageBox.critical(self, "Missing Dependency", "Please install PySide6-WebEngine to use platform connections:\n\npip install PySide6-WebEngine")
+            return
+            
+        if platform_id == "gog":
+            from backend.gog.login_gog import is_gog_connected, disconnect_gog, save_gog_session, exchange_code_for_token
+            
+            if is_gog_connected():
+                disconnect_gog()
+                self.update_platform_btn_ui(btn, False)
+            else:
+                oauth_url = "https://auth.gog.com/auth?client_id=46899977096215655&redirect_uri=https://embed.gog.com/on_login_success%3Forigin%3Dclient&response_type=code&layout=client2"
+                dlg = LoginBrowserDialog(oauth_url, success_url="on_login_success", parent=self)
+                dlg.exec()
+                
+                if dlg.success_triggered and dlg.auth_code:
+                    token_data = exchange_code_for_token(dlg.auth_code)
+                    if token_data and 'access_token' in token_data:
+                        save_gog_session(token_data)
+                        self.update_platform_btn_ui(btn, True)
+                    else:
+                        QMessageBox.warning(self, "Login Failed", "Failed to negotiate OAuth token with GOG.")
+                else:
+                    QMessageBox.warning(self, "Login Failed", translator.tr("msg_login_failed"))
+                dlg.deleteLater()
+        else:
+            QMessageBox.information(self, "Info", translator.tr("tools_platform_not_impl"))
 
     def setup_data_tab(self):
         layout = QVBoxLayout(self.tab_data)

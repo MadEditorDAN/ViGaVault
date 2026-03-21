@@ -11,6 +11,7 @@ Remember to always :
  - Use the Single Responsibility Principle when applicable
  - Do not put all the code in the UI script, use all the other script as they were created forand if necessary create a new one.
  - Use the "smart refresh" and the "targeted update" when possible
+ - Contiune using our loging pattern. 
  
 Let's discuss, no code.
 

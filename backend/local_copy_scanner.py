@@ -15,7 +15,7 @@ def scan_local_system(config, games_dict, token, worker_thread=None):
     target_folders = scan_config.get("target_folders", None)
     root_path = config.get('root_path', '')
 
-    logging.info("--- START OF SCAN ---")
+    logging.info(f"\n{' LOCAL COPY SCAN ':=^80}")
     
     stats = {'scanned': 0, 'new': 0, 'updated': 0, 'deleted': 0, 'fetched_success': 0, 'fetched_fail': 0}
     found_folders = set()
@@ -45,15 +45,16 @@ def scan_local_system(config, games_dict, token, worker_thread=None):
             if target_folders is not None and lvl1_folder not in target_folders:
                 dirs[:] = []
                 continue
+            logging.info(f"{' Scanning: ' + lvl1_folder + ' ':-^80}")
 
-        if depth == 1:
-            logging.info(f"Analyzing: {lvl1_folder} (Type: {rule.get('type', 'None')})")
             
         if depth == 2:
             for folder in dirs:
                 stats['scanned'] += 1
                 found_folders.add(folder)
                 full_path = os.path.join(root, folder)
+                
+                act_str = ""
                 
                 if folder not in games_dict:
                     ghost_match_key = None
@@ -69,7 +70,6 @@ def scan_local_system(config, games_dict, token, worker_thread=None):
                                 break
                     
                     if ghost_match_key:
-                        logging.info(f"    [MERGE] Linking local folder '{folder}' to Galaxy entry '{ghost_match_key}'")
                         game_obj = games_dict.pop(ghost_match_key)
                         game_obj.data['Folder_Name'] = folder
                         game_obj.data['Path_Root'] = full_path
@@ -79,10 +79,11 @@ def scan_local_system(config, games_dict, token, worker_thread=None):
                         if 'Local Copy' in p_set and len(p_set) > 1: p_set.remove('Local Copy')
                         game_obj.data['Platforms'] = ", ".join(sorted(list(p_set)))
                         games_dict[folder] = game_obj
+                        act_str = "Merged"
                         stats['updated'] += 1
                     else:
-                        logging.info(f"    [NEW] Discovered: {folder}")
                         games_dict[folder] = Game(config=config, Folder_Name=folder, Path_Root=full_path)
+                        act_str = "Added"
                         stats['new'] += 1
                 else:
                     game = games_dict[folder]
@@ -117,17 +118,28 @@ def scan_local_system(config, games_dict, token, worker_thread=None):
                     # WHY: Ensure "Local Copy" tag is removed if real platforms exist.
                     if 'Local Copy' in p_set and len(p_set) > 1: p_set.remove('Local Copy')
                     game.data['Platforms'] = ", ".join(sorted(list(p_set)))
+                    act_str = "Updated"
                     stats['updated'] += 1
 
                 game = games_dict[folder]
                 if worker_thread and worker_thread.isInterruptionRequested(): break 
 
                 status = game.data.get('Status_Flag')
+                fetched = False
                 if status == 'NEW':
-                    if token and game.fetch_metadata(token): stats['fetched_success'] += 1
-                    else: 
-                        logging.warning(f"    [FAILURE] Failure for: {folder}")
+                    if token and game.fetch_metadata(token): 
+                        stats['fetched_success'] += 1
+                        fetched = True
+                    else:
                         stats['fetched_fail'] += 1
+                        
+                if act_str in ["Added", "Merged"] or fetched:
+                    log_act = "Fetched" if fetched and act_str == "Updated" else act_str
+                    img_str = "Yes" if game.data.get('Image_Link') else "No "
+                    trl_str = "Yes" if game.data.get('Trailer_Link') else "No "
+                    
+                    action_title = f"{log_act} : {folder}"
+                    logging.info(f"|{action_title[:56]:<56}| Img: {img_str[:3]:<3} | Trl: {trl_str[:3]:<3} |")
 
     existing_folders = list(games_dict.keys())
     for folder in existing_folders:
@@ -160,30 +172,30 @@ def scan_local_system(config, games_dict, token, worker_thread=None):
             has_external_id = any(x in game_ids for x in ['gog_', 'steam_', 'epic_', 'uplay_', 'origin_'])
 
             if real_platforms or has_external_id:
-                logging.info(f"    [UPDATE] Local files removed for '{folder}'. Reverting to Platform Entry.")
                 game_to_check.data['Path_Root'] = ''
                 # WHY: Clean up legacy tags properly when reverting.
                 if 'Local Copy' in platform_list: platform_list.remove('Local Copy')
                 game_to_check.data['Platforms'] = ", ".join(sorted(platform_list))
+                action_title = f"Unlinked : {folder}"
+                logging.info(f"|{action_title[:56]:<56}| Img: No  | Trl: No  |")
                 stats['updated'] += 1
             else:
-                logging.info(f"    [DELETE] Game entry not found on disk, deleting: {folder}")
+                action_title = f"Deleted : {folder}"
+                logging.info(f"|{action_title[:56]:<56}| Img: No  | Trl: No  |")
                 del games_dict[folder]
                 stats['deleted'] += 1
 
     if worker_thread and worker_thread.isInterruptionRequested():
-        report = "\n=== SCAN INTERRUPTED BY USER ===\n"
+        report = f"\n{' SCAN INTERRUPTED BY USER ':=^80}\n"
     else:
         report = (
-            "\n=== LOCAL SCAN REPORT ===\n"
-            f"Folders scanned: {stats['scanned']}\n"
-            f"-----------------------------------\n"
-            f"New games detected: {stats['new']}\n"
-            f"Existing games checked: {stats['updated']}\n"
-            f"Deleted games (not found): {stats['deleted']}\n"
-            f"-----------------------------------\n"
-            f"Metadata fetched (IGDB): {stats['fetched_success']}\n"
-            f"IGDB fetch failures: {stats['fetched_fail']}\n"
-            "==================================="
+            f"{' LOCAL SCAN REPORT ':=^80}\n"
+            f"Folders Scanned: {stats['scanned']}\n"
+            f"{'-'*80}\n"
+            f"New Added      : {stats['new']}\n"
+            f"Smart Merged   : {stats['updated'] - stats['new']}\n"
+            f"Meta Fetched   : {stats['fetched_success']}\n"
+            f"Missing Purged : {stats['deleted']}\n"
+            f"{'='*80}"
         )
     logging.info(report)

@@ -119,6 +119,9 @@ class Sidebar(QWidget):
         super().__init__()
         self.parent = parent
         self.setFixedWidth(350)
+        # WHY: Decouple the Sidebar's internal vertical math from the Main Window. 
+        # This acts as a circuit breaker, preventing Qt from aggressively locking the window's minimum height based on hidden panel elements.
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Ignored)
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(5, 5, 5, 5)
         
@@ -291,6 +294,8 @@ class Sidebar(QWidget):
 
         self.scan_results = QListWidget()
         self.scan_results.setIconSize(QSize(50, 70))
+        # WHY: Force a monospace font and smaller text size to guarantee perfect vertical ASCII alignment for the new tabular logs.
+        self.scan_results.setStyleSheet("font-family: Consolas, 'Courier New', monospace; font-size: 11px;")
 
         self.btns_layout = QHBoxLayout()
         self.btn_confirm = QPushButton(translator.tr("sidebar_manual_scan_confirm_btn"))

@@ -229,13 +229,9 @@ class Game:
                 self.data['Image_Link'] = self._ensure_cover(g, silent=True)
                 self.data['Status_Flag'] = 'OK'
                 
-                log_msg = f"    [IGDB] Found: {self.data['Clean_Title']}"
-                if api_year_str: log_msg += f" ({api_year_str})"
-                logging.info(log_msg)
                 return True
 
         if results is not None:
-            logging.warning(f"    [IGDB] No results for '{search_term}'")
             self.data['Status_Flag'] = 'NEEDS_ATTENTION'
         return False
 
@@ -297,7 +293,6 @@ class Game:
                 
                 self.data['Image_Link'] = self._ensure_cover(g)
                 self.data['Status_Flag'] = 'OK'
-                logging.info(f"    [SMART SCAN] Match found: {self.data['Clean_Title']} (Score: {best_score})")
                 return True
         return False
 

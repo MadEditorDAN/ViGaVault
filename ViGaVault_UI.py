@@ -20,6 +20,8 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle(translator.tr("app_title"))
         self.resize(*MAIN_WINDOW_SIZE)
+        # WHY: Establish a baseline minimum size so Qt doesn't falsely inherit maximum dimensions from multi-monitor geometry restorations.
+        self.setMinimumSize(800, 600)
         self.is_startup = True
         self.sort_desc = True
         self.display_settings = DEFAULT_DISPLAY_SETTINGS.copy()

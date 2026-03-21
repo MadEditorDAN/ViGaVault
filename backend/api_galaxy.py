@@ -14,7 +14,7 @@ from ViGaVault_utils import BASE_DIR, get_safe_filename, normalize_genre
 from .game import Game
 
 def sync_galaxy_database(config, games_dict, worker_thread=None):
-    logging.info("--- START OF GALAXY SYNC ---")
+    logging.info(f"\n{' GALAXY SYNC ':=^80}")
     galaxy_db_path = config.get('galaxy_db_path', os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db'))
 
     if not os.path.exists(galaxy_db_path):
@@ -139,10 +139,12 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
                 try: galaxy_year = ld_release_date[:4]
                 except: pass
 
+            act_str = ""
             game_obj = None
             if releaseKey in key_to_game_map:
                 game_obj = key_to_game_map[releaseKey]
                 stats['matched_key'] += 1
+                act_str = "Updated"
             else:
                 best_score = 0
                 best_game = None
@@ -187,23 +189,22 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
                 threshold = 60 if best_game and re.sub(r'[^a-z0-9]', '', best_game.data.get('Clean_Title', '').lower()) == norm_title else 70
                 if best_game and best_score >= threshold:
                     game_obj = best_game
-                    logging.info(f"    [GALAXY MATCH SMART] Game recognized by title (Score: {best_score}): '{title}' -> '{best_game.data.get('Clean_Title')}'")
                     stats['matched_smart'] += 1
+                    act_str = "Merged"
             
             if not game_obj:
                 folder_name = get_safe_filename(title)
                 if not folder_name: folder_name = f"Unknown Game [{releaseKey}]"
                 if folder_name in games_dict: folder_name = f"{title} [{releaseKey}]"
-                logging.info(f"    [GALAXY NEW] Adding game: '{title}' ({platform})")
                 game_obj = Game(config=config, Folder_Name=folder_name, Status_Flag='OK', Path_Root='')
                 stats['new'] += 1
                 stats['new_by_platform'][platform] = stats['new_by_platform'].get(platform, 0) + 1
+                act_str = "Added"
 
             force_media_refresh = game_obj.data.get('Status_Flag') == 'NEW'
             if force_media_refresh:
-                logging.info(f"    [GALAXY REFRESH] 'NEW' status detected for '{title}'. Checking for missing media.")
+                act_str = "Refresh"
             if game_obj.data.get('Status_Flag') == 'LOCKED':
-                logging.info(f"    [LOCKED] Skipping metadata update for protected game: {title}")
                 continue
 
             current_ids = set(x.strip() for x in game_obj.data.get('game_ID', '').split(',') if x.strip())
@@ -315,6 +316,13 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
                 # WHY: Always save the URL to the DB for asynchronous backfilling.
                 game_obj.data['Cover_URL'] = cover_url
                 
+            if act_str in ["Added", "Merged", "Refresh"]:
+                img_str = "Yes" if game_obj.data.get('Cover_URL') or game_obj.data.get('Image_Link') else "No "
+                trl_str = "Yes" if game_obj.data.get('Trailer_Link') and game_obj.data.get('Trailer_Link') != 'Not_on_Steam' else "No "
+                
+                action_title = f"{act_str} : {title}"
+                logging.info(f"|{action_title[:56]:<56}| Img: {img_str[:3]:<3} | Trl: {trl_str[:3]:<3} |")
+                
             # End of loop assignment
             if force_media_refresh: game_obj.data['Status_Flag'] = 'OK'
             games_dict[game_obj.data['Folder_Name']] = game_obj
@@ -329,6 +337,14 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
         ghosts_to_delete = []
         for folder_name, game in games_dict.items():
             if not game.data.get('Path_Root'):
+                
+                # WHY: Jurisdiction Check - If the standalone GOG Web connector is active, 
+                # it acts as the absolute master for GOG games. Galaxy is forbidden from deleting 
+                # them just because they are Goodies or omitted from the Galaxy SQLite DB.
+                platforms = [p.strip() for p in game.data.get('Platforms', '').split(',') if p.strip()]
+                if 'GOG' in platforms and config.get('enable_gog_web', False):
+                    continue
+
                 game_ids = [x.strip() for x in game.data.get('game_ID', '').split(',') if x.strip()]
                 is_valid = False
                 for gid in game_ids:
@@ -339,25 +355,19 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
                     ghosts_to_delete.append(folder_name)
 
         for folder in ghosts_to_delete:
-            logging.info(f"    [GALAXY CLEANUP] Removing obsolete platform entry: {folder}")
+            action_title = f"Ghost Delete : {folder}"
+            logging.info(f"|{action_title[:56]:<56}| Img: No  | Trl: No  |")
             del games_dict[folder]
             stats['deleted_ghosts'] += 1
 
-    sorted_platforms = sorted(stats['new_by_platform'].items())
-    platform_stats = "\n".join([f"  - {p}: {c}" for p, c in sorted_platforms])
-    if not platform_stats: platform_stats = "  (None)"
-
     report = (
-        "\n=== GALAXY SYNC REPORT ===\n"
+        f"{' REPORT ':=^80}\n"
         f"Games found in GALAXY: {stats['total_found']}\n"
         f"Games processed successfully: {stats['processed']}\n"
-        f"-----------------------------------\n"
-        f"New games added: {stats['new']}\n"
-        f"{platform_stats}\n"
-        f"Updates (Unique Key): {stats['matched_key']}\n"
-        f"Updates (Smart): {stats['matched_smart']}\n"
-        f"Removed (Obsolete Ghosts): {stats['deleted_ghosts']}\n"
+        f"New Added      : {stats['new']}\n"
+        f"Smart Merged   : {stats['matched_smart']}\n"
+        f"Ghosts Removed : {stats['deleted_ghosts']}\n"
         f"Errors / Ignored: {stats['errors']}\n"
-        f"==================================="
+        f"{'='*80}"
     )
     logging.info(report)
