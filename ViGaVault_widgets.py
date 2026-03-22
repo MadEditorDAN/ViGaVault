@@ -330,12 +330,16 @@ class Sidebar(QWidget):
         
         self.chk_scan_galaxy = QCheckBox("Galaxy")
         self.chk_scan_gog_web = QCheckBox("GOG.com")
+        # WHY: Renamed strictly to "Epic" to align with the visual consistency of the other short-named platforms.
+        self.chk_scan_epic = QCheckBox("Epic")
+        
         self.layout_scan_platforms.addWidget(self.chk_scan_galaxy, 0, 0)
         self.layout_scan_platforms.addWidget(self.chk_scan_gog_web, 0, 1)
+        self.layout_scan_platforms.addWidget(self.chk_scan_epic, 1, 0)
 
         # WHY: Inject placeholders for all upcoming platforms in a clean 2-column grid.
-        dummies = ["Steam", "Epic", "Amazon", "Uplay", "Battle.net", "Origin", "Itch", "Xbox", "PSN"]
-        r, c = 1, 0
+        dummies = ["Steam", "Amazon", "Uplay", "Battle.net", "Origin", "Itch", "Xbox", "PSN"]
+        r, c = 1, 1
         for d in dummies:
             chk = QCheckBox(d)
             chk.setEnabled(False)
@@ -409,8 +413,12 @@ class Sidebar(QWidget):
         self.btn_approve_review.clicked.connect(self.parent.approve_reviews)
         self.btn_scan_settings.clicked.connect(self.parent.open_scan_settings)
         self.btn_close_scan_settings.clicked.connect(self.parent.close_scan_settings)
+        
+        # WHY: Reverted to explicit signal connections. Removing instantaneous saving 
+        # so settings are batched and saved on application close just like the GOG checkbox.
         self.chk_scan_galaxy.toggled.connect(self.update_scan_button_state)
         self.chk_scan_gog_web.toggled.connect(self.update_scan_button_state)
+        self.chk_scan_epic.toggled.connect(self.update_scan_button_state)
         self.chk_scan_local.toggled.connect(self.update_scan_button_state)
 
         # Scan Connections
@@ -451,7 +459,8 @@ class Sidebar(QWidget):
     def update_scan_button_state(self):
         """WHY: Single Responsibility - Enables or disables the Scan button based on selected sources."""
         if getattr(self.parent, 'full_scan_in_progress', False): return
-        has_source = self.chk_scan_galaxy.isChecked() or self.chk_scan_gog_web.isChecked() or self.chk_scan_local.isChecked()
+        # WHY: Added self.chk_scan_epic.isChecked() so the button activates when Epic is selected.
+        has_source = self.chk_scan_galaxy.isChecked() or self.chk_scan_gog_web.isChecked() or self.chk_scan_epic.isChecked() or self.chk_scan_local.isChecked()
         self.btn_full_scan.setEnabled(has_source)
 
     def set_search_target(self, target, ph_key):

@@ -6,8 +6,8 @@ import shutil
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget, QFormLayout, 
                                QComboBox, QSlider, QLabel, QCheckBox, QGroupBox, QLineEdit, QPushButton, 
                                QFileDialog, QGridLayout, QScrollArea, QFrame, QMessageBox, QSizePolicy,
-                               QTableWidget, QHeaderView, QAbstractItemView)
-from PySide6.QtCore import Qt
+                               QTableWidget, QHeaderView, QAbstractItemView, QInputDialog)
+from PySide6.QtCore import Qt, QTimer
 
 from ViGaVault_utils import BASE_DIR, get_library_settings_file, translator, DIALOG_STD_SIZE, center_window, DEFAULT_DISPLAY_SETTINGS
 
@@ -324,6 +324,13 @@ class SettingsDialog(QDialog):
             if p_id == "gog":
                 from backend.gog.login_gog import is_gog_connected
                 is_connected = is_gog_connected()
+            elif p_id == "epic":
+                # WHY: Dynamic import checks our backend connection status directly.
+                try:
+                    from backend.epic.login_epic import is_epic_connected
+                    is_connected = is_epic_connected()
+                except ImportError:
+                    pass
             
             btn_connect = QPushButton()
             self.update_platform_btn_ui(btn_connect, is_connected)
@@ -368,18 +375,85 @@ class SettingsDialog(QDialog):
             else:
                 oauth_url = "https://auth.gog.com/auth?client_id=46899977096215655&redirect_uri=https://embed.gog.com/on_login_success%3Forigin%3Dclient&response_type=code&layout=client2"
                 dlg = LoginBrowserDialog(oauth_url, success_url="on_login_success", parent=self)
-                dlg.exec()
                 
-                if dlg.success_triggered and dlg.auth_code:
-                    token_data = exchange_code_for_token(dlg.auth_code)
-                    if token_data and 'access_token' in token_data:
-                        save_gog_session(token_data)
-                        self.update_platform_btn_ui(btn, True)
-                    else:
-                        QMessageBox.warning(self, "Login Failed", "Failed to negotiate OAuth token with GOG.")
-                else:
-                    QMessageBox.warning(self, "Login Failed", translator.tr("msg_login_failed"))
-                dlg.deleteLater()
+                def on_gog_finished(result):
+                    # WHY: Delay the popup by 100ms. If a modal QMessageBox spawns the exact millisecond 
+                    # the browser window hides, the OS window manager gets confused and buries the alert 
+                    # underneath the Settings Dialog, creating an invisible, blocking trap!
+                    def handle_gog_result():
+                        if dlg.success_triggered and dlg.auth_code:
+                            token_data = exchange_code_for_token(dlg.auth_code)
+                            if token_data and 'access_token' in token_data:
+                                save_gog_session(token_data)
+                                self.update_platform_btn_ui(btn, True)
+                            else:
+                                QMessageBox.warning(self, "Login Failed", "Failed to negotiate OAuth token with GOG.")
+                        else:
+                            QMessageBox.warning(self, "Login Failed", translator.tr("msg_login_failed"))
+                        dlg.deleteLater()
+                    QTimer.singleShot(100, handle_gog_result)
+                
+                # WHY: Event-Driven Architecture - Bypasses the fragile blocking C++ loop of exec().
+                dlg.finished.connect(on_gog_finished)
+                dlg.open()
+        elif platform_id == "epic":
+            # WHY: Wiring Epic to use the manual authorization code flow via the user's default external browser.
+            from backend.epic.login_epic import is_epic_connected, disconnect_epic, exchange_code_for_token, save_epic_session
+            import webbrowser
+            import re
+            
+            if is_epic_connected():
+                disconnect_epic()
+                self.update_platform_btn_ui(btn, False)
+                
+                # WHY: Dynamically disable the scanner if disconnected.
+                if hasattr(self.parent_window, 'sidebar'):
+                    self.parent_window.sidebar.chk_scan_epic.setChecked(False)
+                    self.parent_window.sidebar.chk_scan_epic.setEnabled(False)
+                    self.parent_window.epic_connected_cache = False
+            else:
+                logging.info("[EPIC BROWSER] Starting Epic Games manual login flow...")
+                
+                instruction_msg = translator.tr("msg_epic_login_instructions")
+                reply = QMessageBox.information(self, translator.tr("msg_epic_login_title"), instruction_msg, QMessageBox.Ok | QMessageBox.Cancel)
+                
+                if reply == QMessageBox.Ok:
+                    # WHY: Epic's security returns 'null' if you directly hit the API endpoint with a stale session. 
+                    # Wrapping the API endpoint inside Epic's official login router forces the server to perfectly 
+                    # refresh the security context before safely generating the authorizationCode.
+                    oauth_url = "https://www.epicgames.com/id/login?redirectUrl=https%3A%2F%2Fwww.epicgames.com%2Fid%2Fapi%2Fredirect%3FclientId%3D34a02cf8f4414e29b15921876da36f9a%26responseType%3Dcode"
+                    webbrowser.open(oauth_url)
+                    
+                    code_input, ok = QInputDialog.getText(
+                        self, 
+                        translator.tr("msg_epic_input_title"), 
+                        translator.tr("msg_epic_input_prompt")
+                    )
+                    
+                    if ok and code_input:
+                        # WHY: We use Regex to automatically extract the 32-character hex code.
+                        # This makes it idiot-proof, as the user can lazily copy-paste the entire JSON string!
+                        match = re.search(r'([a-fA-F0-9]{32})', code_input)
+                        if match:
+                            auth_code = match.group(1)
+                            logging.info(f"[EPIC BROWSER] Extracted manual exchange code: {auth_code[:5]}...")
+                            token_data = exchange_code_for_token(auth_code)
+                            
+                            if token_data and 'access_token' in token_data:
+                                logging.info("[EPIC BROWSER] Token exchanged successfully. Saving session.")
+                                save_epic_session(token_data)
+                                self.update_platform_btn_ui(btn, True)
+                                
+                                # WHY: Dynamically enable the scanner instantly upon successful connection.
+                                if hasattr(self.parent_window, 'sidebar'):
+                                    self.parent_window.sidebar.chk_scan_epic.setEnabled(True)
+                                    self.parent_window.epic_connected_cache = True
+                            else:
+                                logging.error("[EPIC BROWSER] Failed to exchange manual code for token.")
+                                QMessageBox.warning(self, "Login Failed", translator.tr("msg_epic_token_failed"))
+                        else:
+                            logging.error("[EPIC BROWSER] Found no valid 32-char code in input.")
+                            QMessageBox.warning(self, "Login Failed", translator.tr("msg_epic_invalid_code"))
         else:
             QMessageBox.information(self, "Info", translator.tr("tools_platform_not_impl"))
 
@@ -630,7 +704,7 @@ class SettingsDialog(QDialog):
         global_settings["card_text_size"] = self.TXT_SIZES[self.slider_text_size.value()]
         
         # WHY: Targeted Cleanup - Scrub local library data out of the global settings file.
-        local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "scan_new", "filter_states", "filter_expansion", "sidebar_chk_galaxy", "sidebar_chk_gog_web", "sidebar_chk_local", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_galaxy_db", "galaxy_db_path", "download_images", "download_videos", "image_path", "video_path"]
+        local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "scan_new", "filter_states", "filter_expansion", "sidebar_chk_galaxy", "sidebar_chk_gog_web", "sidebar_chk_epic", "sidebar_chk_local", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_galaxy_db", "galaxy_db_path", "download_images", "download_videos", "image_path", "video_path"]
         for k in local_keys: global_settings.pop(k, None)
         
         try:
@@ -769,5 +843,10 @@ class SettingsDialog(QDialog):
         return True
 
     def accept(self):
+        logging.error("[SETTINGS DIALOG] >>> accept() WAS CALLED! <<<")
         if self.apply_settings():
             super().accept()
+
+    def reject(self):
+        logging.error("[SETTINGS DIALOG] >>> reject() WAS CALLED! <<<")
+        super().reject()

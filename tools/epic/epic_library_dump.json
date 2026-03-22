@@ -1,0 +1,1548 @@
+{
+    "records": [
+        {
+            "namespace": "599d248ca46b45a8b40a3b4e484712cb",
+            "catalogItemId": "bf2f3f45f8e64e3fa130529d06356109",
+            "appName": "Hermit",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "16e35c75b9c3469d9ae5cc977994fb99",
+            "sandboxName": "The Crew 2",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-12-23T11:43:45.723Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "61bc780f42f84fe29e6dfee957ab82de",
+            "catalogItemId": "6e7e8e5c9bcc4352bec6bb2fa5134ad2",
+            "appName": "Peony",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "eb88ba59290b406b8764fa3ec6ed33df",
+            "sandboxName": "The Escapists",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-12-16T14:24:31.663Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "ark",
+            "catalogItemId": "b560fb0489764a5bb7197761562ec16a",
+            "appName": "59e7d1f8e717413586341e227a12aa58",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "prod-ark",
+            "sandboxName": "Ark",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-06-12T07:04:20.730Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "091d95ea332843498122beee1a786d71",
+            "catalogItemId": "8c04901974534bd0818f747952b0a19b",
+            "appName": "Hoki",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "0f48e9fb745c41d48e892a6c0036ba52",
+            "sandboxName": "Darksiders II Deathinitive Edition",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-01-02T00:17:53.694Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "cd14dcaa4f3443f19f7169a980559c62",
+            "catalogItemId": "42ac1ee840304cb1807172a9b47dc8e3",
+            "appName": "Kinglet",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "831ad738547e46e195f87d54e98b8e79",
+            "sandboxName": "Sid Meier's Civilization VI",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-05-25T09:11:23.149Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "cd14dcaa4f3443f19f7169a980559c62",
+            "catalogItemId": "cd9e44a9d1b14b8d84923bb985bc1636",
+            "appName": "KingletAztec",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "831ad738547e46e195f87d54e98b8e79",
+            "sandboxName": "Sid Meier's Civilization VI",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-05-25T09:11:23.149Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "e5e30c728f1947759251eb5283ffa6e3",
+            "catalogItemId": "281504e8e6e44b5dab3a072f9ee21c21",
+            "appName": "Cowbird",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "2f586e5f60cb40e78b46bbcc344954c4",
+            "sandboxName": "Batman\u2122: Arkham Knight",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-09-20T00:26:00.526Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "8432511ef63b489b843d21ff486a0355",
+            "catalogItemId": "6e797b10bc2d4bbb808d14655a30afa1",
+            "appName": "8e425d507bd6473dbb927f0fea8ef4f6",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "29dc2a67d0594fedb03493d256d60ba1",
+            "sandboxName": "Alabaster",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-07-17T07:14:12.999Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "843c8ce683474448bb104a9651e8f325",
+            "catalogItemId": "85c1fcd29dd14ef18c96bd334ee2e10b",
+            "appName": "Goldeneye",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "a57e4867ffd64aae839ed3a31764bf93",
+            "sandboxName": "LEGO\u00ae Batman\u2122: The Videogame",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-09-20T00:27:00.441Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "2bc23fc2438c47ec8acb0641980f50c1",
+            "catalogItemId": "88b2dcb5ece943eca691a2655b7e1cd1",
+            "appName": "Hake",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "264784755dec4382b0033a4d63a4209a",
+            "sandboxName": "Darksiders Warmastered Edition",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-01-02T00:17:33.213Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "742f165671424189aecdfdadf5ea9755",
+            "catalogItemId": "3524134c7a4e4cf2832d8d2a634baef8",
+            "appName": "Turaco",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "af422c0d66204723b7b657f3e9686222",
+            "sandboxName": "Nuclear Throne",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-11-08T15:57:28.980Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "eb9117fdc2a1493ba4e8a4e1d2286e2f",
+            "catalogItemId": "2e095e45bbac4b1e81cd5036adc1cf1b",
+            "appName": "8fceb562623c430db9bb6abf0549c43e",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "f20594e827c846f98146bdbf34f72efb",
+            "sandboxName": "Pathway",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-06-19T17:07:42.415Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "b4d9169e1b8548f2babec33107253309",
+            "catalogItemId": "de47a99c56b04b3aa8bd7813089a3c77",
+            "appName": "Towhee",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "6c09409cc47c41928377173cf260acf8",
+            "sandboxName": "Ticket to Ride",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-02-07T22:16:52.149Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "313f3719063340f886d90e70ae503cd4",
+            "catalogItemId": "533f31e735a848e6b97ba14de429ccd1",
+            "appName": "Parsley",
+            "country": "BE",
+            "platform": [
+                "Mac",
+                "Windows"
+            ],
+            "productId": "38a76bf983ad43a7966401c8e9cc1b49",
+            "sandboxName": "Stories Untold",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-05-17T13:06:48.653Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "f5d58106a0e143758ddf2bb30dd72ae2",
+            "catalogItemId": "cce9b9e0b5934935992139df25efbe1e",
+            "appName": "Escolar",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "fc9495ebd37f4ebbaf0c285538ccda35",
+            "sandboxName": "Wheels of Aurelia",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-04-18T23:23:53.070Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "0584d2013f0149a791e7b9bad0eec102",
+            "catalogItemId": "6e563a2c0f5f46e3b4e88b5f4ed50cca",
+            "appName": "9d2d0eb64d5c44529cece33fe2a46482",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "68d2cc08f9a94b8fb51af4f5cfa6d41b",
+            "sandboxName": "Grand Theft Auto V",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-05-15T08:52:50.276Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "be13f6c4fb11427fbf3313ce93b97cc0",
+            "catalogItemId": "25b771db01554b1bb40c5617b663d17e",
+            "appName": "Garlic",
+            "country": "BE",
+            "platform": [
+                "Mac",
+                "Win32",
+                "Windows"
+            ],
+            "productId": "373a2e61db9c41418340c0378c6989a2",
+            "sandboxName": "Enter the Gungeon",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-06-14T07:55:32.083Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "58c35a214bbb4656a536126ad1552d42",
+            "catalogItemId": "8157061d517946f3854f55a7575108e7",
+            "appName": "2333810845fd49a286baf29f9b58f9ae",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "d441c98ad3de48fab128d3fff59e8041",
+            "sandboxName": "Death Coming",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-05-10T19:37:51.613Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "83022e1b4c304addb2aadee1db854f8d",
+            "catalogItemId": "8475c4b405b44a9d855ad1601cb11c21",
+            "appName": "Gull",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "50b14c829c764b19bb1a5a4c9b4f062a",
+            "sandboxName": "LEGO\u00ae Batman\u2122 3: Beyond Gotham",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-09-20T00:27:00.441Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "puffin",
+            "catalogItemId": "07d9787aea6149fc9768119468a7e087",
+            "appName": "Puffin",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Win32"
+            ],
+            "productId": "prod-puffin",
+            "sandboxName": "Axiom Verge",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-02-11T12:23:26.893Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "b4e95103463b491ab34b29e616404325",
+            "catalogItemId": "fc308a39a7bf4a92b378af93f81dcdd2",
+            "appName": "Hornbill",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "4e131df4698c4811ae245bb1042af6e8",
+            "sandboxName": "The Alto Collection",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-08-14T19:00:36.915Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "clover",
+            "catalogItemId": "1abc2e6bd18349d09683deef8d1be553",
+            "appName": "Clover",
+            "country": "BE",
+            "platform": [
+                "Mac",
+                "Win32",
+                "Windows"
+            ],
+            "productId": "211360ba965b4e829a240da1c843458b",
+            "sandboxName": "Little Inferno",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-12-23T11:37:43.691Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "05279bd00f094731a273370b7c639f24",
+            "catalogItemId": "57a54bda48d24db5b669bcb125fa79ab",
+            "appName": "0a697c1235fb4706a635cfa33f0306ec",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "6114b5847a944f0aaba5fc61f1524da8",
+            "sandboxName": "Stranger Things 3",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-06-26T13:33:17.545Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "e1067ce994e24a4abbe36247eaa26bfd",
+            "catalogItemId": "49beebd4c5d84527a8015fcfe804f3b4",
+            "appName": "Lyrebird",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "a047b3a87dfd4e489bb9fc200aa0e6c7",
+            "sandboxName": "Hob",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-04-03T16:11:43.857Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "ba8062bdcc1342c0b78743e3c6242575",
+            "catalogItemId": "11fa5d6106524a3fa600b111ac243f58",
+            "appName": "Kakopo",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "64943f5c28484fcaa462c4c134f81b61",
+            "sandboxName": "Just Cause 4",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-04-18T23:24:13.957Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "4c7117cadb714722950338f02850fd8d",
+            "catalogItemId": "017e3132e017486bbb3a9a641c984b3a",
+            "appName": "Quail",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Win32"
+            ],
+            "productId": "d8620c68ca8c4591b1bf2b959b97abf1",
+            "sandboxName": "20XX",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-08-01T20:36:45.158Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "hibiscus",
+            "catalogItemId": "a32b4fc85e2440bd9dae0dace76f5c86",
+            "appName": "Hibiscus",
+            "country": "BE",
+            "platform": [
+                "Mac",
+                "Windows"
+            ],
+            "productId": "ddb014391b2f48dcbd327aa86928dbf8",
+            "sandboxName": "Oxenfree",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-03-22T11:25:53.433Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "buffalo",
+            "catalogItemId": "7eb5bc9ec16542c7bb31874ceaad410f",
+            "appName": "Buffalo",
+            "platform": [
+                "Windows",
+                "Win32"
+            ],
+            "productId": "prod-buffalo",
+            "sandboxName": "Super Meat Boy",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-01-02T12:35:31.574Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "675f47ac5d5847f59badceea5b0950cf",
+            "catalogItemId": "433a4f6836b34a05b8371f7a51d31d0a",
+            "appName": "Flagfin",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "58fbdf1f7d4c45f197e4e7c70f66c6c9",
+            "sandboxName": "Tacoma",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-07-24T11:07:29.366Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "ark",
+            "catalogItemId": "e5fb718ceea24f12a6e59602f6a29c6c",
+            "appName": "40404abd974443de81c875af6323f329",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "prod-ark",
+            "sandboxName": "Ark",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-06-12T07:03:35.401Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "85398892cc4544088ee87c673f95bb6f",
+            "catalogItemId": "4d27dfe4f28147d2aef0ee8a9b2ae7dc",
+            "appName": "Tumeric",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "24d9eb2345144ca68e1f3db15aebf80b",
+            "sandboxName": "Observer",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-10-18T01:05:01.734Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "13bb5776b9e1424d84ce42d9ba61c0ca",
+            "catalogItemId": "6fdb5feba66846cd8623a6d15ca68080",
+            "appName": "Marigold",
+            "country": "BE",
+            "platform": [
+                "Win32",
+                "Windows"
+            ],
+            "productId": "777fed0fb6b64ddaafa2d331a7f122db",
+            "sandboxName": "Inside",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-08-30T11:44:19.954Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "d5ee752640ef4cee8b7f5364410ba41f",
+            "catalogItemId": "619e04f4d42c4b65b37d17ea3310f218",
+            "appName": "Sunbird",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "e931215988e648418d1df5b4bf934c3c",
+            "sandboxName": "The Bridge",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-01-27T08:59:19.663Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "8aa6e526d2864c108f219747ad7011e5",
+            "catalogItemId": "abad6949101348dc9735ec624259f42e",
+            "appName": "Palila",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "c575d39bf7b543a2b38625e3b72f9ee5",
+            "sandboxName": "Horace",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-01-21T12:06:52.947Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "f3720f53cccb4a20841a392a8ea0457f",
+            "catalogItemId": "9576e5296aef4c99aec3767280b09bc3",
+            "appName": "26b63c46de9e4dcc856b3c6b106b6777",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "69e8feefa62141dfac4370865eddaa0d",
+            "sandboxName": "AER: Memories of Old",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-06-26T13:31:38.116Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "ut",
+            "catalogItemId": "b8538c739273426aa35a98220e258d55",
+            "appName": "UnrealTournamentDev",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "prod-ut",
+            "sandboxName": "UT Marketplace",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-01-02T12:38:58.442Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "5f7c811695f14b8fa3a8e1ea35713d23",
+            "catalogItemId": "a3361123cbb5436ab8630caea6e1d39a",
+            "appName": "Godwit",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "40e32b4dc5034362a156cec0edd0f30a",
+            "sandboxName": "Batman\u2122: Arkham Asylum Game of the Year Edition",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-09-20T00:26:00.526Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "6110c92696a54f108c8e9002713ea5f9",
+            "catalogItemId": "7aa957cbc73446d08bbfc234d693001a",
+            "appName": "Turkey",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Win32"
+            ],
+            "productId": "ed79fbecdf21430badf35646c87df111",
+            "sandboxName": "Borderlands : The Pre-Sequel",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-05-31T08:04:02.725Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "854ca270c7f04fe483212a35811e9189",
+            "catalogItemId": "3526c66b4bf748f5a6284b9b6391c427",
+            "appName": "Pelican",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Win32"
+            ],
+            "productId": "a6178a59ce744e089c1a8e44010c3aff",
+            "sandboxName": "Everything",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-09-29T07:13:32.965Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "corydalis",
+            "catalogItemId": "1e38b618d106430db94b474abbfecc16",
+            "appName": "Corydalis",
+            "country": "BE",
+            "platform": [
+                "Win32",
+                "Windows",
+                "Mac"
+            ],
+            "productId": "34f98a406ed74c7f906eacead1570f3c",
+            "sandboxName": "Slime Rancher",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-03-08T08:50:03.282Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "weaver",
+            "catalogItemId": "5106a8a7bde5423d8c3f1023764cdbe9",
+            "appName": "Weaver",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "prod-weaver",
+            "sandboxName": "Rebel Galaxy",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-06-21T12:06:08.269Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "cb23c857ec0d42d89b4be34d11302959",
+            "catalogItemId": "c916885297ea4c20a94deb698536bd4a",
+            "appName": "Grackle",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "5e802a1ec87e419182e6b4271ce2bb80",
+            "sandboxName": "LEGO\u00ae Batman\u2122 2: DC Super Heroes",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-09-20T00:27:00.441Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "51c19c28a7024793b9e38174d0e1634b",
+            "catalogItemId": "68cd14c349dd4678ac1e8bb113bbf0da",
+            "appName": "Goby",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "4d90aa5d6b2246cf92cce609680f5287",
+            "sandboxName": "Tormentor x Punisher",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-03-27T12:34:01.968Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "aa5ef9d2f8394731a034504c562e292c",
+            "catalogItemId": "627e807166bf409c8a4a70639a6fe448",
+            "appName": "Chives",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "3d3e0090a6dd43b8815246d09e43e0a6",
+            "sandboxName": "Bad North",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-11-26T14:53:20.174Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "6ac9ddab8e604e3ba2d4ea01e8f9fa7d",
+            "catalogItemId": "4ea6051591b14a37bcc4048081b30dc0",
+            "appName": "Canary",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "2dbe28863ba042eb959dc7c0aaaff8d3",
+            "sandboxName": "Conarium",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-09-12T23:31:13.727Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "115577f4ef1e4055aaf0da534fdfe81e",
+            "catalogItemId": "481004e1785e4a2eb98e63b11797aa9a",
+            "appName": "Fowl",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Win32"
+            ],
+            "productId": "f8699f54112841f4a1b0f69f1fabc2fb",
+            "sandboxName": "The Escapists 2",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-07-14T14:38:59.506Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "ca4058f18b0a4a9e9e2ccc28f7f33000",
+            "catalogItemId": "8f328dced20e41d29b6f1fceed8f2164",
+            "appName": "Eel",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "88801317bf794eaba96d893fa7d0c5c3",
+            "sandboxName": "Kingdom Come: Deliverance",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-02-19T16:38:45.810Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "3e84a6d0684b4f7593e6bf88bee0cbaf",
+            "catalogItemId": "c4aa7780f1ad4084aea750b7e28873e8",
+            "appName": "75553c71fa1744a4be89f71d5b862eae",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "b3a7b47b7ebd4a26b1a5ffe2486b8946",
+            "sandboxName": "Samurai Shodown NeoGeo Collection",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-06-12T07:01:22.369Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "ffe512fa1e594ee6a75d4643d1e21b43",
+            "catalogItemId": "4e7c8122d7b546dc8fe9ab05e4b0f38a",
+            "appName": "Driftfish",
+            "country": "BE",
+            "platform": [
+                "Mac",
+                "Windows"
+            ],
+            "productId": "d09bc49eeaae4e628222e5d07d0099db",
+            "sandboxName": "Totally Accurate Battle Simulator",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-12-25T22:59:54.944Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "109273d8719f46b9b89cb912a6649e5c",
+            "catalogItemId": "dfc6d5a969a148649c237603fc64d2a6",
+            "appName": "Emperor",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "c3df4124018744f8bd0cac51db6a5b1d",
+            "sandboxName": "GoNNER",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-03-07T17:49:49.285Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "5fdcc0dc67294af3be740f362bd976fd",
+            "catalogItemId": "3debdea646834df18a900bcbe76b9013",
+            "appName": "stargazer",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac",
+                "Win32"
+            ],
+            "productId": "dd3c38c69b0c489694376dbd027a18a1",
+            "sandboxName": "Magic The Gathering Arena",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-01-27T09:00:39.667Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "ecebf45065bc4993abfe0e84c40ff18e",
+            "catalogItemId": "6dc445f656de4e029834b2d32b6a2f77",
+            "appName": "Jasper",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "0ef48c2fbefa4e75a5753c0a4ae919c9",
+            "sandboxName": "Watch Dogs 1",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-03-24T14:48:38.243Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "92053006068e4aa9b1ad413f72090f5e",
+            "catalogItemId": "9354cd92a21f42a186b73c984290c942",
+            "appName": "Hazelnut",
+            "country": "BE",
+            "platform": [
+                "Win32",
+                "Windows"
+            ],
+            "productId": "483e8369f22e4c46884b0b8406a33bde",
+            "sandboxName": "Limbo",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-07-24T11:10:32.106Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "74d82b28ab424956ac24407229fe6faa",
+            "catalogItemId": "682122e968804007beadd755c79db11b",
+            "appName": "Laridae",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "4643586fc7444f00b48e39159bb8d334",
+            "sandboxName": "RUINER",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-11-08T15:57:58.590Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "petunia",
+            "catalogItemId": "5b2c145a99284d87b0a46ca79ab75b59",
+            "appName": "Petunia",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "prod-petunia",
+            "sandboxName": "Metro 2033 Redux",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-09-29T07:15:10.942Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "magnolia",
+            "catalogItemId": "a379f050fa3d47e4a0fa696b0ef744d5",
+            "appName": "Magnolia",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "prod-magnolia",
+            "sandboxName": "The Witness",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-04-04T15:44:46.466Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "5b325322a4c04b9e9e780b9a1e9b2d70",
+            "catalogItemId": "9d60f0d4300a407e817ce5548f12f12d",
+            "appName": "Grunt",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "ca72a212479d4f658b053d06fa37330e",
+            "sandboxName": "Aztez",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-02-19T16:38:16.960Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "0e87bed2a83c4cf6a68a7aeb43f25cf0",
+            "catalogItemId": "d0f62d60809d4d8f989b7130a169eab6",
+            "appName": "cacao",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac",
+                "Win32"
+            ],
+            "productId": "edd2031b28e2451b9e1264025e98926c",
+            "sandboxName": "Kingdom New Lands",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-06-07T14:00:57.498Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "a646020cb93b4ea995cda70647bbe001",
+            "catalogItemId": "7592111dd8664fb6aef9a738d71c3c67",
+            "appName": "Barracuda",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "05cd371dc82f48aeb99d5ee2faab5690",
+            "sandboxName": "Steep",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-01-02T00:18:33.446Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "4492ce99b4124b74a0bb83f78b3d70b8",
+            "catalogItemId": "430f4445291f4566989cc26039f4694c",
+            "appName": "Discus",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "55cfb7ec385d4a009bef201249c03db9",
+            "sandboxName": "For The King",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-04-28T17:21:56.555Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "41f47fd0d3e248bc938a5815d6d64daa",
+            "catalogItemId": "7a70b499513441c792b541d53505e0b2",
+            "appName": "Bluebird",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac",
+                "Win32"
+            ],
+            "productId": "4f0cd8b701924f4b98be9b3948676a07",
+            "sandboxName": "Fez",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-08-22T21:02:30.157Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "anemone",
+            "catalogItemId": "716245e44f694937b68792dcd090a15c",
+            "appName": "Anemone",
+            "country": "BE",
+            "platform": [
+                "Win32",
+                "Windows",
+                "Mac"
+            ],
+            "productId": "593dcb4fe2a14cffa72e7274a2dd504c",
+            "sandboxName": "World of Goo",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-05-02T20:04:29.564Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "fc8d1547232045f6a23257cfd04ef3e8",
+            "catalogItemId": "dfa11ab71fc74866b9f27f5d944324e0",
+            "appName": "Anchovy",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Win32"
+            ],
+            "productId": "142456888e9149ee8a76de3b879ae7b7",
+            "sandboxName": "Rayman Legends",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-12-03T11:53:55.558Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "f4a7772a4da24870a3ea6dfb8aeac662",
+            "catalogItemId": "445a01ff01344692a69a092595849f03",
+            "appName": "Dodo",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Win32"
+            ],
+            "productId": "fbb7b5df655a4b07ad280fec947d0d9f",
+            "sandboxName": "Borderlands 2",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-05-31T08:04:02.725Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "ark",
+            "catalogItemId": "c76f31b0c4ea4b99bc80ce6844212802",
+            "appName": "028eaf5aa1bf4867b4bf163303d338d3",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "prod-ark",
+            "sandboxName": "Ark",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-06-12T07:04:00.835Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "b671fbc7be424e888c9346a9a6d3d9db",
+            "catalogItemId": "38c07a09dc174b69b756aa51890c3dd4",
+            "appName": "Salt",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac",
+                "Win32"
+            ],
+            "productId": "9ae799adceab466a97fbc0408d12c5b8",
+            "sandboxName": "Celeste",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-08-30T18:03:21.560Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "4756b80eb0f74d45b77922e54052cfed",
+            "catalogItemId": "4d3e7e2358e448c381626d326cb9587f",
+            "appName": "Falcon",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "be813a8467f9444a841a6777a465de28",
+            "sandboxName": "Mutant Year Zero",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-08-19T10:26:36.274Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "ceaa24233cdb4b678a1cf515e3a912e8",
+            "catalogItemId": "1efa6e54bc134ec68ea15b5280da7ccd",
+            "appName": "9bc4423d873845739cc99ab69b6bfbe9",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "db98a8404062421ebf3baee0e1d831ab",
+            "sandboxName": "God's Trigger",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-08-21T07:35:40.163Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "62d6f15b1bb345f6a42585b4c8c847a0",
+            "catalogItemId": "3c8142e2d269463996ba868cc8f26d7e",
+            "appName": "Parakeet",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "50af5c44f34f454e98e2154f146eec6e",
+            "sandboxName": "Hyper Light Drifter",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-08-19T10:26:30.291Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "ark",
+            "catalogItemId": "8077d89481064a9097dd4b8fe7bca090",
+            "appName": "ARKDevKit",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "prod-ark",
+            "sandboxName": "Ark",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-06-12T07:03:12.735Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "1109b87f323946e5b7883d724e6a22ba",
+            "catalogItemId": "d2fb14a0fe4946d4b4dffa2750fce03a",
+            "appName": "f6d328ca5be24fd585478d1477e1ea4d",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "430899c8a12140f7b43385eb82d88520",
+            "sandboxName": "Superbrothers: Sword & Sworcery EP",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-08-01T20:37:50.336Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "4c00c7506c4b4fa695f749bd6bb07ff6",
+            "catalogItemId": "4107733638294e9397e7d0bbda5b8734",
+            "appName": "Freesia",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "b956bc18169b4fd7821f5a63c5344a14",
+            "sandboxName": "The Stanley Parable",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-03-24T14:48:06.735Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "6c77bc1b5faa4ac98441ec75cca0d320",
+            "catalogItemId": "ec51cdd339bd4f88822a384a0174aacb",
+            "appName": "Coley",
+            "country": "BE",
+            "platform": [
+                "Win32",
+                "Windows"
+            ],
+            "productId": "980a9f62bb1e4d5db2c0b55ae112f61c",
+            "sandboxName": "Ape Out",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-12-24T07:25:34.131Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "40c34bea9cd0460589c867f6a7246342",
+            "catalogItemId": "fda38b88f1ea454c9e65cba125947d60",
+            "appName": "Egret",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "f7caa001841e43418e0dcac647eed1b0",
+            "sandboxName": "Batman\u2122: Arkham City - Game of the Year Edition",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-09-20T00:26:00.526Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "ba3149b6d7a7488ab5cc674154458757",
+            "catalogItemId": "75e740783b2f496ab7f6f8ecf546c702",
+            "appName": "Grouse",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "37e6b31c5c5547a182664c24dd308549",
+            "sandboxName": "Jotun",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-12-09T13:54:01.061Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "7af7476ff9eb4a8d9cd9d6486224de76",
+            "catalogItemId": "1e4e727584484401ac62b2b513419a52",
+            "appName": "Curry",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "d86062a81b754a36982d67ab5a7c0b5e",
+            "sandboxName": "ABZU",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-09-05T21:35:34.691Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "tulip",
+            "catalogItemId": "115a33f26ad24147af1178683a9f6fb9",
+            "appName": "Tulip",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac",
+                "Win32"
+            ],
+            "productId": "prod-tulip",
+            "sandboxName": "Thimbleweed Park",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-02-25T12:58:17.573Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "663e521f2a444199be58152fd93fa66e",
+            "catalogItemId": "b0e071ce0bb54cba93ad02011ce40f76",
+            "appName": "b4a0d2d15acb4db894a599b810297543",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "3640bafead2f41b09e3db71b245be100",
+            "sandboxName": "Remnant: From the Ashes",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-08-14T18:59:19.754Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "cd88d9edc5a748cfa138e467205adcac",
+            "catalogItemId": "bba1b26cf8d74559a18416a33c6688ec",
+            "appName": "Herring",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Win32"
+            ],
+            "productId": "50c7fef4b8a44187a4c71ca5686b41b3",
+            "sandboxName": "Hue",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-07-03T12:07:12.489Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "4d2a12aff0484d699b1806ab104d259b",
+            "catalogItemId": "a2febf833fed4471a9185c7b80af59c3",
+            "appName": "Condor",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "0293ace10f2a46b481f736f3e06c491e",
+            "sandboxName": "Alan Wake's American Nightmare",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-10-18T01:03:56.248Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "9ce4c6f216cf43e7ba5eff1045b6e08d",
+            "catalogItemId": "a3e6fab1a6e04e35b407207591544ac5",
+            "appName": "860a4feefe2a4f48905ae86c61d5db64",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "a2066c9609874d49a54648eff2a63f8f",
+            "sandboxName": "Lifeless Planet",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-07-14T14:38:37.558Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "387bc8d3398a40f7ae14de417b4acefc",
+            "catalogItemId": "cfc6700550314690b6d174393166a1cc",
+            "appName": "Almond",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "3907e77278c445b299608155cf725e41",
+            "sandboxName": "InnerSpace",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-02-28T21:47:13.725Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "1b8a504ec52d4430b65cca2990ad6c7f",
+            "catalogItemId": "ac61a543107645e3a086382425bac279",
+            "appName": "afdf59e3dc8f40ec8fd887b5d3fcef23",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "887d6ccb7419441da64ce208b7490aa7",
+            "sandboxName": "Crashlands",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-04-30T22:20:59.015Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "43605e89e49d438485298819a7ef17b4",
+            "catalogItemId": "f1d1779e3b434d429d954b49349bb4bb",
+            "appName": "Petrel",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "d8ad0bf6065a46539604eee86510c9b9",
+            "sandboxName": "Minit",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-10-04T09:47:05.766Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "bec822fb982843c3be794d440728336b",
+            "catalogItemId": "4255c34fbbb746ca8a982f1245c0e490",
+            "appName": "Eagle",
+            "country": "BE",
+            "platform": [
+                "Mac",
+                "Windows"
+            ],
+            "productId": "f4fe2ffc7b0f4acebc040a31b6dcd278",
+            "sandboxName": "Moonlighter",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-07-28T10:34:24.141Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "bc81d1e7d1794d3a94e4dbf26e92166d",
+            "catalogItemId": "6ab3fccba1b045a6b77eebefb5b65fc4",
+            "appName": "Dill",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac",
+                "Win32"
+            ],
+            "productId": "b76c653a77cd4f0bbf1cdb8125a138a6",
+            "sandboxName": "Transistor",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-04-19T11:51:59.215Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "270e1d648a5e4060b7b441615c4da4d9",
+            "catalogItemId": "1b2bc7cc58ae4633bcc8f7abc67fd537",
+            "appName": "ed5e8d42b2ac461eb6f9176d163b9515",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "1c8da4b090f347819213f9130f5289d7",
+            "sandboxName": "Figment",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-03-27T12:29:23.759Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "752368fdba244e9386023cfb2b9d6ceb",
+            "catalogItemId": "adb023dbbb754ec0b88d7912bc747e5d",
+            "appName": "Jay",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "4d63784e33824d6aa15ce9cf0fdb659d",
+            "sandboxName": "The Messenger",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-11-19T11:01:32.208Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "wombat",
+            "catalogItemId": "ec6ed5344a904ea78729113d80818d18",
+            "appName": "Wombat",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "prod-wombat",
+            "sandboxName": "World War Z",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-03-27T12:28:33.240Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "4561b40e52584ac2bcf34bbd5c401480",
+            "catalogItemId": "7e97838fff4e48e79f892f1e64d42cb0",
+            "appName": "Sage",
+            "country": "BE",
+            "platform": [
+                "Win32",
+                "Windows"
+            ],
+            "productId": "4b3ecffc16b14b5aa968abe906ba457d",
+            "sandboxName": "Overcooked",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-06-05T06:47:35.327Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "8a6a94901c8248fca1f5c78931c85cbd",
+            "catalogItemId": "2fc6b6a71a3249fca823e9c24a5b7d9c",
+            "appName": "Emu",
+            "country": "BE",
+            "platform": [
+                "Mac",
+                "Windows"
+            ],
+            "productId": "1f0c2b7ac810474a8ce948853d95738d",
+            "sandboxName": "SOMA",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-11-03T14:19:13.368Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "ark",
+            "catalogItemId": "743e47ee84ac49a1a49f4781da70e0d0",
+            "appName": "aafc587fbf654758802c8e41e4fb3255",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "prod-ark",
+            "sandboxName": "Ark",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-06-12T07:02:46.798Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "e8882546f28e4832af823c646aed232e",
+            "catalogItemId": "10eeeb5bec7e442ba1ced3717a9c25bf",
+            "appName": "Snapper",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "91208157bb194a3291f123b35a87b494",
+            "sandboxName": "Offworld Trading Company",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-03-07T17:48:21.535Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "0aaf0617ee0d47df87c0dc93509159dd",
+            "catalogItemId": "3e3d9fea445042c9bd504afb9b15f184",
+            "appName": "Thrush",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "3128267890c34e88a0fcb61463fd78c4",
+            "sandboxName": "Carcassonne",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-02-07T22:14:46.298Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "91189432bbad4478afd611edff7f0339",
+            "catalogItemId": "d6c4defc748b4026bb6b00aa4d0d7c0c",
+            "appName": "Cardinal",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "ad5b87d7aaff49e6a2e3ade1237ab2e1",
+            "sandboxName": "This War of Mine",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-07-28T10:34:51.522Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "4b5f1eb366dc45f0920d397c01b291ba",
+            "catalogItemId": "a86bbe049ef14f519c69fdc27615d7f4",
+            "appName": "Auk",
+            "country": "BE",
+            "platform": [
+                "Windows"
+            ],
+            "productId": "ff0ade54077543a99f000452c374d481",
+            "sandboxName": "Q.U.B.E. 2",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2019-10-27T09:09:00.233Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "7563789523404ae7ba52588adc99963a",
+            "catalogItemId": "d4262740659b444e8f19e47a2b28dc48",
+            "appName": "Sumac",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "8855742b74c0449b96eab666e5bdd650",
+            "sandboxName": "Next Up Hero",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-07-24T11:07:05.565Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "ca8077d80493497188e0ca5bca3ebe60",
+            "catalogItemId": "667e9987946046af92f4b8b3a54ed417",
+            "appName": "Moa",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "1c69ffb2de3d4bd08ad09a47bfb46537",
+            "sandboxName": "Sundered Eldritch Edition",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-01-10T09:42:34.576Z",
+            "dependencies": []
+        },
+        {
+            "namespace": "ark",
+            "catalogItemId": "8a86839da0b94334851f4c07b0d161a9",
+            "appName": "e25eb863aafb4453b9f9fd17af3ae6d2",
+            "country": "BE",
+            "platform": [
+                "Windows",
+                "Mac"
+            ],
+            "productId": "prod-ark",
+            "sandboxName": "Ark",
+            "sandboxType": "PUBLIC",
+            "recordType": "APPLICATION",
+            "acquisitionDate": "2020-06-12T07:04:38.391Z",
+            "dependencies": []
+        }
+    ]
+}

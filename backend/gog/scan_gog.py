@@ -63,8 +63,6 @@ def scan_gog_account(config, games_dict, worker_thread=None):
         logging.error(f"[GOG.COM] Error connecting to GOG: {e}")
         return False
 
-    # WHY: Pre-fetch the IGDB token once for the session to avoid requesting it repeatedly for every new game.
-    igdb_token = get_igdb_access_token()
 
     # WHY: Pre-emptive Diffing. We isolate strictly new purchases to save API bandwidth and time.
     # We also keep a reference to existing games to patch missing URLs using the bulk data.
@@ -89,20 +87,20 @@ def scan_gog_account(config, games_dict, worker_thread=None):
         'new_to_fetch': len(new_ids),
         'matched_smart': 0,
         'new_added': 0,
-        'failed': 0
+        'failed': 0,
+        'merged_titles': []
     }
 
     def print_report():
         stats['failed'] = stats['new_to_fetch'] - stats['matched_smart'] - stats['new_added']
-        report = (
-            f"{' REPORT ':=^80}\n"
-            f"Total Cloud    : {stats['total_cloud']}\n"
-            f"Already in DB  : {stats['already_in_db']}\n"
-            f"New Added      : {stats['new_added']}\n"
-            f"Smart Merged   : {stats['matched_smart']}\n"
-            f"Errors / Skips : {stats['failed']}\n"
-            f"{'='*80}"
-        )
+        report = f"{' REPORT ':=^80}\n"
+        report += f"Total Cloud    : {stats['total_cloud']}\n"
+        report += f"Already in DB  : {stats['already_in_db']}\n"
+        report += f"New Added      : {stats['new_added']}\n"
+        report += f"Smart Merged   : {stats['matched_smart']}\n"
+        for t in stats['merged_titles']: report += f"                 {t}\n"
+        report += f"Errors / Skips : {stats['failed']}\n"
+        report += f"{'='*80}"
         logging.info(report)
 
     if not new_ids:
@@ -167,6 +165,7 @@ def scan_gog_account(config, games_dict, worker_thread=None):
             logging.info(f"|{action_title[:56]:<56}| Img: {img_str[:3]:<3} | Trl: {trl_str[:3]:<3} |")
             
             stats['matched_smart'] += 1
+            stats['merged_titles'].append(title_clean)
             changes_made = True
             continue
             
@@ -229,13 +228,6 @@ def scan_gog_account(config, games_dict, worker_thread=None):
                         game_obj.data['Original_Release_Date'] = dt.strftime(config.get('date_format', '%d/%m/%Y'))
                     except Exception: pass
 
-        # WHY: Check if any core metadata is missing (or if we need a better cover), and scan with IGDB to backfill.
-        missing_meta = not all([game_obj.data.get(f) for f in ['Developer', 'Publisher', 'Genre', 'Summary', 'Original_Release_Date']])
-        if (missing_meta or not game_obj.data.get('Cover_URL')) and igdb_token:
-            game_obj.fill_missing_metadata(igdb_token)
-
-        # WHY: Only after the IGDB scan is complete, we promote the game to OK.
-        game_obj.data['Status_Flag'] = 'OK'
         if game_obj.data.get('Cover_URL') or game_obj.data.get('Image_Link'):
             img_ok = "Yes"
 

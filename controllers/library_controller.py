@@ -436,7 +436,7 @@ class LibraryController(QObject):
         global_settings.update({"splitter_sizes": self.mw.splitter.sizes()})
         
         # WHY: Targeted Cleanup - Scrub local library data out of the global settings file to fix legacy data bleed.
-        local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "scan_new", "filter_states", "filter_expansion", "sidebar_chk_galaxy", "sidebar_chk_gog_web", "sidebar_chk_local", "sidebar_chk_folders", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_galaxy_db", "galaxy_db_path", "download_images", "download_videos", "image_path", "video_path"]
+        local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "scan_new", "filter_states", "filter_expansion", "sidebar_chk_galaxy", "sidebar_chk_gog_web", "sidebar_chk_epic", "sidebar_chk_local", "sidebar_chk_folders", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_galaxy_db", "galaxy_db_path", "download_images", "download_videos", "image_path", "video_path"]
         for k in local_keys: global_settings.pop(k, None)
         
         try:
@@ -481,8 +481,11 @@ class LibraryController(QObject):
             "scan_new": self.mw.sidebar.chk_show_new.isChecked(),
             "filter_states": filter_states,
             "filter_expansion": saved_expansion,
+            # WHY: Reverted to explicit key mapping to match the original GOG logic exactly. 
+            # Checkbox states are securely batched here and written to VGVDB.json on application close.
             "sidebar_chk_galaxy": self.mw.sidebar.chk_scan_galaxy.isChecked(),
             "sidebar_chk_gog_web": self.mw.sidebar.chk_scan_gog_web.isChecked(),
+            "sidebar_chk_epic": self.mw.sidebar.chk_scan_epic.isChecked(),
             "sidebar_chk_local": self.mw.sidebar.chk_scan_local.isChecked(),
             "sidebar_chk_folders": checked_folders
         })

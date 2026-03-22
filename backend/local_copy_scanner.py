@@ -6,7 +6,7 @@ import re
 from ViGaVault_utils import BASE_DIR, is_hidden, normalize_genre
 from .game import Game
 
-def scan_local_system(config, games_dict, token, worker_thread=None):
+def scan_local_system(config, games_dict, worker_thread=None):
     scan_config = config.get('local_scan_config', {})
     ignore_hidden_global = scan_config.get("ignore_hidden", True)
     scan_mode = scan_config.get("scan_mode", "advanced")
@@ -17,7 +17,10 @@ def scan_local_system(config, games_dict, token, worker_thread=None):
 
     logging.info(f"\n{' LOCAL COPY SCAN ':=^80}")
     
-    stats = {'scanned': 0, 'new': 0, 'updated': 0, 'deleted': 0, 'fetched_success': 0, 'fetched_fail': 0}
+    stats = {
+        'scanned': 0, 'new': 0, 'updated': 0, 'deleted': 0,
+        'merged_titles': [], 'deleted_titles': []
+    }
     found_folders = set()
 
     target_game_depth = 1 if scan_mode == "simple" and "Direct" in global_type else 2 if scan_mode == "simple" else 3
@@ -81,6 +84,7 @@ def scan_local_system(config, games_dict, token, worker_thread=None):
                         games_dict[folder] = game_obj
                         act_str = "Merged"
                         stats['updated'] += 1
+                        stats['merged_titles'].append(folder)
                     else:
                         games_dict[folder] = Game(config=config, Folder_Name=folder, Path_Root=full_path)
                         act_str = "Added"
@@ -120,24 +124,14 @@ def scan_local_system(config, games_dict, token, worker_thread=None):
                     game.data['Platforms'] = ", ".join(sorted(list(p_set)))
                     act_str = "Updated"
                     stats['updated'] += 1
+                    # WHY: Any metadata or path refresh strictly acts as a Merge event for the tracking logs.
+                    stats['merged_titles'].append(folder)
 
                 game = games_dict[folder]
                 if worker_thread and worker_thread.isInterruptionRequested(): break 
 
-                status = game.data.get('Status_Flag')
-                fetched = False
-                if status == 'NEW':
-                    if token and game.fetch_metadata(token): 
-                        stats['fetched_success'] += 1
-                        fetched = True
-                    else:
-                        stats['fetched_fail'] += 1
-                    
-                    # WHY: As requested, guarantee the status is set to OK only after the IGDB scan has been performed.
-                    game.data['Status_Flag'] = 'OK'
-                        
-                if act_str in ["Added", "Merged"] or fetched:
-                    log_act = "Fetched" if fetched and act_str == "Updated" else act_str
+                if act_str in ["Added", "Merged"]:
+                    log_act = act_str
                     img_str = "Yes" if game.data.get('Image_Link') else "No "
                     trl_str = "Yes" if game.data.get('Trailer_Link') else "No "
                     
@@ -187,17 +181,19 @@ def scan_local_system(config, games_dict, token, worker_thread=None):
                 logging.info(f"|{action_title[:55]:<55}| Img: No  | Trl: No  |")
                 del games_dict[folder]
                 stats['deleted'] += 1
+                stats['deleted_titles'].append(folder)
 
     if worker_thread and worker_thread.isInterruptionRequested():
         report = f"\n{' Full Scan interrupted by user ':-^80}\n{' SCAN INTERRUPTED BY USER ':=^80}\n"
     else:
-        report = (
-            f"{' REPORT ':=^80}\n"
-            f"Folders Scanned: {stats['scanned']}\n"
-            f"{'New Added':<28}: {stats['new']}\n"
-            f"{'Smart Merged':<28}: {stats['updated'] - stats['new']}\n"
-            f"{'Meta Fetched':<28}: {stats['fetched_success']}\n"
-            f"{'Missing Purged':<28}: {stats['deleted']}\n"
-            f"{'='*80}"
-        )
+        report = f"{' REPORT ':=^80}\n"
+        report += f"Folders Scanned: {stats['scanned']}\n"
+        report += f"{'New Added':<28}: {stats['new']}\n"
+        # WHY: Removed the mathematical subtraction because 'stats['updated']' natively only increments on updates/merges.
+        report += f"{'Smart Merged':<28}: {stats['updated']}\n"
+        for t in stats['merged_titles']: report += f"                             {t}\n"
+        report += f"{'Missing Purged':<28}: {stats['deleted']}\n"
+        for t in stats['deleted_titles']: report += f"                             {t}\n"
+        report += f"{'='*80}"
+        
     logging.info(report)

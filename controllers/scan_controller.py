@@ -61,6 +61,7 @@ class ScanController(QObject):
         self.mw.sidebar.chk_show_new.setEnabled(False)
         self.mw.sidebar.chk_scan_galaxy.setEnabled(False)
         self.mw.sidebar.chk_scan_gog_web.setEnabled(False)
+        self.mw.sidebar.chk_scan_epic.setEnabled(False)
         self.mw.sidebar.chk_scan_local.setEnabled(False)
         self.mw.filter_controller.set_filters_ui_state(False)
 
@@ -84,13 +85,14 @@ class ScanController(QObject):
 
         do_galaxy = self.mw.sidebar.chk_scan_galaxy.isChecked()
         do_gog_web = self.mw.sidebar.chk_scan_gog_web.isChecked()
+        do_epic = self.mw.sidebar.chk_scan_epic.isChecked()
         do_local = self.mw.sidebar.chk_scan_local.isChecked()
         
         target_folders = []
         for folder, chk in self.mw.sidebar.chk_scan_folders.items():
             if chk.isChecked(): target_folders.append(folder)
             
-        self.full_scan_worker = FullScanWorker(do_galaxy=do_galaxy, do_local=do_local, do_gog_web=do_gog_web, target_folders=target_folders)
+        self.full_scan_worker = FullScanWorker(do_galaxy=do_galaxy, do_local=do_local, do_gog_web=do_gog_web, do_epic=do_epic, target_folders=target_folders)
         self.full_scan_worker.finished.connect(self.finish_full_scan)
         self.full_scan_worker.start()
 
@@ -113,6 +115,7 @@ class ScanController(QObject):
         self.mw.sidebar.chk_show_review.setChecked(True)
         self.mw.sidebar.chk_scan_galaxy.setEnabled(True)
         self.mw.sidebar.chk_scan_gog_web.setEnabled(True)
+        self.mw.sidebar.chk_scan_epic.setEnabled(getattr(self.mw, 'epic_connected_cache', False))
         self.mw.sidebar.chk_scan_local.setEnabled(True)
 
         if self.mw.sidebar.scan_panel.isVisible():
@@ -140,6 +143,7 @@ class ScanController(QObject):
         self.mw.sidebar.btn_scan_settings.setEnabled(False)
         self.mw.sidebar.chk_scan_galaxy.setEnabled(False)
         self.mw.sidebar.chk_scan_gog_web.setEnabled(False)
+        self.mw.sidebar.chk_scan_epic.setEnabled(False)
         self.mw.sidebar.chk_scan_local.setEnabled(False)
         
         self.restore_scan_panel()
@@ -229,6 +233,7 @@ class ScanController(QObject):
         config = build_scanner_config()
         self.mw.sidebar.chk_scan_galaxy.setEnabled(config.get('enable_galaxy_db', True))
         self.mw.sidebar.chk_scan_gog_web.setEnabled(True)
+        self.mw.sidebar.chk_scan_epic.setEnabled(getattr(self.mw, 'epic_connected_cache', False))
         self.mw.sidebar.chk_scan_local.setEnabled(config.get('local_scan_config', {}).get('enable_local_scan', True))
         
         self.mw.sidebar.scan_results.clear()

@@ -6,7 +6,7 @@
         "Battle.net",
         "Epic Games Store"
     ],
-    "search_text": "death",
+    "search_text": "",
     "scroll_value": 164084,
     "chk_new": false,
     "chk_a_tester": false,
@@ -115,24 +115,29 @@
     "gog_db_path": "C:\\ProgramData\\GOG.com\\Galaxy\\storage\\galaxy-2.0.db",
     "download_videos": false,
     "scan_new": false,
-    "filter_states": {},
+    "filter_states": {
+        "Platforms": [
+            "Epic Games Store"
+        ]
+    },
     "enable_gog_db": true,
     "video_path": "D:\\ViGaVault\\Videos",
     "filter_expansion": {
-        "Platforms": false,
+        "Platforms": true,
         "Genre": false,
         "Collection": false
     },
     "image_path": "D:\\ViGaVault\\Images",
     "download_images": true,
-    "anchor_folder": "Death Rally (Classic)",
+    "anchor_folder": "Dishonored Death of the Outsider",
     "sidebar_chk_gog": true,
-    "sidebar_chk_local": true,
+    "sidebar_chk_local": false,
     "enable_galaxy_db": true,
     "galaxy_db_path": "C:\\ProgramData\\GOG.com\\Galaxy\\storage\\galaxy-2.0.db",
-    "sidebar_chk_galaxy": true,
+    "sidebar_chk_galaxy": false,
     "sidebar_chk_gog_web": true,
     "sidebar_chk_folders": [
         "GAMES"
-    ]
+    ],
+    "sidebar_chk_epic": false
 }

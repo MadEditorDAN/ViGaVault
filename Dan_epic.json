@@ -1,29 +1,17 @@
 {
-    "root_path": "",
-    "local_scan_config": {
-        "enable_local_scan": false,
-        "ignore_hidden": true,
-        "scan_mode": "simple",
-        "global_type": "Genre",
-        "global_filter": true,
-        "folder_rules": {}
-    },
-    "galaxy_db_path": "C:\\ProgramData\\GOG.com\\Galaxy\\storage\\galaxy-2.0.db",
-    "enable_galaxy_db": false,
-    "download_images": true,
-    "download_videos": false,
     "sort_desc": true,
     "sort_index": 0,
+    "search_text": "",
+    "anchor_folder": null,
     "scan_new": false,
     "filter_states": {},
     "filter_expansion": {
         "Platforms": false,
         "Genre": false
     },
-    "search_text": "",
-    "anchor_folder": "Arcade Paradise",
     "sidebar_chk_galaxy": false,
     "sidebar_chk_gog_web": true,
+    "sidebar_chk_epic": false,
     "sidebar_chk_local": false,
     "sidebar_chk_folders": [],
     "platform_map": {
@@ -76,5 +64,17 @@
         "playfire",
         "weplay"
     ],
+    "root_path": "T:\\GAMES",
+    "local_scan_config": {
+        "enable_local_scan": true,
+        "ignore_hidden": true,
+        "scan_mode": "simple",
+        "global_type": "Genre",
+        "global_filter": true,
+        "folder_rules": {}
+    },
+    "enable_galaxy_db": false,
+    "galaxy_db_path": "C:\\ProgramData\\GOG.com\\Galaxy\\storage\\galaxy-2.0.db",
+    "download_images": true,
     "image_path": "c:\\Users\\mad_e\\OneDrive\\Batch Collection\\ViGaVault\\images"
 }

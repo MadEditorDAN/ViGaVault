@@ -213,5 +213,11 @@
     "msg_file_locked": "Die Datei {db_path} ist in einem anderen Programm (z.B. Excel) geöffnet.\n\nBitte schließen Sie es und versuchen Sie es erneut.",
     "dialog_switch_lib_exist_title": "Vorhandene Datenbank",
     "dialog_switch_lib_exist_msg": "Dies ist eine bereits vorhandene Datenbank.\nMöchten Sie diese Datei laden?",
-    "msg_local_path_mandatory": "Ein Hauptpfad ist zwingend erforderlich, um nach lokalen Kopien zu scannen."
+    "msg_local_path_mandatory": "Ein Hauptpfad ist zwingend erforderlich, um nach lokalen Kopien zu scannen.",
+    "msg_epic_login_instructions": "Um Epic Games sicher zu verbinden, verwenden wir Ihren echten Browser:\n\n1. Ihr Standard-Webbrowser wird geöffnet.\n2. Melden Sie sich bei Epic Games an (lösen Sie alle CAPTCHAs normal).\n3. Sobald Sie angemeldet sind, sehen Sie eine weiße Seite mit Text.\n4. Kopieren Sie den Wert neben \"authorizationCode\" (oder kopieren Sie den gesamten Text).\n\nKlicken Sie auf OK, um Ihren Browser zu öffnen.",
+    "msg_epic_login_title": "Epic Games Login",
+    "msg_epic_input_title": "Autorisierungscode eingeben",
+    "msg_epic_input_prompt": "Fügen Sie den 'authorizationCode' oder den gesamten Text von der Browserseite ein:",
+    "msg_epic_invalid_code": "In Ihrer Eingabe konnte kein gültiger 32-stelliger Autorisierungscode gefunden werden.",
+    "msg_epic_token_failed": "Das Aushandeln des OAuth-Tokens ist fehlgeschlagen. Der Code könnte abgelaufen sein."
 }

@@ -52,13 +52,15 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
         if 'con' in locals() and con: con.close()
         return
 
-    # WHY: Pre-fetch the IGDB token once to patch any missing metadata on newly discovered games.
-    igdb_token = get_igdb_access_token()
 
     images_dir = config.get('image_path', os.path.join(BASE_DIR, 'images'))
     os.makedirs(images_dir, exist_ok=True)
     
-    stats = {'total_found': 0, 'processed': 0, 'new': 0, 'matched_key': 0, 'matched_smart': 0, 'errors': 0, 'deleted_ghosts': 0, 'new_by_platform': {}}
+    stats = {
+        'total_found': 0, 'processed': 0, 'new': 0, 'matched_key': 0, 'matched_smart': 0, 
+        'errors': 0, 'deleted_ghosts': 0, 'new_by_platform': {},
+        'merged_titles': [], 'ignored_titles': [], 'deleted_ghost_titles': []
+    }
 
     key_to_game_map = {}
     for game in games_dict.values():
@@ -108,6 +110,7 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
         try:
             if not title:
                 stats['errors'] += 1
+                stats['ignored_titles'].append(f"Unknown (Key: {releaseKey})")
                 continue
 
             title = re.sub(r'\s*-\s*Amazon.*$', '', title, flags=re.IGNORECASE)
@@ -194,6 +197,7 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
                 if best_game and best_score >= threshold:
                     game_obj = best_game
                     stats['matched_smart'] += 1
+                    stats['merged_titles'].append(title)
                     act_str = "Merged"
             
             if not game_obj:
@@ -329,20 +333,16 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
                 logging.info(f"|{action_title[:56]:<56}| Img: {img_str[:3]:<3} | Trl: {trl_str[:3]:<3} |")
                 
             # End of loop assignment
-            if act_str == "Added":
-                # WHY: Check if any key metadata is missing, and if so, query IGDB to backfill it before setting to OK.
-                missing_meta = not all([game_obj.data.get(f) for f in ['Developer', 'Publisher', 'Genre', 'Summary', 'Original_Release_Date']])
-                if (missing_meta or not game_obj.data.get('Cover_URL')) and igdb_token:
-                    game_obj.fill_missing_metadata(igdb_token)
-                game_obj.data['Status_Flag'] = 'OK'
-            elif force_media_refresh: 
-                game_obj.data['Status_Flag'] = 'OK'
+            if act_str == "Added" or force_media_refresh:
+                # WHY: Defer IGDB backfilling and status evaluation entirely to the IGDB Scrapper Engine.
+                pass
                 
             games_dict[game_obj.data['Folder_Name']] = game_obj
             stats['processed'] += 1
         except Exception as e:
             logging.error(f"    [GALAXY ERROR] Error processing game '{title}' (releaseKey: {releaseKey}): {e}")
             stats['errors'] += 1
+            stats['ignored_titles'].append(title)
 
     con.close()
     
@@ -372,15 +372,19 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
             logging.info(f"|{action_title[:56]:<56}| Img: No  | Trl: No  |")
             del games_dict[folder]
             stats['deleted_ghosts'] += 1
+            # WHY: Fixed unexpected indent to properly align with the loop's execution block.
+            stats['deleted_ghost_titles'].append(folder)
 
-    report = (
-        f"{' REPORT ':=^80}\n"
-        f"Games found in GALAXY: {stats['total_found']}\n"
-        f"Games processed successfully: {stats['processed']}\n"
-        f"New Added      : {stats['new']}\n"
-        f"Smart Merged   : {stats['matched_smart']}\n"
-        f"Ghosts Removed : {stats['deleted_ghosts']}\n"
-        f"Errors / Ignored: {stats['errors']}\n"
-        f"{'='*80}"
-    )
+    report = f"{' REPORT ':=^80}\n"
+    report += f"Games found in GALAXY: {stats['total_found']}\n"
+    report += f"Games processed successfully: {stats['processed']}\n"
+    report += f"New Added      : {stats['new']}\n"
+    report += f"Smart Merged   : {stats['matched_smart']}\n"
+    for t in stats['merged_titles']: report += f"                 {t}\n"
+    report += f"Ghosts Removed : {stats['deleted_ghosts']}\n"
+    for t in stats['deleted_ghost_titles']: report += f"                 {t}\n"
+    report += f"Errors / Ignored: {stats['errors']}\n"
+    for t in stats['ignored_titles']: report += f"                 {t}\n"
+    report += f"{'='*80}"
+    
     logging.info(report)

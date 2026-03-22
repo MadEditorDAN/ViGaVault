@@ -14,11 +14,12 @@ from ViGaVault_utils import get_db_path, build_scanner_config
 # Operations like scanning or filtering can take time. We run them in separate threads
 # to prevent the GUI from freezing (becoming unresponsive) while they process.
 class FullScanWorker(QThread):
-    def __init__(self, do_galaxy=True, do_local=True, do_gog_web=False, target_folders=None, parent=None):
+    def __init__(self, do_galaxy=True, do_local=True, do_gog_web=False, do_epic=False, target_folders=None, parent=None):
         super().__init__(parent)
         self.do_galaxy = do_galaxy
         self.do_local = do_local
         self.do_gog_web = do_gog_web
+        self.do_epic = do_epic
         self.target_folders = target_folders
         self.config = build_scanner_config()
 
@@ -28,6 +29,7 @@ class FullScanWorker(QThread):
         # ensures the LibraryManager respects user choice cleanly without modifying permanent settings.
         self.config['enable_galaxy_db'] = self.do_galaxy
         self.config['enable_gog_web'] = self.do_gog_web
+        self.config['enable_epic_web'] = self.do_epic
         
         if 'local_scan_config' not in self.config:
             self.config['local_scan_config'] = {}

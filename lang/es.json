@@ -213,5 +213,11 @@
     "msg_file_locked": "El archivo {db_path} está abierto en otro programa (ej. Excel).\n\nPor favor ciérrelo y vuelva a intentarlo.",
     "dialog_switch_lib_exist_title": "Base de datos existente",
     "dialog_switch_lib_exist_msg": "Esta es una base de datos existente.\n¿Desea cargar este archivo?",
-    "msg_local_path_mandatory": "Es obligatorio especificar una Ruta Principal para escanear copias locales."
+    "msg_local_path_mandatory": "Es obligatorio especificar una Ruta Principal para escanear copias locales.",
+    "msg_epic_login_instructions": "Para conectar de forma segura Epic Games, usaremos su navegador real:\n\n1. Se abrirá su navegador web predeterminado.\n2. Inicie sesión en Epic Games (resuelva cualquier CAPTCHA normalmente).\n3. Una vez iniciada la sesión, verá una página blanca con algo de texto.\n4. Copie el valor junto a \"authorizationCode\" (o copie todo el texto).\n\nHaga clic en Aceptar para abrir su navegador.",
+    "msg_epic_login_title": "Inicio de sesión de Epic Games",
+    "msg_epic_input_title": "Introduzca el Código de Autorización",
+    "msg_epic_input_prompt": "Pegue el 'authorizationCode' o todo el texto de la página del navegador:",
+    "msg_epic_invalid_code": "No se pudo encontrar un código de autorización válido de 32 caracteres en su entrada.",
+    "msg_epic_token_failed": "Error al negociar el token OAuth. El código podría haber caducado."
 }

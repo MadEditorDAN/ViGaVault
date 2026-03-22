@@ -148,17 +148,19 @@ class Game:
                 if not ext: ext = '.jpg'
             except: ext = '.jpg'
 
-            save_path = os.path.join(images_dir, f"{safe_filename}{ext}")
+            expected_filename = f"{safe_filename}{ext}"
+            save_path = os.path.join(images_dir, expected_filename)
             
-            # WHY: Only process the HTTP download request if allowed globally, or manually overridden.
-            if self.config.get('download_images', True) or force_download:
+            # WHY: Only process the physical HTTP download request if manually overridden (like Inline Scans).
+            # Automated scans strictly defer downloading to the IGDB Scrapper/Backfill phase.
+            if force_download:
                 try:
                     response = requests.get(cover_url, stream=True)
                     if response.status_code == 200:
                         with open(save_path, 'wb') as f: shutil.copyfileobj(response.raw, f)
-                        return f"{safe_filename}{ext}"
                 except Exception as e: pass
-        return ""
+            return expected_filename
+        return existing_name
 
     def fetch_metadata(self, token):
         search_term = self.data.get('Search_Title') or self.data.get('Clean_Title') or self.data.get('Folder_Name')
@@ -266,6 +268,15 @@ class Game:
             
             if best_match:
                 g = best_match
+                
+                # WHY: For Local Copies that lack platform metadata, we allow IGDB to perfect the title capitalization and store the ID.
+                if self.data.get('Platforms') == 'Local Copy':
+                    if 'name' in g: self.data['Clean_Title'] = g.get('name')
+                    if 'id' in g:
+                        current_ids = set(x.strip() for x in self.data.get('game_ID', '').split(',') if x.strip())
+                        current_ids.add(f"igdb_{g.get('id')}")
+                        self.data['game_ID'] = ", ".join(sorted(list(current_ids)))
+                        
                 if not self.data.get('Summary'): self.data['Summary'] = g.get('summary', '')
                 if not self.data.get('Genre'): self.data['Genre'] = normalize_genre(", ".join([ge['name'] for ge in g.get('genres', [])]))
                 
