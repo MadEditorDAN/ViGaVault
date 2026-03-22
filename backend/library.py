@@ -42,20 +42,20 @@ class LibraryManager:
         do_local = local_cfg.get("enable_local_scan", True)
         target_folders = local_cfg.get("target_folders")
         
-        # WHY: Display a clean, strictly formatted 80-column checklist mirroring user settings.
+        # WHY: Display a clean, strictly formatted 80-column checklist mirroring user settings and mockup.
         checklist = f"{' PRE-SCAN CHECKLIST ':-^80}\n"
-        checklist += f"Galaxy Sync     : {'ON' if do_galaxy else 'OFF'}\n"
-        checklist += f"GOG.com Web     : {'ON' if do_gog else 'OFF'}\n"
+        checklist += f"{'Galaxy Sync':<16}: {'ON' if do_galaxy else 'OFF'}\n"
+        checklist += f"{'GOG':<16}: {'ON' if do_gog else 'OFF'}\n"
         if do_local:
-            checklist += "Local Folders   : ON\n"
+            checklist += f"{'Local Folders':<16}: ON\n"
             if target_folders is not None and len(target_folders) > 0:
                 for tf in sorted(target_folders):
-                    checklist += f"                : {tf}\n"
+                    checklist += f"  - {tf}\n"
             else:
-                checklist += "                : All Folders\n"
+                checklist += "  - All Folders\n"
         else:
-            checklist += "Local Folders   : OFF\n"
-        checklist += f"Images Download : {'ON' if self.config.get('download_images', True) else 'OFF'}"
+            checklist += f"{'Local Folders':<16}: OFF\n"
+        checklist += f"{'Images Download':<16}: {'ON' if self.config.get('download_images', True) else 'OFF'}"
         logging.info(checklist + "\n")
 
         if do_galaxy:
@@ -189,7 +189,7 @@ class LibraryManager:
                                 cover_url_raw = "https:" + best_match['cover']['url'].replace('t_thumb', 't_cover_big')
                                 game.data['Cover_URL'] = cover_url_raw
                                 game.data['Status_Flag'] = 'REVIEW'
-                                log_act = "IGDB Cover"
+                                log_act = "IGDB Download"
                                 changes_made = True
 
                 if cover_url_raw:
@@ -221,13 +221,13 @@ class LibraryManager:
                                     shutil.copyfileobj(response.raw, f)
                                 game.data['Image_Link'] = f"{safe_filename}{ext}"
                                 game.data['Has_Image'] = True
-                                log_act = "Cover DL"
+                                log_act = "Cover Download"
                                 changes_made = True
                                 break # Stop trying fallbacks once we succeed!
                         except Exception as e: pass
 
             if 'log_act' in locals() and log_act:
-                action_title = f"{log_act} : {folder}"
-                logging.info(f"|{action_title[:56]:<56}| Img: Yes | Trl: --- |")
+                action_title = f"{log_act:<14} : {folder}"
+                logging.info(f"|{action_title[:55]:<55}| Img: Yes | Trl: --- |")
 
         if changes_made: self.save_db()

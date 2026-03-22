@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 
 from ViGaVault_utils import BASE_DIR, get_safe_filename, normalize_genre
 from .game import Game
+from .api_igdb import get_igdb_access_token
 
 def sync_galaxy_database(config, games_dict, worker_thread=None):
     logging.info(f"\n{' GALAXY SYNC ':=^80}")
@@ -50,6 +51,9 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
         logging.error(f"Error reading Galaxy database: {e}")
         if 'con' in locals() and con: con.close()
         return
+
+    # WHY: Pre-fetch the IGDB token once to patch any missing metadata on newly discovered games.
+    igdb_token = get_igdb_access_token()
 
     images_dir = config.get('image_path', os.path.join(BASE_DIR, 'images'))
     os.makedirs(images_dir, exist_ok=True)
@@ -196,13 +200,14 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
                 folder_name = get_safe_filename(title)
                 if not folder_name: folder_name = f"Unknown Game [{releaseKey}]"
                 if folder_name in games_dict: folder_name = f"{title} [{releaseKey}]"
-                game_obj = Game(config=config, Folder_Name=folder_name, Status_Flag='OK', Path_Root='')
+                # WHY: Initialize as NEW so we can strictly control its promotion to OK after missing metadata checks.
+                game_obj = Game(config=config, Folder_Name=folder_name, Status_Flag='NEW', Path_Root='')
                 stats['new'] += 1
                 stats['new_by_platform'][platform] = stats['new_by_platform'].get(platform, 0) + 1
                 act_str = "Added"
 
             force_media_refresh = game_obj.data.get('Status_Flag') == 'NEW'
-            if force_media_refresh:
+            if force_media_refresh and act_str != "Added":
                 act_str = "Refresh"
             if game_obj.data.get('Status_Flag') == 'LOCKED':
                 continue
@@ -324,7 +329,15 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
                 logging.info(f"|{action_title[:56]:<56}| Img: {img_str[:3]:<3} | Trl: {trl_str[:3]:<3} |")
                 
             # End of loop assignment
-            if force_media_refresh: game_obj.data['Status_Flag'] = 'OK'
+            if act_str == "Added":
+                # WHY: Check if any key metadata is missing, and if so, query IGDB to backfill it before setting to OK.
+                missing_meta = not all([game_obj.data.get(f) for f in ['Developer', 'Publisher', 'Genre', 'Summary', 'Original_Release_Date']])
+                if (missing_meta or not game_obj.data.get('Cover_URL')) and igdb_token:
+                    game_obj.fill_missing_metadata(igdb_token)
+                game_obj.data['Status_Flag'] = 'OK'
+            elif force_media_refresh: 
+                game_obj.data['Status_Flag'] = 'OK'
+                
             games_dict[game_obj.data['Folder_Name']] = game_obj
             stats['processed'] += 1
         except Exception as e:

@@ -1,6 +1,6 @@
 {
     "sort_desc": true,
-    "sort_index": 1,
+    "sort_index": 2,
     "checked_platforms": [
         "Amazon",
         "Battle.net",
@@ -125,7 +125,7 @@
     },
     "image_path": "D:\\ViGaVault\\Images",
     "download_images": true,
-    "anchor_folder": "Death Stranding 2 On The Beach",
+    "anchor_folder": "Death Rally (Classic)",
     "sidebar_chk_gog": true,
     "sidebar_chk_local": true,
     "enable_galaxy_db": true,

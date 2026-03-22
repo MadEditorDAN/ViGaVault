@@ -96,7 +96,7 @@ class ScanController(QObject):
 
     def stop_full_scan(self):
         if self.mw.full_scan_in_progress and hasattr(self, 'full_scan_worker'):
-            logging.info("--- Full Scan interrupted by user. ---")
+            logging.info(f"{' Full Scan interrupted by user ':-^80}")
             self.full_scan_worker.requestInterruption()
             self.mw.sidebar.scan_panel.hide()
             self.mw.filter_controller.set_filters_ui_state(True)
@@ -107,7 +107,7 @@ class ScanController(QObject):
         
         self.mw.full_scan_in_progress = False
         self.mw.sidebar.btn_scan_settings.setEnabled(True)
-        self.mw.sidebar.btn_full_scan.setEnabled(True)
+        self.mw.sidebar.update_scan_button_state()
         self.mw.sidebar.btn_full_scan.setText(translator.tr("sidebar_btn_full_scan"))
         self.mw.sidebar.chk_show_new.setEnabled(True)
         self.mw.sidebar.chk_show_review.setChecked(True)
@@ -225,7 +225,7 @@ class ScanController(QObject):
         
         # WHY: Targeted Update - Restore the main scan UI elements based on their configured global state.
         self.mw.sidebar.btn_scan_settings.setEnabled(True)
-        self.mw.sidebar.btn_full_scan.setEnabled(True)
+        self.mw.sidebar.update_scan_button_state()
         config = build_scanner_config()
         self.mw.sidebar.chk_scan_galaxy.setEnabled(config.get('enable_galaxy_db', True))
         self.mw.sidebar.chk_scan_gog_web.setEnabled(True)

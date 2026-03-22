@@ -188,7 +188,8 @@ def scan_gog_account(config, games_dict, worker_thread=None):
         folder_name = get_safe_filename(title_clean) or f"Unknown Game [{gog_id}]"
         if folder_name in games_dict: folder_name = f"{title_clean} [{gog_id}]"
         
-        game_obj = Game(config=config, Folder_Name=folder_name, Status_Flag='OK', Path_Root='')
+        # WHY: Initialize as NEW so we strictly enforce the IGDB fallback check before marking it OK.
+        game_obj = Game(config=config, Folder_Name=folder_name, Status_Flag='NEW', Path_Root='')
         game_obj.data['Clean_Title'] = title_clean
         game_obj.data['game_ID'] = str(gog_id)
         game_obj.data['Platforms'] = "GOG"
@@ -227,26 +228,15 @@ def scan_gog_account(config, games_dict, worker_thread=None):
                         dt = datetime.strptime(dt_str, "%Y-%m-%d")
                         game_obj.data['Original_Release_Date'] = dt.strftime(config.get('date_format', '%d/%m/%Y'))
                     except Exception: pass
-        
-        # WHY: GOG image CDN is highly unreliable for vertical 3:4 posters.
-        # We leverage the Single Responsibility Principle: Use GOG for perfect text metadata, 
-        # but query IGDB strictly to harvest their standardized high-quality covers.
-        if igdb_token:
-            igdb_res = query_igdb_api(igdb_token, search_term=title_clean, limit=3)
-            if igdb_res:
-                best_match, best_score = None, -1
-                for g in igdb_res:
-                    score = int(difflib.SequenceMatcher(None, title_clean.lower(), g.get('name', '').lower()).ratio() * 100)
-                    if g.get('category', 0) == 0: score += 15
-                    elif g.get('category', 0) in [1, 2]: score -= 30
-                    if score > best_score and 'cover' in g and 'url' in g['cover']:
-                        best_score, best_match = score, g
-                
-                if best_match:
-                    cover_url = "https:" + best_match['cover']['url'].replace('t_thumb', 't_cover_big')
 
-        if cover_url:
-            game_obj.data['Cover_URL'] = cover_url
+        # WHY: Check if any core metadata is missing (or if we need a better cover), and scan with IGDB to backfill.
+        missing_meta = not all([game_obj.data.get(f) for f in ['Developer', 'Publisher', 'Genre', 'Summary', 'Original_Release_Date']])
+        if (missing_meta or not game_obj.data.get('Cover_URL')) and igdb_token:
+            game_obj.fill_missing_metadata(igdb_token)
+
+        # WHY: Only after the IGDB scan is complete, we promote the game to OK.
+        game_obj.data['Status_Flag'] = 'OK'
+        if game_obj.data.get('Cover_URL') or game_obj.data.get('Image_Link'):
             img_ok = "Yes"
 
         games_dict[folder_name] = game_obj

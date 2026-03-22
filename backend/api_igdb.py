@@ -12,7 +12,7 @@ def get_igdb_access_token():
     if response.status_code == 200:
         return response.json().get("access_token")
     else:
-        logging.error(f"    [API AUTH ERROR] Token failure: {response.text}")
+        logging.error(f"{'IGDB API ERROR':<15} : Token failure: {response.text}")
         return None
 
 def query_igdb_api(token, search_term=None, limit=5, by_id=False, custom_query=None):
@@ -31,8 +31,8 @@ def query_igdb_api(token, search_term=None, limit=5, by_id=False, custom_query=N
         response = requests.post(api_url, headers=headers, data=query, timeout=10)
         if response.status_code == 200: return response.json()
         else:
-            logging.error(f"    [IGDB API ERROR] {response.status_code} for query: {query}")
+            logging.error(f"{'IGDB API ERROR':<15} : {response.status_code} for query: {query}")
             return None
     except Exception as e:
-        logging.error(f"    [IGDB NETWORK ERROR] {e}")
+        logging.error(f"{'IGDB API ERROR':<15} : {e}")
         return None

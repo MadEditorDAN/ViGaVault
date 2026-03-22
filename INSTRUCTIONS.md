@@ -1,12 +1,19 @@
 - Always use English in application GUI, Logs and code comments/documentation.
 - Apply only the specific changes I request. 
-- Remember the language json files.
 - Comment the code and explain why each modification is done. 
 - Don't remove previous comment to do ti, you can combine them. only delete when the subject of the comment has also been deleted.
-- Use DRY principle when applicable
 - Every change you make must be a direct and literal implementation of my instructions.
 - Never make any unsolicited modifications, including but not limited to: code cleanup, refactoring, feature removal, or style adjustments, if one of those is needed, you can suggest to do it, but wait for my approval before offering code.
 - Take what's in todo.txt in consideration, it will help you know what's will be done in the future and maybe adapt for it, but NEVER try to implement anything from it if it was not specifically asked.
 - If given precise instruction, don't extrapolate, do as asked and if you have an idea, a better solution or a suggestion, say it, but don't apply it before approval.
 - When asked an explanation or to discuss about something, stay theoretical, don't propose code right away, provide the request explanation/information and give new code or code modification only when instructed to.
 - Never use tooltip !
+
+
+- Update the language json files when needed. 
+- Comment the code and explain why each modification is done. 
+- Use DRY principle when applicable
+- Use the Single Responsibility Principle when applicable
+- Do not put all the code in the UI script, use all the other script as they were created forand if necessary create a new one.
+- Use the "smart refresh" and the "targeted update" when possible
+- Contiune using our loging pattern. 

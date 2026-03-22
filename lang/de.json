@@ -57,7 +57,7 @@
     "settings_display_date_format": "Datumsformat:",
     "settings_display_sizes_group": "Elementgrößen",
     "settings_folders_scan_local": "Nach lokalen Kopien scannen",
-    "settings_folders_root_group": "Stammverzeichnis",
+    "settings_folders_local_copies_group": "Lokale Kopien",
     "settings_folders_main_path": "Hauptpfad:",
     "settings_folders_structure_group": "Ordnerstruktur",
     "settings_folders_ignore_hidden": "Versteckte Ordner ignorieren",
@@ -210,5 +210,8 @@
     "sidebar_log_no_results": "Keine Ergebnisse gefunden.",
     "sidebar_log_update_complete": "Aktualisierung abgeschlossen!",
     "msg_save_success": "Bibliothek erfolgreich gespeichert unter\n{db_path}.",
-    "msg_file_locked": "Die Datei {db_path} ist in einem anderen Programm (z.B. Excel) geöffnet.\n\nBitte schließen Sie es und versuchen Sie es erneut."
+    "msg_file_locked": "Die Datei {db_path} ist in einem anderen Programm (z.B. Excel) geöffnet.\n\nBitte schließen Sie es und versuchen Sie es erneut.",
+    "dialog_switch_lib_exist_title": "Vorhandene Datenbank",
+    "dialog_switch_lib_exist_msg": "Dies ist eine bereits vorhandene Datenbank.\nMöchten Sie diese Datei laden?",
+    "msg_local_path_mandatory": "Ein Hauptpfad ist zwingend erforderlich, um nach lokalen Kopien zu scannen."
 }

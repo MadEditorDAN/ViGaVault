@@ -2,7 +2,6 @@
 
 @workspace, read the file INSTRUCTIONS.md and use it as a set of rules for all your future answers on this project.
 
-
 For each point, give your insight and some explanation of why/how it happened and how you fixed it.
 Remember to always : 
  - Update the language json files when needed. 
@@ -18,4 +17,3 @@ Let's discuss, no code.
 
 Games to fix :
 Doom project
-

@@ -65,12 +65,20 @@ class LibraryController(QObject):
         self.mw.sidebar.lbl_lib_name.setText(f"{lib_name}")
 
     def select_library(self):
-        filePath, _ = QFileDialog.getSaveFileName(self.mw, "Switch or Create Library", "", "ViGaVault Library (*.csv)")
+        # WHY: Use DontConfirmOverwrite to suppress the OS-level "File exists, replace?" warning, replacing it with our custom contextual load prompt.
+        filePath, _ = QFileDialog.getSaveFileName(self.mw, "Switch or Create Library", "", "ViGaVault Library (*.csv)", options=QFileDialog.DontConfirmOverwrite)
         if filePath:
-            self.save_settings()
             if not filePath.lower().endswith('.csv'): filePath += '.csv'
             is_new_file = not os.path.exists(filePath)
 
+            if not is_new_file:
+                reply = QMessageBox.question(self.mw, translator.tr("dialog_switch_lib_exist_title"),
+                                            translator.tr("dialog_switch_lib_exist_msg"),
+                                            QMessageBox.Yes | QMessageBox.No)
+                if reply == QMessageBox.No: return
+
+            self.save_settings()
+            
             try:
                 settings = {}
                 if os.path.exists("settings.json"):
@@ -94,7 +102,8 @@ class LibraryController(QObject):
                         "root_path": "",
                         "local_scan_config": {"enable_local_scan": False, "ignore_hidden": True, "scan_mode": "simple", "global_type": "Genre", "global_filter": True, "folder_rules": {}},
                         "galaxy_db_path": os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db'),
-                        "enable_galaxy_db": False, "download_images": False, "download_videos": False, "sort_desc": True, "sort_index": 0, "scan_new": False, "filter_states": {}, "filter_expansion": {}
+                    # WHY: Set default download_images to True so fresh libraries automatically backfill covers from API scans.
+                    "enable_galaxy_db": False, "download_images": True, "download_videos": False, "sort_desc": True, "sort_index": 0, "scan_new": False, "filter_states": {}, "filter_expansion": {}
                     }
                     with open(lib_settings_path, "w", encoding='utf-8') as f:
                         json.dump(default_lib_settings, f, indent=4)
@@ -210,12 +219,12 @@ class LibraryController(QObject):
             db_filename = os.path.basename(db_path)
             backup_file = os.path.join(backup_dir, f"{os.path.splitext(db_filename)[0]}_{timestamp}.csv")
             shutil.copy2(db_path, backup_file)
-            logging.info(f"    [DB BACKUP] Backup created at {backup_file}")
+            logging.info(f"{'DB BACKUP':<15} : Backup created at {backup_file}")
         
         try:
             df_to_save = self.mw.master_df.drop(columns=['temp_sort_date', 'temp_sort_title'], errors='ignore')
             df_to_save.to_csv(db_path, sep=';', index=False, encoding='utf-8')
-            logging.info(f"    [DB SAVE] Database saved to {db_path} ({len(self.mw.master_df)} games).")
+            logging.info(f"{'DB SAVE':<15} : Database saved to {db_path} ({len(self.mw.master_df)} games).")
             QMessageBox.information(self.mw, "Save Complete", translator.tr("msg_save_success", db_path=db_path))
         except PermissionError:
              QMessageBox.warning(self.mw, "File Locked", translator.tr("msg_file_locked", db_path=db_path))
@@ -249,7 +258,7 @@ class LibraryController(QObject):
 
             self.update_status_checkboxes_state()
             self.mw.list_controller.update_visible_widgets()
-            logging.info("Approved all games pending review.")
+            logging.info(f"{'Approved':<15} : All games pending review have been approved")
 
     def update_game_data(self, folder_name, new_data):
         manager = LibraryManager(build_scanner_config())
@@ -369,7 +378,7 @@ class LibraryController(QObject):
         self.mw.list_controller.remove_single_card(folder_name)
         self.update_status_checkboxes_state()
         self.save_settings()
-        logging.info(f"Deleted game and media completely: {folder_name}")
+        logging.info(f"{'Deleted':<15} : {folder_name}")
 
     def batch_delete_metadata(self, field, items_to_delete):
         """
@@ -564,6 +573,8 @@ class LibraryController(QObject):
             if not enable_local: self.mw.sidebar.chk_scan_local.setChecked(False)
             else: self.mw.sidebar.chk_scan_local.setChecked(lib_settings.get("sidebar_chk_local", False))
             
+            # WHY: Update the scan button state based on the loaded checkbox configuration
+            self.mw.sidebar.update_scan_button_state()
             return lib_settings.get("anchor_folder")
         except Exception as e:
             print(f"Error loading settings: {e}")

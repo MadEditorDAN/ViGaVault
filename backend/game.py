@@ -235,6 +235,61 @@ class Game:
             self.data['Status_Flag'] = 'NEEDS_ATTENTION'
         return False
 
+    def fill_missing_metadata(self, token):
+        """
+        WHY: Single Responsibility - Queries IGDB to strictly fill in any empty fields 
+        for newly discovered games without overwriting their existing valid metadata.
+        """
+        search_term = self.data.get('Search_Title') or self.data.get('Clean_Title') or self.data.get('Folder_Name')
+        local_year = self.data.get('Year_Folder', '')
+        
+        folder_lower = self.data.get('Folder_Name', '').lower()
+        edition_keywords = ['goty', 'remaster', 'definitive', 'complete', 'edition', 'director', 'redux', 'anniversary']
+        has_edition_keyword = any(kw in folder_lower for kw in edition_keywords)
+        
+        results = query_igdb_api(token, search_term=search_term, limit=5)
+        
+        if results:
+            best_match, best_score = None, -1
+            for g in results:
+                score = 0
+                ratio = difflib.SequenceMatcher(None, search_term.lower(), g.get('name', '').lower()).ratio()
+                score += int(ratio * 100)
+                
+                cat = g.get('category', 0)
+                if cat == 0: score += 15
+                elif cat in [1, 2]: score -= 30
+                elif cat in [3, 8, 9] and not has_edition_keyword: score -= 20
+                
+                if score > best_score:
+                    best_score, best_match = score, g
+            
+            if best_match:
+                g = best_match
+                if not self.data.get('Summary'): self.data['Summary'] = g.get('summary', '')
+                if not self.data.get('Genre'): self.data['Genre'] = normalize_genre(", ".join([ge['name'] for ge in g.get('genres', [])]))
+                
+                companies = g.get('involved_companies', [])
+                if not self.data.get('Developer'): self.data['Developer'] = ", ".join([c['company']['name'] for c in companies if c.get('developer')])
+                if not self.data.get('Publisher'): self.data['Publisher'] = ", ".join([c['company']['name'] for c in companies if c.get('publisher')])
+                
+                if not self.data.get('Trailer_Link'):
+                    videos = g.get('videos', [])
+                    if videos: self.data['Trailer_Link'] = f"https://www.youtube.com/watch?v={videos[0]['video_id']}"
+                
+                if not self.data.get('Original_Release_Date'):
+                    dates = g.get('release_dates', [])
+                    if dates:
+                        valid_dates = [d['date'] for d in dates if 'date' in d]
+                        if valid_dates:
+                            orig_ts = min(valid_dates)
+                            self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime(self.config.get('date_format', '%d/%m/%Y'))
+                
+                if not self.data.get('Image_Link') and not self.data.get('Cover_URL'):
+                    self.data['Image_Link'] = self._ensure_cover(g, silent=True)
+                return True
+        return False
+
     def fetch_smart_metadata(self, token, search_override=None):
         search_term = search_override or self.data.get('Search_Title') or self.data.get('Folder_Name')
         local_dev = self.data.get('Developer', '').lower()

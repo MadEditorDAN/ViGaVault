@@ -57,7 +57,7 @@
     "settings_display_date_format": "Formato Data:",
     "settings_display_sizes_group": "Dimensioni Elementi",
     "settings_folders_scan_local": "Cerca copie locali",
-    "settings_folders_root_group": "Radice",
+    "settings_folders_local_copies_group": "Copie Locali",
     "settings_folders_main_path": "Percorso Principale:",
     "settings_folders_structure_group": "Struttura Cartelle",
     "settings_folders_ignore_hidden": "Ignora cartelle nascoste",
@@ -210,5 +210,8 @@
     "sidebar_log_no_results": "Nessun risultato trovato.",
     "sidebar_log_update_complete": "Aggiornamento completato!",
     "msg_save_success": "Libreria salvata con successo in\n{db_path}.",
-    "msg_file_locked": "Il file {db_path} è aperto in un altro programma (es. Excel).\n\nChiudilo e riprova."
+    "msg_file_locked": "Il file {db_path} è aperto in un altro programma (es. Excel).\n\nChiudilo e riprova.",
+    "dialog_switch_lib_exist_title": "Database Esistente",
+    "dialog_switch_lib_exist_msg": "Questo è un database esistente.\nVuoi caricare questo file?",
+    "msg_local_path_mandatory": "Un percorso principale è obbligatorio per cercare copie locali."
 }

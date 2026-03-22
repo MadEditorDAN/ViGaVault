@@ -57,7 +57,7 @@
     "settings_display_date_format": "Date Format:",
     "settings_display_sizes_group": "Element Sizes",
     "settings_folders_scan_local": "Scan for Local Copies",
-    "settings_folders_root_group": "Root",
+    "settings_folders_local_copies_group": "Local Copies",
     "settings_folders_main_path": "Main Path:",
     "settings_folders_structure_group": "Folder Structure",
     "settings_folders_ignore_hidden": "Ignore hidden folders",
@@ -210,5 +210,8 @@
     "sidebar_log_no_results": "No results found.",
     "sidebar_log_update_complete": "Update complete!",
     "msg_save_success": "Library saved successfully to\n{db_path}.",
-    "msg_file_locked": "The file {db_path} is open in another program (e.g., Excel).\n\nPlease close it and try again."
+    "msg_file_locked": "The file {db_path} is open in another program (e.g., Excel).\n\nPlease close it and try again.",
+    "dialog_switch_lib_exist_title": "Existing Database",
+    "dialog_switch_lib_exist_msg": "This is an existing database.\nDo you want to load this file?",
+    "msg_local_path_mandatory": "A Main Path is mandatory to scan for local copies."
 }

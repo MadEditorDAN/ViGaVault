@@ -132,14 +132,17 @@ def scan_local_system(config, games_dict, token, worker_thread=None):
                         fetched = True
                     else:
                         stats['fetched_fail'] += 1
+                    
+                    # WHY: As requested, guarantee the status is set to OK only after the IGDB scan has been performed.
+                    game.data['Status_Flag'] = 'OK'
                         
                 if act_str in ["Added", "Merged"] or fetched:
                     log_act = "Fetched" if fetched and act_str == "Updated" else act_str
                     img_str = "Yes" if game.data.get('Image_Link') else "No "
                     trl_str = "Yes" if game.data.get('Trailer_Link') else "No "
                     
-                    action_title = f"{log_act} : {folder}"
-                    logging.info(f"|{action_title[:56]:<56}| Img: {img_str[:3]:<3} | Trl: {trl_str[:3]:<3} |")
+                    action_title = f"{log_act:<14} : {folder}"
+                    logging.info(f"|{action_title[:55]:<55}| Img: {img_str[:3]:<3} | Trl: {trl_str[:3]:<3} |")
 
     existing_folders = list(games_dict.keys())
     for folder in existing_folders:
@@ -176,26 +179,25 @@ def scan_local_system(config, games_dict, token, worker_thread=None):
                 # WHY: Clean up legacy tags properly when reverting.
                 if 'Local Copy' in platform_list: platform_list.remove('Local Copy')
                 game_to_check.data['Platforms'] = ", ".join(sorted(platform_list))
-                action_title = f"Unlinked : {folder}"
-                logging.info(f"|{action_title[:56]:<56}| Img: No  | Trl: No  |")
+                action_title = f"{'Unlinked':<14} : {folder}"
+                logging.info(f"|{action_title[:55]:<55}| Img: No  | Trl: No  |")
                 stats['updated'] += 1
             else:
-                action_title = f"Deleted : {folder}"
-                logging.info(f"|{action_title[:56]:<56}| Img: No  | Trl: No  |")
+                action_title = f"{'Deleted':<14} : {folder}"
+                logging.info(f"|{action_title[:55]:<55}| Img: No  | Trl: No  |")
                 del games_dict[folder]
                 stats['deleted'] += 1
 
     if worker_thread and worker_thread.isInterruptionRequested():
-        report = f"\n{' SCAN INTERRUPTED BY USER ':=^80}\n"
+        report = f"\n{' Full Scan interrupted by user ':-^80}\n{' SCAN INTERRUPTED BY USER ':=^80}\n"
     else:
         report = (
-            f"{' LOCAL SCAN REPORT ':=^80}\n"
+            f"{' REPORT ':=^80}\n"
             f"Folders Scanned: {stats['scanned']}\n"
-            f"{'-'*80}\n"
-            f"New Added      : {stats['new']}\n"
-            f"Smart Merged   : {stats['updated'] - stats['new']}\n"
-            f"Meta Fetched   : {stats['fetched_success']}\n"
-            f"Missing Purged : {stats['deleted']}\n"
+            f"{'New Added':<28}: {stats['new']}\n"
+            f"{'Smart Merged':<28}: {stats['updated'] - stats['new']}\n"
+            f"{'Meta Fetched':<28}: {stats['fetched_success']}\n"
+            f"{'Missing Purged':<28}: {stats['deleted']}\n"
             f"{'='*80}"
         )
     logging.info(report)

@@ -429,14 +429,8 @@ class SettingsDialog(QDialog):
         
         layout.addWidget(grp_media)
         
-        self.chk_scan_local = QCheckBox(translator.tr("settings_folders_scan_local"))
-        self.chk_scan_local.setChecked(False)
-        self.chk_scan_local.toggled.connect(self.mark_changed)
-        self.chk_scan_local.toggled.connect(self.toggle_local_scan_options)
-        layout.addWidget(self.chk_scan_local)
-
-        grp_root = QGroupBox(translator.tr("settings_folders_root_group"))
-        layout_root = QFormLayout(grp_root)
+        grp_root = QGroupBox(translator.tr("settings_folders_local_copies_group"))
+        layout_root = QVBoxLayout(grp_root)
         self.root_path_input = QLineEdit("")
         self.root_path_input.textChanged.connect(self.mark_changed)
         self.btn_browse_root = QPushButton("...")
@@ -444,10 +438,16 @@ class SettingsDialog(QDialog):
         self.btn_browse_root.clicked.connect(self.browse_root_path)
         
         path_layout = QHBoxLayout()
+        self.chk_scan_local = QCheckBox(translator.tr("settings_folders_scan_local"))
+        self.chk_scan_local.setChecked(False)
+        self.chk_scan_local.toggled.connect(self.mark_changed)
+        self.chk_scan_local.toggled.connect(self.toggle_local_scan_options)
+        path_layout.addWidget(self.chk_scan_local)
+        path_layout.addWidget(QLabel(translator.tr("settings_folders_main_path")))
         path_layout.addWidget(self.root_path_input)
         path_layout.addWidget(self.btn_browse_root)
         
-        layout_root.addRow(translator.tr("settings_folders_main_path"), path_layout)
+        layout_root.addLayout(path_layout)
         layout.addWidget(grp_root)
         
         grp_structure = QGroupBox(translator.tr("settings_folders_structure_group"))
@@ -716,6 +716,11 @@ class SettingsDialog(QDialog):
             QMessageBox.critical(self, "Error", f"Failed to move files: {e}")
 
     def apply_settings(self):
+        # WHY: Input Validation - Prevent saving an invalid state where the local scan engine is enabled but has nowhere to look.
+        if self.chk_scan_local.isChecked() and not self.root_path_input.text().strip():
+            QMessageBox.warning(self, "Warning", translator.tr("msg_local_path_mandatory"))
+            return False
+            
         self.save_settings()
         
         # WHY: Smart Refresh logic checking Dirty Flags
@@ -752,6 +757,7 @@ class SettingsDialog(QDialog):
                 if not new_galaxy: self.parent_window.sidebar.chk_scan_galaxy.setChecked(False)
                 self.parent_window.sidebar.chk_scan_local.setEnabled(new_local)
                 if not new_local: self.parent_window.sidebar.chk_scan_local.setChecked(False)
+            self.parent_window.sidebar.update_scan_button_state()
             self.initial_galaxy = new_galaxy
             self.initial_gog_web = new_gog_web
             
@@ -760,7 +766,8 @@ class SettingsDialog(QDialog):
             
         # WHY: State successfully committed.
         self.btn_apply.setEnabled(False)
+        return True
 
     def accept(self):
-        self.apply_settings()
-        super().accept()
+        if self.apply_settings():
+            super().accept()

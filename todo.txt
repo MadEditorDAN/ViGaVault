@@ -13,9 +13,6 @@ On top of the name column, a text box. If you type in it, it search the game con
 If you select something in the upper listbox it filter the below list to what you selected.
 Also, and a custom word list user can create to filter the gamelist on (goodie, dlc,...) so non games get removed from the list. Also change the main counter total in the sidebar and remove those excluded games from the count.
 
-- allow the possibility to change the horizontal size of the sidebar from 1/5 (moe or less actual size) to max 1/3 of the full windows. 
-To adapt the content, don't change anything but the number of columns in the filters. It will adapt from 2 to 3 or 4 (depending on the available space) 
-
 TO DO : 
 
 When adding a platform, first do a full Data Discovery Dump with a separate script to assess the data we can recover from that platform. Get all the metadata, all the image url's and files and all the video url's. Analyse the results and select the data/files to import.

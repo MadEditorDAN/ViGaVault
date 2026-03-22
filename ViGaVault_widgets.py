@@ -409,6 +409,9 @@ class Sidebar(QWidget):
         self.btn_approve_review.clicked.connect(self.parent.approve_reviews)
         self.btn_scan_settings.clicked.connect(self.parent.open_scan_settings)
         self.btn_close_scan_settings.clicked.connect(self.parent.close_scan_settings)
+        self.chk_scan_galaxy.toggled.connect(self.update_scan_button_state)
+        self.chk_scan_gog_web.toggled.connect(self.update_scan_button_state)
+        self.chk_scan_local.toggled.connect(self.update_scan_button_state)
 
         # Scan Connections
         self.scan_btn.clicked.connect(self.parent.on_manual_search_trigger)
@@ -444,6 +447,12 @@ class Sidebar(QWidget):
                 best_size = size
                 break
         self.scan_results.setStyleSheet(f"font-family: Consolas, 'Courier New', monospace; font-size: {best_size}px;")
+
+    def update_scan_button_state(self):
+        """WHY: Single Responsibility - Enables or disables the Scan button based on selected sources."""
+        if getattr(self.parent, 'full_scan_in_progress', False): return
+        has_source = self.chk_scan_galaxy.isChecked() or self.chk_scan_gog_web.isChecked() or self.chk_scan_local.isChecked()
+        self.btn_full_scan.setEnabled(has_source)
 
     def set_search_target(self, target, ph_key):
         """Dynamically swaps the placeholder text and triggers an instant refilter."""

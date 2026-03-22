@@ -57,7 +57,7 @@
     "settings_display_date_format": "Format de Date :",
     "settings_display_sizes_group": "Tailles des Éléments",
     "settings_folders_scan_local": "Rechercher des copies locales",
-    "settings_folders_root_group": "Racine",
+    "settings_folders_local_copies_group": "Copies Locales",
     "settings_folders_main_path": "Chemin Principal :",
     "settings_folders_structure_group": "Structure des Dossiers",
     "settings_folders_ignore_hidden": "Ignorer les Dossiers Cachés (Global)",
@@ -210,5 +210,8 @@
     "sidebar_log_no_results": "Aucun résultat trouvé.",
     "sidebar_log_update_complete": "Mise à jour terminée !",
     "msg_save_success": "Bibliothèque sauvegardée avec succès dans\n{db_path}.",
-    "msg_file_locked": "Le fichier {db_path} est ouvert dans un autre programme (ex: Excel).\n\nVeuillez le fermer et réessayer."
+    "msg_file_locked": "Le fichier {db_path} est ouvert dans un autre programme (ex: Excel).\n\nVeuillez le fermer et réessayer.",
+    "dialog_switch_lib_exist_title": "Base de données existante",
+    "dialog_switch_lib_exist_msg": "Ceci est une base de données existante.\nVoulez-vous charger ce fichier ?",
+    "msg_local_path_mandatory": "Un chemin principal est obligatoire pour rechercher des copies locales."
 }
