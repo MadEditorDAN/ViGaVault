@@ -61,12 +61,13 @@ class MenuController(QObject):
         action_about.triggered.connect(self.show_about)
         help_menu.addAction(action_about)
 
-    def open_settings(self):
+    def open_settings(self, tab_index=0):
         # WHY: Block settings access during a full scan to prevent modifying paths or rules while the background thread is actively using them.
         if self.mw.full_scan_in_progress:
             QMessageBox.warning(self.mw, "Warning", translator.tr("msg_wait_for_scan"))
             return
         dlg = SettingsDialog(self.mw)
+        dlg.tabs.setCurrentIndex(tab_index)
         dlg.exec()
 
     def show_media_manager(self):

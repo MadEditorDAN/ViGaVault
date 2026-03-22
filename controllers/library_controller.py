@@ -4,7 +4,7 @@ import shutil
 import logging
 from datetime import datetime
 import pandas as pd
-from PySide6.QtCore import QObject, Slot, QByteArray, Qt, QPoint
+from PySide6.QtCore import QObject, Slot, QByteArray, Qt, QPoint, QTimer
 from PySide6.QtWidgets import QFileDialog, QMessageBox, QApplication, QCheckBox
 
 from backend.library import LibraryManager
@@ -18,6 +18,13 @@ class LibraryController(QObject):
     def __init__(self, main_window):
         super().__init__(main_window)
         self.mw = main_window
+
+    @Slot()
+    def trigger_initial_settings(self):
+        """WHY: Explicitly bound slot guarantees the PySide6 C++ engine retains the reference for the delayed timer."""
+        logging.info("[STARTUP] Triggering initial Settings Dialog...")
+        if hasattr(self.mw, 'menu_controller'):
+            self.mw.menu_controller.open_settings(tab_index=1)
 
     def get_second_visible_folder(self):
         """WHY: Finds the second item visible at the top of the list to act as a stable layout anchor immune to pixel shifts."""
@@ -89,6 +96,7 @@ class LibraryController(QObject):
                     json.dump(settings, f, indent=4)
                 
                 if is_new_file:
+                    self.mw.force_settings_open = True
                     expected_columns = [
                         'Folder_Name', 'Clean_Title', 'Search_Title', 'Path_Root', 'Path_Video', 
                         'Status_Flag', 'Image_Link', 'Year_Folder', 'Platforms', 'Developer', 
@@ -177,10 +185,24 @@ class LibraryController(QObject):
         self.refresh_scan_folders_ui()
 
         if self.mw.is_startup:
+            if not os.path.exists(lib_settings_file):
+                self.mw.force_settings_open = True            
             self.mw.filter_controller.start_filter_worker()
         else:
             self.mw.filter_controller.request_filter_update()
-        
+        # WHY: Explicit Intent Tracking. Instead of guessing based on config states, 
+        # we strictly check the physical existence of the configuration file or the UI intent to create a new one.
+        if getattr(self.mw, 'force_settings_open', False):
+            self.mw.force_settings_open = False
+            # WHY: Use a persistent QTimer object attached to 'self' instead of a static singleShot. 
+            # PySide6's aggressive Garbage Collector can sometimes destroy singleShot bound slots before they fire.
+            logging.info("[STARTUP] Bare database detected. Queuing Settings window...")
+            self._startup_timer = QTimer(self)
+            self._startup_timer.setSingleShot(True)
+            self._startup_timer.setInterval(800)
+            self._startup_timer.timeout.connect(self.trigger_initial_settings)
+            self._startup_timer.start()
+
         if not hasattr(self.mw, 'startup_sync_done'):
             self.mw.startup_sync_done = True
             self.startup_worker = StartupSyncWorker(build_scanner_config())
@@ -571,7 +593,19 @@ class LibraryController(QObject):
             self.mw.sidebar.chk_scan_galaxy.setEnabled(enable_galaxy)
             if not enable_galaxy: self.mw.sidebar.chk_scan_galaxy.setChecked(False)
             else: self.mw.sidebar.chk_scan_galaxy.setChecked(lib_settings.get("sidebar_chk_galaxy", False))
-            self.mw.sidebar.chk_scan_gog_web.setChecked(lib_settings.get("sidebar_chk_gog_web", False))
+
+            # WHY: Strict Token Check - Grey out the GOG scan checkbox if the user has no valid login session.
+            try:
+                from backend.gog.login_gog import is_gog_connected
+                gog_enabled = is_gog_connected()
+            except ImportError: gog_enabled = False
+            self.mw.gog_connected_cache = gog_enabled
+            
+            self.mw.sidebar.chk_scan_gog_web.setEnabled(gog_enabled)
+            if not gog_enabled: self.mw.sidebar.chk_scan_gog_web.setChecked(False)
+            else: self.mw.sidebar.chk_scan_gog_web.setChecked(lib_settings.get("sidebar_chk_gog_web", False))
+
+            
             self.mw.sidebar.chk_scan_local.setEnabled(enable_local)
             if not enable_local: self.mw.sidebar.chk_scan_local.setChecked(False)
             else: self.mw.sidebar.chk_scan_local.setChecked(lib_settings.get("sidebar_chk_local", False))

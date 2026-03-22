@@ -8,8 +8,9 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QW
                                QFileDialog, QGridLayout, QScrollArea, QFrame, QMessageBox, QSizePolicy,
                                QTableWidget, QHeaderView, QAbstractItemView, QInputDialog)
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QPalette
 
-from ViGaVault_utils import BASE_DIR, get_library_settings_file, translator, DIALOG_STD_SIZE, center_window, DEFAULT_DISPLAY_SETTINGS
+from ViGaVault_utils import BASE_DIR, get_library_settings_file, translator, DIALOG_STD_SIZE, center_window, DEFAULT_DISPLAY_SETTINGS, is_hidden
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None):
@@ -156,12 +157,12 @@ class SettingsDialog(QDialog):
         self.lbl_text_size.setText(f"{self.TXT_SIZES[self.slider_text_size.value()]} px")
 
     def toggle_local_scan_options(self, checked):
+        # WHY: Explicitly target the variables because they are no longer blindly looped inside a QVBoxLayout container.
         self.root_path_input.setEnabled(checked)
         self.btn_browse_root.setEnabled(checked)
-        for i in range(self.struct_layout.count()):
-            item = self.struct_layout.itemAt(i)
-            if item.widget():
-                item.widget().setEnabled(checked)
+        self.chk_ignore_hidden.setEnabled(checked)
+        self.mode_simple_widget.setEnabled(checked)
+        self.mode_advanced_widget.setEnabled(checked)
 
     def switch_to_simple(self):
         self.mode_advanced_widget.hide()
@@ -172,6 +173,34 @@ class SettingsDialog(QDialog):
         self.mode_simple_widget.hide()
         self.mode_advanced_widget.show()
         self.current_scan_mode = "advanced"
+        self.save_current_folder_rules_state()
+        self.populate_folders_list(self.current_folder_rules)
+        
+    def on_path_edited(self):
+        """WHY: Smart Refresh - Updates the advanced folders list live when the text input loses focus or Enter is pressed."""
+        if hasattr(self, 'current_scan_mode') and self.current_scan_mode == "advanced":
+            self.save_current_folder_rules_state()
+            self.populate_folders_list(self.current_folder_rules)
+            
+    def save_current_folder_rules_state(self):
+        """WHY: Captures the live UI states before wiping the grid so the user doesn't lose their unsaved checkboxes."""
+        if not hasattr(self, 'folder_widgets'): return
+        for folder, widgets in self.folder_widgets.items():
+            self.current_folder_rules[folder] = {
+                "type": widgets["combo"].currentText(),
+                "filter": widgets["filter"].isChecked(),
+                "scan": widgets["scan"].isChecked(),
+                "inject_enabled": widgets["inject_enabled"].isChecked(),
+                "inject_field": widgets["inject_field"].currentText(),
+                "inject_value": widgets["inject_value"].text().strip()
+            }
+            
+    def clear_all_folders(self):
+        """WHY: Convenience function to instantly uncheck the scan flag for all advanced folders."""
+        if not hasattr(self, 'folder_widgets'): return
+        for widgets in self.folder_widgets.values():
+            widgets["scan"].setChecked(False)
+        self.mark_changed()
 
     def populate_folders_list(self, saved_rules):
         while self.folders_grid.count():
@@ -179,12 +208,12 @@ class SettingsDialog(QDialog):
             if item.widget(): item.widget().deleteLater()
 
         self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_folder")), 0, 0)
-        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_content_type")), 0, 1)
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_scan")), 0, 1)
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_content_type")), 0, 2)
         self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_filter")), 0, 3)
-        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_scan")), 0, 4)
-        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_inject")), 0, 6)
-        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_inject_field")), 0, 7)
-        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_inject_value")), 0, 8)
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_inject")), 0, 5)
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_inject_field")), 0, 6)
+        self.folders_grid.addWidget(QLabel(translator.tr("settings_folders_adv_mode_inject_value")), 0, 7)
 
         root = self.root_path_input.text().strip()
         disk_folders = set()
@@ -192,34 +221,35 @@ class SettingsDialog(QDialog):
             try: disk_folders = {f for f in os.listdir(root) if os.path.isdir(os.path.join(root, f))}
             except: pass
         
-        all_folders = sorted(list(disk_folders.union(saved_rules.keys())))
+        # WHY: Strict Physical Mirroring. Stop merging historical JSON rules with actual disk contents.
+        all_folders = sorted(list(disk_folders))
         
-        # WHY: Add a vertical separator with padding to visually group the Inject settings apart from the Scan settings.
         vline = QFrame()
         vline.setFrameShape(QFrame.VLine)
         vline.setFrameShadow(QFrame.Sunken)
-        self.folders_grid.addWidget(vline, 0, 5, len(all_folders) + 1, 1)
-        
-        # WHY: Redefined column spacing to perfectly distribute checkboxes and add requested padding.
-        self.folders_grid.setColumnMinimumWidth(1, 200)
-        self.folders_grid.setColumnMinimumWidth(2, 40) # Spacer Col
-        self.folders_grid.setColumnMinimumWidth(3, 40) # Filter
-        self.folders_grid.setColumnMinimumWidth(4, 40) # Scan
-        self.folders_grid.setColumnMinimumWidth(5, 10) # VLine
-        self.folders_grid.setColumnMinimumWidth(6, 40) # Inject
-        self.folders_grid.setColumnMinimumWidth(7, 200) # Target
+        self.folders_grid.addWidget(vline, 0, 4, len(all_folders) + 1, 1)      
+        # WHY: Coordinate re-mapping to logically position the Scan Master Checkbox directly next to the Folder Name.
+        self.folders_grid.setColumnMinimumWidth(1, 40)  # Scan
+        self.folders_grid.setColumnMinimumWidth(2, 200) # Content Type
+        self.folders_grid.setColumnMinimumWidth(3, 40)  # Filter
+        self.folders_grid.setColumnMinimumWidth(4, 10)  # VLine
+        self.folders_grid.setColumnMinimumWidth(5, 40)  # Inject
+        self.folders_grid.setColumnMinimumWidth(6, 200) # Target
+        self.folders_grid.setColumnMinimumWidth(7, 200) # Value        
         
         self.folder_widgets = {}
         
         row = 1
         for folder in all_folders:
+            full_path = os.path.join(root, folder)
+            hidden = is_hidden(full_path) if os.path.exists(full_path) else False
+                      
             lbl = QLabel(folder)
             if folder not in disk_folders:
                 lbl.setStyleSheet("color: red;")
             
             combo = QComboBox()
             # WHY: Explicitly force the widget to stretch horizontally to utilize the 1280px window width.
-            combo.setMinimumWidth(200)
             combo.addItems(["None", "Genre", "Collection", "Publisher", "Developer", "Year", "Other"])
             
             chk_filter = QCheckBox()
@@ -227,8 +257,6 @@ class SettingsDialog(QDialog):
             
             chk_inject = QCheckBox()
             combo_inject = QComboBox()
-            combo_inject.setMinimumWidth(200)
-            # WHY: Align the target fields with the content type fields, excluding "None".
             combo_inject.addItems(["Genre", "Collection", "Publisher", "Developer", "Year", "Other"])
             txt_inject = QLineEdit()
             
@@ -251,8 +279,8 @@ class SettingsDialog(QDialog):
             combo_inject.setEnabled(chk_scan.isChecked() and chk_inject.isChecked())
             txt_inject.setEnabled(chk_scan.isChecked() and chk_inject.isChecked())
             
-            chk_scan.stateChanged.connect(lambda state, c=combo, f=chk_filter, i=chk_inject, ci=combo_inject, ti=txt_inject: 
-                                          (c.setEnabled(state), f.setEnabled(state), i.setEnabled(state), ci.setEnabled(state and i.isChecked()), ti.setEnabled(state and i.isChecked())))
+            chk_scan.stateChanged.connect(lambda state, c=combo, f=chk_filter, i=chk_inject, ci=combo_inject, ti=txt_inject, scan=chk_scan: 
+                                          (c.setEnabled(state and scan.isEnabled()), f.setEnabled(state and scan.isEnabled()), i.setEnabled(state and scan.isEnabled()), ci.setEnabled(state and i.isChecked() and scan.isEnabled()), ti.setEnabled(state and i.isChecked() and scan.isEnabled())))
             chk_inject.stateChanged.connect(lambda state, ci=combo_inject, ti=txt_inject: 
                                             (ci.setEnabled(state), ti.setEnabled(state)))
             
@@ -264,19 +292,39 @@ class SettingsDialog(QDialog):
             txt_inject.textChanged.connect(self.mark_changed)
             
             self.folders_grid.addWidget(lbl, row, 0)
-            self.folders_grid.addWidget(combo, row, 1)
+            self.folders_grid.addWidget(chk_scan, row, 1)
+            self.folders_grid.addWidget(combo, row, 2)
             self.folders_grid.addWidget(chk_filter, row, 3)
-            self.folders_grid.addWidget(chk_scan, row, 4)
-            self.folders_grid.addWidget(chk_inject, row, 6)
-            self.folders_grid.addWidget(combo_inject, row, 7)
-            self.folders_grid.addWidget(txt_inject, row, 8)
-            
+            self.folders_grid.addWidget(chk_inject, row, 5)
+            self.folders_grid.addWidget(combo_inject, row, 6)
+            self.folders_grid.addWidget(txt_inject, row, 7)
+
             self.folder_widgets[folder] = {
-                "combo": combo, "filter": chk_filter, "scan": chk_scan, 
-                "inject_enabled": chk_inject, "inject_field": combo_inject, "inject_value": txt_inject
+                "lbl": lbl, "combo": combo, "filter": chk_filter, "scan": chk_scan, 
+                "inject_enabled": chk_inject, "inject_field": combo_inject, "inject_value": txt_inject,
+                "is_hidden": hidden
             }
             row += 1
+        self.update_hidden_folders_visibility()
 
+    def update_hidden_folders_visibility(self):
+        """WHY: Smart Refresh - Instantly greys out hidden folders and disables their sub-widgets if the ignore setting is checked."""
+        if not hasattr(self, 'folder_widgets'): return
+        ignore = self.chk_ignore_hidden.isChecked()
+        for folder, widgets in self.folder_widgets.items():
+            if widgets.get("is_hidden", False):
+                is_enabled = not ignore
+                widgets["lbl"].setEnabled(is_enabled)
+                widgets["scan"].setEnabled(is_enabled)
+                
+                scan_checked = widgets["scan"].isChecked() and is_enabled
+                widgets["combo"].setEnabled(scan_checked)
+                widgets["filter"].setEnabled(scan_checked)
+                widgets["inject_enabled"].setEnabled(scan_checked)
+                
+                inj_checked = widgets["inject_enabled"].isChecked() and scan_checked
+                widgets["inject_field"].setEnabled(inj_checked)
+                widgets["inject_value"].setEnabled(inj_checked)
     def setup_platforms_tab(self):
         layout = QVBoxLayout(self.tab_platforms)
         
@@ -424,47 +472,58 @@ class SettingsDialog(QDialog):
                     oauth_url = "https://www.epicgames.com/id/login?redirectUrl=https%3A%2F%2Fwww.epicgames.com%2Fid%2Fapi%2Fredirect%3FclientId%3D34a02cf8f4414e29b15921876da36f9a%26responseType%3Dcode"
                     webbrowser.open(oauth_url)
                     
-                    code_input, ok = QInputDialog.getText(
-                        self, 
-                        translator.tr("msg_epic_input_title"), 
-                        translator.tr("msg_epic_input_prompt")
-                    )
-                    
-                    if ok and code_input:
-                        # WHY: We use Regex to automatically extract the 32-character hex code.
-                        # This makes it idiot-proof, as the user can lazily copy-paste the entire JSON string!
-                        match = re.search(r'([a-fA-F0-9]{32})', code_input)
-                        if match:
-                            auth_code = match.group(1)
-                            logging.info(f"[EPIC BROWSER] Extracted manual exchange code: {auth_code[:5]}...")
-                            token_data = exchange_code_for_token(auth_code)
-                            
-                            if token_data and 'access_token' in token_data:
-                                logging.info("[EPIC BROWSER] Token exchanged successfully. Saving session.")
-                                save_epic_session(token_data)
-                                self.update_platform_btn_ui(btn, True)
+                    # WHY: Provide 200ms breathing room to ensure the instruction QMessageBox is completely destroyed 
+                    # by the OS window manager before spawning the modal QInputDialog. This prevents Z-order corruption 
+                    # that causes the main application to invisibly freeze after closing settings.
+                    def prompt_token():
+                        code_input, ok = QInputDialog.getText(
+                            self, 
+                            translator.tr("msg_epic_input_title"), 
+                            translator.tr("msg_epic_input_prompt")
+                        )
+                        
+                        if ok and code_input:
+                            match = re.search(r'([a-fA-F0-9]{32})', code_input)
+                            if match:
+                                auth_code = match.group(1)
+                                logging.info(f"[EPIC BROWSER] Extracted manual exchange code: {auth_code[:5]}...")
+                                token_data = exchange_code_for_token(auth_code)
                                 
-                                # WHY: Dynamically enable the scanner instantly upon successful connection.
-                                if hasattr(self.parent_window, 'sidebar'):
-                                    self.parent_window.sidebar.chk_scan_epic.setEnabled(True)
-                                    self.parent_window.epic_connected_cache = True
+                                if token_data and 'access_token' in token_data:
+                                    logging.info("[EPIC BROWSER] Token exchanged successfully. Saving session.")
+                                    save_epic_session(token_data)
+                                    self.update_platform_btn_ui(btn, True)
+                                    
+                                    if hasattr(self.parent_window, 'sidebar'):
+                                        self.parent_window.sidebar.chk_scan_epic.setEnabled(True)
+                                        self.parent_window.epic_connected_cache = True
+                                else:
+                                    logging.error("[EPIC BROWSER] Failed to exchange manual code for token.")
+                                    QMessageBox.warning(self, "Login Failed", translator.tr("msg_epic_token_failed"))
                             else:
-                                logging.error("[EPIC BROWSER] Failed to exchange manual code for token.")
-                                QMessageBox.warning(self, "Login Failed", translator.tr("msg_epic_token_failed"))
-                        else:
-                            logging.error("[EPIC BROWSER] Found no valid 32-char code in input.")
-                            QMessageBox.warning(self, "Login Failed", translator.tr("msg_epic_invalid_code"))
+                                logging.error("[EPIC BROWSER] Found no valid 32-char code in input.")
+                                QMessageBox.warning(self, "Login Failed", translator.tr("msg_epic_invalid_code"))
+                    QTimer.singleShot(200, prompt_token)
         else:
             QMessageBox.information(self, "Info", translator.tr("tools_platform_not_impl"))
 
     def setup_data_tab(self):
         layout = QVBoxLayout(self.tab_data)
+        
+        # WHY: Force strict vertical alignment for the labels and checkboxes across entirely separate group boxes.
+        COL_0_W = 160
+        COL_1_W = 140
 
+        # --- GALAXY ---
         grp_galaxy = QGroupBox(translator.tr("settings_data_galaxy_group"))
         layout_galaxy = QGridLayout(grp_galaxy)
         
         self.chk_enable_galaxy = QCheckBox(translator.tr("settings_data_galaxy_checkbox"))
+        self.chk_enable_galaxy.setFixedWidth(COL_0_W)
         self.chk_enable_galaxy.toggled.connect(self.toggle_galaxy_input)
+
+        lbl_gal_path = QLabel("")
+        lbl_gal_path.setFixedWidth(COL_1_W)
 
         self.galaxy_db_input = QLineEdit()
         self.galaxy_db_input.textChanged.connect(self.mark_changed)
@@ -477,87 +536,104 @@ class SettingsDialog(QDialog):
         self.btn_browse_galaxy.clicked.connect(self.browse_galaxy_db)
         
         layout_galaxy.addWidget(self.chk_enable_galaxy, 0, 0)
-        layout_galaxy.addWidget(self.galaxy_db_input, 0, 1)
-        layout_galaxy.addWidget(self.btn_browse_galaxy, 0, 2)
+        layout_galaxy.addWidget(lbl_gal_path, 0, 1)
+        layout_galaxy.addWidget(self.galaxy_db_input, 0, 2)
+        layout_galaxy.addWidget(self.btn_browse_galaxy, 0, 3)
+        layout_galaxy.setColumnStretch(2, 1)
         
         layout.addWidget(grp_galaxy)
         
+        # --- MEDIA DOWNLOAD ---
         grp_media = QGroupBox(translator.tr("settings_data_media_group"))
-        # WHY: A QGridLayout with setColumnStretch aligns all items perfectly across rows, 
-        # and stretching the input column pushes the browse button and checkboxes to the right edge.
         layout_media = QGridLayout(grp_media)
         
-        layout_media.addWidget(QLabel(translator.tr("settings_data_media_images_path")), 0, 0)
+        self.chk_download_images = QCheckBox(translator.tr("settings_data_media_download_images"))
+        self.chk_download_images.setFixedWidth(COL_0_W)
+        self.chk_download_images.toggled.connect(self.mark_changed)
+        
+        lbl_img_path = QLabel(translator.tr("settings_data_media_images_path"))
+        lbl_img_path.setFixedWidth(COL_1_W)
         self.image_path_input = QLineEdit()
         self.image_path_input.textChanged.connect(self.mark_changed)
-        layout_media.addWidget(self.image_path_input, 0, 1)
         self.btn_browse_image = QPushButton("...")
         self.btn_browse_image.setFixedWidth(40)
         self.btn_browse_image.clicked.connect(self.browse_image_path)
-        layout_media.addWidget(self.btn_browse_image, 0, 2)
-        self.chk_download_images = QCheckBox(translator.tr("settings_data_media_download_images"))
-        self.chk_download_images.toggled.connect(self.mark_changed)
-        layout_media.addWidget(self.chk_download_images, 0, 3)
         
-        layout_media.setColumnStretch(1, 1)
+        layout_media.addWidget(self.chk_download_images, 0, 0)
+        layout_media.addWidget(lbl_img_path, 0, 1)
+        layout_media.addWidget(self.image_path_input, 0, 2)
+        layout_media.addWidget(self.btn_browse_image, 0, 3)
+        layout_media.setColumnStretch(2, 1)
         
         layout.addWidget(grp_media)
         
+        # --- LOCAL COPIES (MERGED) ---
+        # WHY: The "Folder Structure" box was removed to adhere to DRY UI principles, grouping 
+        # strictly related variables perfectly under a single aligned grid layout header.
         grp_root = QGroupBox(translator.tr("settings_folders_local_copies_group"))
-        layout_root = QVBoxLayout(grp_root)
+        
+        self.struct_layout = QGridLayout(grp_root)
+        
+        self.chk_scan_local = QCheckBox(translator.tr("settings_folders_scan_local"))
+        self.chk_scan_local.setFixedWidth(COL_0_W)
+        self.chk_scan_local.setChecked(False)
+        self.chk_scan_local.toggled.connect(self.mark_changed)
+        self.chk_scan_local.toggled.connect(self.toggle_local_scan_options)
+        
+        lbl_root_path = QLabel(translator.tr("settings_folders_main_path"))
+        lbl_root_path.setFixedWidth(COL_1_W)
+        
         self.root_path_input = QLineEdit("")
         self.root_path_input.textChanged.connect(self.mark_changed)
+        # WHY: Trigger smart UI refresh instantly when user modifies the text path manually.
+        self.root_path_input.editingFinished.connect(self.on_path_edited)
+        
         self.btn_browse_root = QPushButton("...")
         self.btn_browse_root.setFixedWidth(40)
         self.btn_browse_root.clicked.connect(self.browse_root_path)
         
-        path_layout = QHBoxLayout()
-        self.chk_scan_local = QCheckBox(translator.tr("settings_folders_scan_local"))
-        self.chk_scan_local.setChecked(False)
-        self.chk_scan_local.toggled.connect(self.mark_changed)
-        self.chk_scan_local.toggled.connect(self.toggle_local_scan_options)
-        path_layout.addWidget(self.chk_scan_local)
-        path_layout.addWidget(QLabel(translator.tr("settings_folders_main_path")))
-        path_layout.addWidget(self.root_path_input)
-        path_layout.addWidget(self.btn_browse_root)
-        
-        layout_root.addLayout(path_layout)
-        layout.addWidget(grp_root)
-        
-        grp_structure = QGroupBox(translator.tr("settings_folders_structure_group"))
-        self.struct_layout = QVBoxLayout(grp_structure)
+        self.struct_layout.addWidget(self.chk_scan_local, 0, 0)
+        self.struct_layout.addWidget(lbl_root_path, 0, 1)
+        self.struct_layout.addWidget(self.root_path_input, 0, 2)
+        self.struct_layout.addWidget(self.btn_browse_root, 0, 3)
         
         self.chk_ignore_hidden = QCheckBox(translator.tr("settings_folders_ignore_hidden"))
         self.chk_ignore_hidden.toggled.connect(self.mark_changed)
-        self.struct_layout.addWidget(self.chk_ignore_hidden)
+        self.chk_ignore_hidden.toggled.connect(self.update_hidden_folders_visibility)
+        self.struct_layout.addWidget(self.chk_ignore_hidden, 1, 0, 1, 4)
 
         self.mode_simple_widget = QWidget()
-        simple_layout = QVBoxLayout(self.mode_simple_widget)
+        simple_layout = QGridLayout(self.mode_simple_widget)
         simple_layout.setContentsMargins(0, 10, 0, 0)
         
         lbl_simple = QLabel(translator.tr("settings_folders_simple_mode_label"))
         lbl_simple.setStyleSheet("font-weight: bold; color: #4CAF50;")
-        simple_layout.addWidget(lbl_simple)
+        lbl_simple.setFixedWidth(COL_0_W)
         
-        form_simple = QFormLayout()
+        lbl_simple_content = QLabel(translator.tr("settings_folders_simple_mode_content"))
+        lbl_simple_content.setFixedWidth(COL_1_W)
+        
         self.combo_global_type = QComboBox()
         self.combo_global_type.addItems(["Direct (Root -> Games)", "Genre", "Collection", "Publisher", "Developer", "Year", "Other", "None"])
         self.combo_global_type.currentIndexChanged.connect(self.mark_changed)
-        form_simple.addRow(translator.tr("settings_folders_simple_mode_content"), self.combo_global_type)
         
         self.chk_global_filter = QCheckBox(translator.tr("settings_folders_simple_mode_add_filter"))
         self.chk_global_filter.toggled.connect(self.mark_changed)
-        form_simple.addRow("", self.chk_global_filter)
-        simple_layout.addLayout(form_simple)
+        
+        simple_layout.addWidget(lbl_simple, 0, 0)
+        simple_layout.addWidget(lbl_simple_content, 0, 1)
+        simple_layout.addWidget(self.combo_global_type, 0, 2)
+        simple_layout.addWidget(self.chk_global_filter, 0, 3)
+        simple_layout.setColumnStretch(2, 1)
         
         self.btn_switch_advanced = QPushButton(translator.tr("settings_folders_simple_mode_switch_btn"))
         self.btn_switch_advanced.clicked.connect(self.switch_to_advanced)
-        simple_layout.addWidget(self.btn_switch_advanced)
-        simple_layout.addStretch()
+        simple_layout.addWidget(self.btn_switch_advanced, 1, 0, 1, 4)
         
-        self.struct_layout.addWidget(self.mode_simple_widget)
+        self.struct_layout.addWidget(self.mode_simple_widget, 2, 0, 1, 4)
 
         self.mode_advanced_widget = QWidget()
+        
         adv_layout = QVBoxLayout(self.mode_advanced_widget)
         adv_layout.setContentsMargins(0, 10, 0, 0)
         
@@ -566,30 +642,44 @@ class SettingsDialog(QDialog):
         adv_layout.addWidget(lbl_adv)
 
         scroll = QScrollArea()
+        
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
         
         self.levels_container = QWidget()
+        
         self.folders_grid = QGridLayout(self.levels_container)
         self.folders_grid.setAlignment(Qt.AlignTop)
         self.folders_grid.setContentsMargins(0, 0, 0, 0)
         
         scroll.setWidget(self.levels_container)
+        
         adv_layout.addWidget(scroll)
 
         btn_layout = QHBoxLayout()
         self.btn_switch_simple = QPushButton(translator.tr("settings_folders_adv_mode_switch_btn"))
         self.btn_switch_simple.clicked.connect(self.switch_to_simple)
+        
+        # WHY: Quality of Life feature - Clear All instantly wipes the active flags.
+        self.btn_clear_all = QPushButton("Clear All")
+        self.btn_clear_all.clicked.connect(self.clear_all_folders)
+        
         btn_layout.addWidget(self.btn_switch_simple)
+        btn_layout.addWidget(self.btn_clear_all)
         btn_layout.addStretch()
         adv_layout.addLayout(btn_layout)
         
-        self.struct_layout.addWidget(self.mode_advanced_widget)
-        layout.addWidget(grp_structure, 1)
+        self.struct_layout.addWidget(self.mode_advanced_widget, 3, 0, 1, 4)
+        self.struct_layout.setColumnStretch(2, 1)
+        layout.addWidget(grp_root, 1)
+        
+        self.current_folder_rules = {}
 
     def browse_root_path(self):
         dir_path = QFileDialog.getExistingDirectory(self, "Select Root Folder", self.root_path_input.text())
-        if dir_path: self.root_path_input.setText(os.path.normpath(dir_path))
+        if dir_path: 
+            self.root_path_input.setText(os.path.normpath(dir_path))
+            self.on_path_edited()
 
     def browse_galaxy_db(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Select Galaxy Database", self.galaxy_db_input.text(), "SQLite DB (*.db);;All Files (*.*)")
@@ -658,7 +748,8 @@ class SettingsDialog(QDialog):
         if self.current_scan_mode == "simple": self.switch_to_simple()
         else: self.switch_to_advanced()
         
-        self.populate_folders_list(local_config.get("folder_rules", {}))
+        self.current_folder_rules = local_config.get("folder_rules", {})
+        self.populate_folders_list(self.current_folder_rules)
         
         self.chk_enable_galaxy.setChecked(lib_settings.get("enable_galaxy_db", False))
         self.galaxy_db_input.setText(lib_settings.get("galaxy_db_path", self.galaxy_db_input.text()))
@@ -726,24 +817,15 @@ class SettingsDialog(QDialog):
 
         lib_settings["root_path"] = self.root_path_input.text()
         
-        folder_rules = {}
-        for folder, widgets in self.folder_widgets.items():
-            folder_rules[folder] = {
-                "type": widgets["combo"].currentText(),
-                "filter": widgets["filter"].isChecked(),
-                "scan": widgets["scan"].isChecked(),
-                "inject_enabled": widgets["inject_enabled"].isChecked(),
-                "inject_field": widgets["inject_field"].currentText(),
-                "inject_value": widgets["inject_value"].text().strip()
-            }
-        
+        self.save_current_folder_rules_state()
+
         lib_settings["local_scan_config"] = {
             "enable_local_scan": self.chk_scan_local.isChecked(),
             "ignore_hidden": self.chk_ignore_hidden.isChecked(),
             "scan_mode": self.current_scan_mode,
             "global_type": self.combo_global_type.currentText(),
             "global_filter": self.chk_global_filter.isChecked(),
-            "folder_rules": folder_rules
+            "folder_rules": self.current_folder_rules
         }
         
         lib_settings["enable_galaxy_db"] = self.chk_enable_galaxy.isChecked()

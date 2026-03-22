@@ -121,7 +121,7 @@
     "settings_folders_adv_mode_scan": "Scanner",
     "settings_folders_adv_mode_inject": "Injecter",
     "settings_folders_adv_mode_inject_field": "Champ Cible",
-    "settings_folders_adv_mode_inject_value": "Valeur Perso.",
+    "settings_folders_adv_mode_inject_value": "Valeur Perso. (Val 1, Val 2, ...)",
     "settings_folders_adv_mode_switch_btn": "Retirer un Niveau",
     "gamecard_info_release_date": "Date de sortie",
     "gamecard_info_platforms": "Plateforme(s)",
@@ -214,10 +214,10 @@
     "dialog_switch_lib_exist_title": "Base de données existante",
     "dialog_switch_lib_exist_msg": "Ceci est une base de données existante.\nVoulez-vous charger ce fichier ?",
     "msg_local_path_mandatory": "Un chemin principal est obligatoire pour rechercher des copies locales.",
-    "msg_epic_login_instructions": "Pour connecter Epic Games en toute sécurité, nous utiliserons votre navigateur :\n\n1. Votre navigateur par défaut va s'ouvrir.\n2. Connectez-vous à Epic Games (résolvez les CAPTCHAs normalement).\n3. Une fois connecté, vous verrez une page blanche avec du texte.\n4. Copiez la valeur à côté de \"authorizationCode\" (ou copiez tout le texte).\n\nCliquez sur OK pour ouvrir le navigateur.",
-    "msg_epic_login_title": "Connexion Epic Games",
-    "msg_epic_input_title": "Entrez le Code d'Autorisation",
-    "msg_epic_input_prompt": "Collez le 'authorizationCode' ou tout le texte de la page du navigateur :",
+    "msg_epic_login_instructions": "Pour connecter Epic Games en toute sécurité, nous utiliserons votre navigateur :\n\n1 - Votre navigateur va s'ouvrir (Chrome, Firefox, Edge, etc...)\n2 - Connectez-vous à l'Epic Games Store\n3 - Une fois connecté, vous verrez du texte.\n4 - Copiez tout le texte (Cliquez sur la page, CTRL-A, CTRL-C)\n5 - Collez le texte (CTRL-V) dans la fenêtre Token (CTRL-V)\n\nCliquez sur OK pour ouvrir votre navigateur.",
+    "msg_epic_login_title": "Epic Games Store",
+    "msg_epic_input_title": "Token",
+    "msg_epic_input_prompt": "Collez le texte (CTRL-V) ici :",
     "msg_epic_invalid_code": "Impossible de trouver un code d'autorisation valide de 32 caractères dans votre saisie.",
     "msg_epic_token_failed": "Échec de la négociation du token OAuth. Le code est peut-être expiré."
 }

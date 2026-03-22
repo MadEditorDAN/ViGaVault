@@ -121,7 +121,7 @@
     "settings_folders_adv_mode_scan": "Scan",
     "settings_folders_adv_mode_inject": "Einfügen",
     "settings_folders_adv_mode_inject_field": "Zielfeld",
-    "settings_folders_adv_mode_inject_value": "Eigener Wert",
+    "settings_folders_adv_mode_inject_value": "Eigener Wert (Val 1, Val 2, ...)",
     "settings_folders_adv_mode_switch_btn": "Ebene entfernen",
     "gamecard_info_release_date": "VÖ-Datum",
     "gamecard_info_platforms": "Plattform(en)",
@@ -214,10 +214,10 @@
     "dialog_switch_lib_exist_title": "Vorhandene Datenbank",
     "dialog_switch_lib_exist_msg": "Dies ist eine bereits vorhandene Datenbank.\nMöchten Sie diese Datei laden?",
     "msg_local_path_mandatory": "Ein Hauptpfad ist zwingend erforderlich, um nach lokalen Kopien zu scannen.",
-    "msg_epic_login_instructions": "Um Epic Games sicher zu verbinden, verwenden wir Ihren echten Browser:\n\n1. Ihr Standard-Webbrowser wird geöffnet.\n2. Melden Sie sich bei Epic Games an (lösen Sie alle CAPTCHAs normal).\n3. Sobald Sie angemeldet sind, sehen Sie eine weiße Seite mit Text.\n4. Kopieren Sie den Wert neben \"authorizationCode\" (oder kopieren Sie den gesamten Text).\n\nKlicken Sie auf OK, um Ihren Browser zu öffnen.",
-    "msg_epic_login_title": "Epic Games Login",
-    "msg_epic_input_title": "Autorisierungscode eingeben",
-    "msg_epic_input_prompt": "Fügen Sie den 'authorizationCode' oder den gesamten Text von der Browserseite ein:",
+    "msg_epic_login_instructions": "Um Epic Games sicher zu verbinden, verwenden wir Ihren Browser:\n\n1 - Ihr Browser wird geöffnet (Chrome, Firefox, Edge, etc...)\n2 - Melden Sie sich im Epic Games Store an\n3 - Nach der Anmeldung sehen Sie einen Text.\n4 - Kopieren Sie den gesamten Text (Klicken Sie auf die Seite, STRG-A, STRG-C)\n5 - Fügen Sie den Text (STRG-V) in das Token-Fenster ein (STRG-V)\n\nKlicken Sie auf OK, um Ihren Browser zu öffnen.",
+    "msg_epic_login_title": "Epic Games Store",
+    "msg_epic_input_title": "Token",
+    "msg_epic_input_prompt": "Fügen Sie den Text (STRG-V) hier ein:",
     "msg_epic_invalid_code": "In Ihrer Eingabe konnte kein gültiger 32-stelliger Autorisierungscode gefunden werden.",
     "msg_epic_token_failed": "Das Aushandeln des OAuth-Tokens ist fehlgeschlagen. Der Code könnte abgelaufen sein."
 }

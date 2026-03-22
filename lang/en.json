@@ -121,7 +121,7 @@
     "settings_folders_adv_mode_scan": "Scan",
     "settings_folders_adv_mode_inject": "Inject",
     "settings_folders_adv_mode_inject_field": "Target Field",
-    "settings_folders_adv_mode_inject_value": "Custom Value",
+    "settings_folders_adv_mode_inject_value": "Custom Value (Val 1, Val 2, ...)",
     "settings_folders_adv_mode_switch_btn": "Remove Level",
     "gamecard_info_release_date": "Release Date",
     "gamecard_info_platforms": "Platform(s)",
@@ -214,10 +214,10 @@
     "dialog_switch_lib_exist_title": "Existing Database",
     "dialog_switch_lib_exist_msg": "This is an existing database.\nDo you want to load this file?",
     "msg_local_path_mandatory": "A Main Path is mandatory to scan for local copies.",
-    "msg_epic_login_instructions": "To securely connect Epic Games, we will use your real browser:\n\n1. Your default web browser will open.\n2. Log in to Epic Games (solve any CAPTCHAs normally).\n3. Once logged in, you will see a white page with some text (JSON).\n4. Copy the value next to \"authorizationCode\" (or just copy all the text).\n\nClick OK to open your browser.",
-    "msg_epic_login_title": "Epic Games Login",
-    "msg_epic_input_title": "Enter Authorization Code",
-    "msg_epic_input_prompt": "Paste the 'authorizationCode' or the entire text from the browser page:",
+    "msg_epic_login_instructions": "To securely connect Epic Games, we will use your Browser:\n\n1 - Your browser will open (Chrome, Firefox, Edge, etc...)\n2 - Log in to Epic Games Store\n3 - After login in, you will see some text.\n4 - Copy the whole text (Click on the page, CTRL-A, CTRL-C)\n5 - Paste the text (CTRL-V) in the Token windows (CTRL-V)\n\nClick OK to open your browser.",
+    "msg_epic_login_title": "Epic Games Store",
+    "msg_epic_input_title": "Token",
+    "msg_epic_input_prompt": "Paste the text (CTRL-V) here:",
     "msg_epic_invalid_code": "Could not find a valid 32-character authorization code in your input.",
     "msg_epic_token_failed": "Failed to negotiate OAuth token. The code might be expired."
 }

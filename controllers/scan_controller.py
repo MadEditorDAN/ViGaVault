@@ -114,7 +114,7 @@ class ScanController(QObject):
         self.mw.sidebar.chk_show_new.setEnabled(True)
         self.mw.sidebar.chk_show_review.setChecked(True)
         self.mw.sidebar.chk_scan_galaxy.setEnabled(True)
-        self.mw.sidebar.chk_scan_gog_web.setEnabled(True)
+        self.mw.sidebar.chk_scan_gog_web.setEnabled(getattr(self.mw, 'gog_connected_cache', False))
         self.mw.sidebar.chk_scan_epic.setEnabled(getattr(self.mw, 'epic_connected_cache', False))
         self.mw.sidebar.chk_scan_local.setEnabled(True)
 
@@ -232,7 +232,7 @@ class ScanController(QObject):
         self.mw.sidebar.update_scan_button_state()
         config = build_scanner_config()
         self.mw.sidebar.chk_scan_galaxy.setEnabled(config.get('enable_galaxy_db', True))
-        self.mw.sidebar.chk_scan_gog_web.setEnabled(True)
+        self.mw.sidebar.chk_scan_gog_web.setEnabled(getattr(self.mw, 'gog_connected_cache', False))
         self.mw.sidebar.chk_scan_epic.setEnabled(getattr(self.mw, 'epic_connected_cache', False))
         self.mw.sidebar.chk_scan_local.setEnabled(config.get('local_scan_config', {}).get('enable_local_scan', True))
         

@@ -106,17 +106,23 @@ def scan_local_system(config, games_dict, worker_thread=None):
                         inj_field = rule.get("inject_field")
                         inj_val = rule.get("inject_value", "").strip()
                         if inj_field and inj_val:
+                            # WHY: Target Update - Support multiple comma-separated values for advanced batch tagging.
+                            inj_vals = [v.strip() for v in inj_val.split(',') if v.strip()]
+                            
                             if inj_field == "Genre":
                                 game.data['Genre'] = normalize_genre(f"{inj_val}, {game.data.get('Genre', '')}")
                             elif inj_field in ["Collection", "Publisher", "Developer"]:
-                                # WHY: Safely append the injected text without overwriting existing DB/IGDB metadata
+                                # WHY: Safely append multiple injected texts without overwriting existing metadata
                                 existing = game.data.get(inj_field, "")
-                                if not existing:
-                                    game.data[inj_field] = inj_val
-                                elif inj_val.lower() not in existing.lower():
-                                    game.data[inj_field] = f"{existing}, {inj_val}"
-                            elif inj_field == "Year":
-                                if not game.data.get('Year_Folder'): game.data['Year_Folder'] = inj_val
+                                existing_list = [x.strip().lower() for x in existing.split(',')] if existing else []
+                                for v in inj_vals:
+                                    if v.lower() not in existing_list:
+                                        existing = f"{existing}, {v}" if existing else v
+                                        existing_list.append(v.lower())
+                                game.data[inj_field] = existing
+                            elif inj_field == "Year" and inj_vals:
+                                # WHY: Years don't support multi-values, so we strictly inject the first one available.
+                                if not game.data.get('Year_Folder'): game.data['Year_Folder'] = inj_vals[0]
 
                     p_set = set(x.strip() for x in game.data.get('Platforms', '').split(',') if x.strip())
                     # WHY: Ensure "Local Copy" tag is removed if real platforms exist.
