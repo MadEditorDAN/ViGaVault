@@ -37,14 +37,23 @@ class ActionDialog(QDialog):
         self.form_layout = QFormLayout(metadata_group)
         self.inputs = {}
         
-        # Locked Checkbox
+        # Status & DLC Checkboxes
+        checkbox_layout = QHBoxLayout()
         self.chk_locked = QCheckBox(translator.tr("dialog_edit_locked"))
         self.chk_locked.setChecked(self.original_data.get('Status_Flag') == 'LOCKED')
-        self.form_layout.addRow("", self.chk_locked)
+        
+        self.chk_dlc = QCheckBox(translator.tr("batch_edit_mark_dlc"))
+        is_dlc = str(self.original_data.get('Is_DLC', False)).lower() in ['true', '1']
+        self.chk_dlc.setChecked(is_dlc)
+        
+        checkbox_layout.addWidget(self.chk_locked)
+        checkbox_layout.addWidget(self.chk_dlc)
+        # WHY: Wrap both checkboxes inside a horizontal layout so they render flawlessly side-by-side.
+        self.form_layout.addRow(checkbox_layout)
         
         fields_to_disable = ['Folder_Name', 'Status_Flag', 'Image_Link', 'Platforms']
         # WHY: Explicitly exclude internal system flags and media paths so they don't clutter the generic text zone.
-        fields_to_exclude = ['Trailer_Link', 'game_ID', 'Image_Link', 'temp_sort_date', 'temp_sort_title', 'temp_sort_index', 'Path_Root', 'Year_Folder', 'Is_Local', 'Has_Image', 'Has_Video', 'Cover_URL', 'Path_Video']
+        fields_to_exclude = ['Trailer_Link', 'game_ID', 'Image_Link', 'temp_sort_date', 'temp_sort_title', 'temp_sort_index', 'Path_Root', 'Year_Folder', 'Is_Local', 'Has_Image', 'Has_Video', 'Cover_URL', 'Path_Video', 'Is_DLC', 'Is_Excluded']
         fmt_str = build_scanner_config().get('date_format_str', 'DD/MM/YYYY')
 
         for field, value in self.original_data.items():
@@ -279,5 +288,6 @@ class ActionDialog(QDialog):
         new_data.update(self.updated_data)
         
         new_data['Status_Flag'] = 'LOCKED' if self.chk_locked.isChecked() else 'OK'
+        new_data['Is_DLC'] = self.chk_dlc.isChecked()
         new_data['Trailer_Link'] = self.url_line_edit.text().strip()
         return new_data

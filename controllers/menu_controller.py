@@ -36,10 +36,6 @@ class MenuController(QObject):
         file_menu.addAction(action_quit)
         
         tools_menu = menu_bar.addMenu(translator.tr("menu_tools"))
-        action_full_scan = QAction(translator.tr("sidebar_btn_full_scan"), self.mw)
-        action_full_scan.triggered.connect(self.mw.scan_controller.start_full_scan)
-        tools_menu.addAction(action_full_scan)
-        
         action_media_manager = QAction(translator.tr("menu_tools_media_manager"), self.mw)
         action_media_manager.triggered.connect(self.show_media_manager)
         tools_menu.addAction(action_media_manager)

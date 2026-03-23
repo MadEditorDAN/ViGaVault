@@ -57,14 +57,17 @@ class LibraryController(QObject):
         # under the "Show NEW" toggle umbrella so they don't become permanently invisible ghosts.
         has_new = 'NEW' in self.mw.master_df['Status_Flag'].values or 'NEEDS_ATTENTION' in self.mw.master_df['Status_Flag'].values
         has_review = 'REVIEW' in self.mw.master_df['Status_Flag'].values
+        has_dlc = self.mw.master_df['Is_DLC'].any() or self.mw.master_df['Is_Excluded'].any()
         
-        self.mw.sidebar.chk_show_new.setEnabled(has_new)
-        self.mw.sidebar.chk_show_review.setEnabled(has_review)
+        self.mw.sidebar.btn_toggle_new.setEnabled(has_new)
+        self.mw.sidebar.btn_toggle_review.setEnabled(has_review)
+        self.mw.sidebar.btn_toggle_dlc.setEnabled(has_dlc)
         self.mw.sidebar.btn_approve_review.setEnabled(has_review)
         
         # Uncheck instantly if there are no more results to prevent a blank UI
-        if not has_new and self.mw.sidebar.chk_show_new.isChecked(): self.mw.sidebar.chk_show_new.setChecked(False)
-        if not has_review and self.mw.sidebar.chk_show_review.isChecked(): self.mw.sidebar.chk_show_review.setChecked(False)
+        if not has_new and self.mw.sidebar.btn_toggle_new.isChecked(): self.mw.sidebar.btn_toggle_new.setChecked(False)
+        if not has_review and self.mw.sidebar.btn_toggle_review.isChecked(): self.mw.sidebar.btn_toggle_review.setChecked(False)
+        if not has_dlc and self.mw.sidebar.btn_toggle_dlc.isChecked(): self.mw.sidebar.btn_toggle_dlc.setChecked(False)
 
     def update_library_info(self):
         lib_name = os.path.basename(get_db_path()).replace('.csv', '')
@@ -111,7 +114,7 @@ class LibraryController(QObject):
                         "local_scan_config": {"enable_local_scan": False, "ignore_hidden": True, "scan_mode": "simple", "global_type": "Genre", "global_filter": True, "folder_rules": {}},
                         "galaxy_db_path": os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db'),
                     # WHY: Set default download_images to True so fresh libraries automatically backfill covers from API scans.
-                    "enable_galaxy_db": False, "download_images": True, "download_videos": False, "sort_desc": True, "sort_index": 0, "scan_new": False, "filter_states": {}, "filter_expansion": {}
+                    "enable_galaxy_db": False, "download_images": True, "download_videos": False, "sort_desc": True, "sort_index": 0, "view_new": False, "view_dlc": False, "view_review": False, "filter_states": {}, "filter_expansion": {}
                     }
                     with open(lib_settings_path, "w", encoding='utf-8') as f:
                         json.dump(default_lib_settings, f, indent=4)
@@ -164,18 +167,22 @@ class LibraryController(QObject):
         self.mw.filter_controller.populate_dynamic_filters(saved_filters, saved_expansion)
 
         self.mw.sidebar.combo_sort.blockSignals(True)
-        self.mw.sidebar.chk_show_new.blockSignals(True)
-        self.mw.sidebar.chk_show_review.blockSignals(True)
+        self.mw.sidebar.btn_toggle_new.blockSignals(True)
+        self.mw.sidebar.btn_toggle_dlc.blockSignals(True)
+        self.mw.sidebar.btn_toggle_review.blockSignals(True)
 
         self.mw.sort_desc = lib_settings.get("sort_desc", True)
         self.mw.sidebar.combo_sort.setCurrentIndex(lib_settings.get("sort_index", 0))
         self.mw.sidebar.search_bar.setText(lib_settings.get("search_text", ""))
-        self.mw.sidebar.chk_show_new.setChecked(lib_settings.get("scan_new", False))
+        self.mw.sidebar.btn_toggle_new.setChecked(lib_settings.get("view_new", False))
+        self.mw.sidebar.btn_toggle_dlc.setChecked(lib_settings.get("view_dlc", False))
+        self.mw.sidebar.btn_toggle_review.setChecked(lib_settings.get("view_review", False))
         self.mw.sidebar.update_sort_button(self.mw.sort_desc)
 
         self.mw.sidebar.combo_sort.blockSignals(False)
-        self.mw.sidebar.chk_show_new.blockSignals(False)
-        self.mw.sidebar.chk_show_review.blockSignals(False)
+        self.mw.sidebar.btn_toggle_new.blockSignals(False)
+        self.mw.sidebar.btn_toggle_dlc.blockSignals(False)
+        self.mw.sidebar.btn_toggle_review.blockSignals(False)
         self.update_status_checkboxes_state()
 
         self.update_library_info()
@@ -546,7 +553,7 @@ class LibraryController(QObject):
         global_settings.update({"splitter_sizes": self.mw.splitter.sizes()})
         
         # WHY: Targeted Cleanup - Scrub local library data out of the global settings file to fix legacy data bleed.
-        local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "scan_new", "filter_states", "filter_expansion", "sidebar_chk_galaxy", "sidebar_chk_gog_web", "sidebar_chk_epic", "sidebar_chk_local", "sidebar_chk_folders", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_galaxy_db", "galaxy_db_path", "download_images", "download_videos", "image_path", "video_path"]
+        local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "view_new", "view_dlc", "view_review", "filter_states", "filter_expansion", "sidebar_chk_galaxy", "sidebar_chk_gog_web", "sidebar_chk_epic", "sidebar_chk_local", "sidebar_chk_folders", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_galaxy_db", "galaxy_db_path", "download_images", "download_videos", "image_path", "video_path"]
         for k in local_keys: global_settings.pop(k, None)
         
         try:
@@ -588,7 +595,9 @@ class LibraryController(QObject):
             "sort_index": self.mw.sidebar.combo_sort.currentIndex(),
             "search_text": self.mw.sidebar.search_bar.text(),
             "anchor_folder": self.get_second_visible_folder(),
-            "scan_new": self.mw.sidebar.chk_show_new.isChecked(),
+            "view_new": self.mw.sidebar.btn_toggle_new.isChecked(),
+            "view_dlc": self.mw.sidebar.btn_toggle_dlc.isChecked(),
+            "view_review": self.mw.sidebar.btn_toggle_review.isChecked(),
             "filter_states": filter_states,
             "filter_expansion": saved_expansion,
             # WHY: Reverted to explicit key mapping to match the original GOG logic exactly. 
@@ -645,12 +654,17 @@ class LibraryController(QObject):
             if 0 <= idx < self.mw.sidebar.combo_sort.count(): self.mw.sidebar.combo_sort.setCurrentIndex(idx)
             self.mw.sidebar.search_bar.setText(lib_settings.get("search_text", ""))
             
-            self.mw.sidebar.chk_show_new.blockSignals(True)
+            # WHY: Update legacy attribute references to target the new UI toggle buttons safely during boot.
+            self.mw.sidebar.btn_toggle_new.blockSignals(True)
+            self.mw.sidebar.btn_toggle_dlc.blockSignals(True)
+            self.mw.sidebar.btn_toggle_review.blockSignals(True)
             if hasattr(self.mw.filter_controller, 'dynamic_filters'):
                 for checkboxes in self.mw.filter_controller.dynamic_filters.values():
                     for chk in checkboxes: chk.blockSignals(True)
 
-            self.mw.sidebar.chk_show_new.setChecked(lib_settings.get("scan_new", False))
+            self.mw.sidebar.btn_toggle_new.setChecked(lib_settings.get("view_new", False))
+            self.mw.sidebar.btn_toggle_dlc.setChecked(lib_settings.get("view_dlc", False))
+            self.mw.sidebar.btn_toggle_review.setChecked(lib_settings.get("view_review", False))
 
             filter_states = lib_settings.get("filter_states")
             if hasattr(self.mw.filter_controller, 'dynamic_filters'):
@@ -672,7 +686,9 @@ class LibraryController(QObject):
                 for checkboxes in self.mw.filter_controller.dynamic_filters.values():
                     for chk in checkboxes: chk.blockSignals(False)
             
-            self.mw.sidebar.chk_show_new.blockSignals(False)
+            self.mw.sidebar.btn_toggle_new.blockSignals(False)
+            self.mw.sidebar.btn_toggle_dlc.blockSignals(False)
+            self.mw.sidebar.btn_toggle_review.blockSignals(False)
             
             enable_galaxy = lib_settings.get("enable_galaxy_db", False)
             enable_local = lib_settings.get("local_scan_config", {}).get("enable_local_scan", False)

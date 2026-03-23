@@ -40,8 +40,10 @@ class MediaManagerDialog(QDialog):
         
         self.chk_image = QCheckBox(translator.tr("media_manager_col_image"))
         self.chk_trailer = QCheckBox(translator.tr("media_manager_col_trailer"))
+        self.chk_hidden = QCheckBox(translator.tr("media_manager_chk_show_hidden"))
         self.chk_image.setChecked(True)
         self.chk_trailer.setChecked(True)
+        self.chk_hidden.setChecked(False)
         
         self.lbl_missing_img = QLabel("")
         self.lbl_missing_trl = QLabel("")
@@ -53,6 +55,8 @@ class MediaManagerDialog(QDialog):
         checkbox_layout.addWidget(self.lbl_missing_img, 0, 1)
         checkbox_layout.addWidget(self.chk_trailer, 1, 0)
         checkbox_layout.addWidget(self.lbl_missing_trl, 1, 1)
+        # WHY: Inject the new checkbox immediately below the media options to control the dataset scope.
+        checkbox_layout.addWidget(self.chk_hidden, 2, 0)
         
         lbl_notice = QLabel(translator.tr("media_manager_notice"))
         lbl_notice.setWordWrap(True)
@@ -83,6 +87,7 @@ class MediaManagerDialog(QDialog):
         
         check_img = self.chk_image.isChecked()
         check_trl = self.chk_trailer.isChecked()
+        check_hidden = self.chk_hidden.isChecked()
         
         headers = [translator.tr("media_manager_col_game"), translator.tr("media_manager_col_copy")]
         if check_img: headers.append(translator.tr("media_manager_col_image"))
@@ -103,7 +108,26 @@ class MediaManagerDialog(QDialog):
         missing_trl_count = 0
         
         missing_games = []
+        
+        # WHY: DRY Principle - Read the pre-calculated Is_DLC and Is_Excluded flags natively from the memory DataFrame 
+        # to guarantee the Media Manager respects the exact same exclusion rules as the main interface without re-parsing settings.json.
+        hidden_folders = set()
+        if hasattr(self.parent_window, 'master_df'):
+            df = self.parent_window.master_df
+            if not df.empty:
+                has_dlc = 'Is_DLC' in df.columns
+                has_excl = 'Is_Excluded' in df.columns
+                if has_dlc and has_excl:
+                    hidden_folders = set(df[(df['Is_DLC'] == True) | (df['Is_Excluded'] == True)]['Folder_Name'])
+                elif has_dlc:
+                    hidden_folders = set(df[df['Is_DLC'] == True]['Folder_Name'])
+                elif has_excl:
+                    hidden_folders = set(df[df['Is_Excluded'] == True]['Folder_Name'])
+                    
         for folder, game in self.manager.games.items():
+            if not check_hidden and folder in hidden_folders:
+                continue
+                
             trailer_link = game.data.get('Trailer_Link', '')
             
             has_img = str(game.data.get('Has_Image')).lower() in ['true', '1']

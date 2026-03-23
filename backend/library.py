@@ -105,7 +105,8 @@ class LibraryManager:
         return get_igdb_access_token()
 
     def _get_db_schema(self):
-        return ['Folder_Name', 'Clean_Title', 'Search_Title', 'Path_Root', 'Status_Flag', 'Image_Link', 'Cover_URL', 'Year_Folder', 'Platforms', 'Developer', 'Publisher', 'Original_Release_Date', 'Summary', 'Genre', 'Collection', 'Trailer_Link', 'game_ID', 'Is_Local', 'Has_Image'] + [f'platform_ID_{i:02d}' for i in range(1, 51)]
+        # WHY: Inject Is_DLC into the permanent schema matrix so manual batch tags persist perfectly to the hard drive.
+        return ['Folder_Name', 'Clean_Title', 'Search_Title', 'Path_Root', 'Status_Flag', 'Image_Link', 'Cover_URL', 'Year_Folder', 'Platforms', 'Developer', 'Publisher', 'Original_Release_Date', 'Summary', 'Genre', 'Collection', 'Trailer_Link', 'game_ID', 'Is_Local', 'Has_Image', 'Is_DLC'] + [f'platform_ID_{i:02d}' for i in range(1, 51)]
 
     def save_db(self):
         if os.path.exists(self.db_file):

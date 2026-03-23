@@ -26,7 +26,16 @@ class BatchEditDialog(QDialog):
         center_window(self, parent)
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(translator.tr("game_manager_batch_edit_desc", count=count)))
+        
+        # WHY: Wrap the description text inside its own native QGroupBox to create a bounding frame.
+        desc_group = QGroupBox()
+        desc_layout = QVBoxLayout(desc_group)
+        # WHY: Drastically reduce the top and bottom margins to eliminate empty space around the text block.
+        desc_layout.setContentsMargins(10, 5, 10, 5)
+        lbl_desc = QLabel(translator.tr("game_manager_batch_edit_desc", count=count))
+        lbl_desc.setAlignment(Qt.AlignCenter)
+        desc_layout.addWidget(lbl_desc)
+        layout.addWidget(desc_group)
 
         form_group = QGroupBox()
         self.form_layout = QFormLayout(form_group)
@@ -39,6 +48,13 @@ class BatchEditDialog(QDialog):
             inp = QLineEdit()
             self.form_layout.addRow(label_text, inp)
             self.inputs[field] = inp
+            
+        # WHY: Use a tristate checkbox so the user can explicitly choose to mark, unmark, or completely ignore the DLC status during batch edits.
+        self.chk_dlc = QCheckBox(translator.tr("batch_edit_mark_dlc"))
+        self.chk_dlc.setTristate(True)
+        self.chk_dlc.setCheckState(Qt.PartiallyChecked)
+        self.form_layout.addRow(self.chk_dlc)
+        
         layout.addWidget(form_group)
 
         btn_box = QHBoxLayout()
@@ -53,7 +69,15 @@ class BatchEditDialog(QDialog):
 
     def get_data(self):
         # WHY: Smart filtering mathematically drops completely blank inputs so they safely skip the backend logic.
-        return {field: inp.text().strip() for field, inp in self.inputs.items() if inp.text().strip()}
+        data = {field: inp.text().strip() for field, inp in self.inputs.items() if inp.text().strip()}
+        
+        # WHY: Interpret the tristate checkbox to cleanly apply or revoke the DLC flag, while safely ignoring it if left partially checked.
+        if self.chk_dlc.checkState() == Qt.Checked:
+            data['Is_DLC'] = True
+        elif self.chk_dlc.checkState() == Qt.Unchecked:
+            data['Is_DLC'] = False
+            
+        return data
 
 class GameManagerModel(QAbstractTableModel):
     def __init__(self, df, display_cols):

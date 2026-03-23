@@ -192,8 +192,9 @@ class FilterController(QObject):
             'active_filters': active_filters,
             'sort_col': sort_col_map[self.mw.sidebar.combo_sort.currentIndex()],
             'sort_desc': self.mw.sort_desc,
-            'scan_new': self.mw.sidebar.chk_show_new.isChecked(),
-            'scan_review': self.mw.sidebar.chk_show_review.isChecked(),
+            'scan_new': self.mw.sidebar.btn_toggle_new.isChecked(),
+            'scan_dlc': self.mw.sidebar.btn_toggle_dlc.isChecked(),
+            'scan_review': self.mw.sidebar.btn_toggle_review.isChecked(),
         }
 
         self.filter_worker = FilterWorker(self.mw.master_df, params)
@@ -204,7 +205,11 @@ class FilterController(QObject):
     def on_filtering_finished(self, filtered_df):
             
         self.mw.current_df = filtered_df
-        self.mw.sidebar.lbl_counter.setText(f"{len(filtered_df)}/{len(self.mw.master_df)}")
+        
+        # WHY: Smart Refresh - Calculates total valid games purely by mathematically ignoring DLCs and Exclusions, perfectly hiding them from the counter.
+        valid_games_mask = ~self.mw.master_df['Is_DLC'] & ~self.mw.master_df['Is_Excluded']
+        valid_total = valid_games_mask.sum()
+        self.mw.sidebar.lbl_counter.setText(f"{len(filtered_df)}/{valid_total}")
 
         if hasattr(self.mw, 'pending_anchor_folder') and self.mw.pending_anchor_folder:
             anchor_folder = self.mw.pending_anchor_folder

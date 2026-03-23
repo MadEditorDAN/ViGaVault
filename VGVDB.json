@@ -397,7 +397,7 @@
     },
     "image_path": "D:\\ViGaVault\\Images",
     "download_images": true,
-    "anchor_folder": "Opus Magnum De Re Metallica",
+    "anchor_folder": "Dink Smallwood HD",
     "sidebar_chk_gog": true,
     "sidebar_chk_local": false,
     "enable_galaxy_db": true,
@@ -411,8 +411,8 @@
         "_TEMP"
     ],
     "sidebar_chk_epic": true,
-    "exclusion_words": [
-        "goodie",
-        "modkit"
-    ]
+    "exclusion_words": [],
+    "view_new": false,
+    "view_dlc": false,
+    "view_review": false
 }

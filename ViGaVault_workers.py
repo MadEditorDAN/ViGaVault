@@ -76,6 +76,7 @@ class FilterWorker(QThread):
                 df = df[df['Summary'].fillna('').str.lower().str.contains(search)]
             
         is_scan_new = self.params.get('scan_new', False)
+        is_scan_dlc = self.params.get('scan_dlc', False)
         is_scan_review = self.params.get('scan_review', False)
 
         # 2. Dynamic Filters (Sidebar Checkboxes)
@@ -92,17 +93,21 @@ class FilterWorker(QThread):
                 regex_pattern = '|'.join([re.escape(v) for v in selected_values])
                 df = df[df[col].astype(str).str.contains(regex_pattern, case=False, na=False)]
 
-        # Status Filter (Exclusive)
+        # WHY: Status & DLC Filter - Ensures Excluded and DLC items strictly vanish from standard UI views unless manually requested via the DLC toggle.
         allowed_flags = []
         if is_scan_new: 
-            allowed_flags.append('NEW')
-            allowed_flags.append('NEEDS_ATTENTION')
+            allowed_flags.extend(['NEW', 'NEEDS_ATTENTION'])
         if is_scan_review: allowed_flags.append('REVIEW')
         
-        if not allowed_flags:
-            df = df[df['Status_Flag'].isin(['OK', 'LOCKED'])]
+        if is_scan_dlc:
+            # Show strictly DLCs and Exclusions
+            df = df[df['Is_DLC'] | df['Is_Excluded']]
+        elif allowed_flags:
+            # Show target statuses, but protect against DLC/Exclusion pollution
+            df = df[df['Status_Flag'].isin(allowed_flags) & ~df['Is_DLC'] & ~df['Is_Excluded']]
         else:
-            df = df[df['Status_Flag'].isin(allowed_flags)]
+            # Default safe view
+            df = df[df['Status_Flag'].isin(['OK', 'LOCKED']) & ~df['Is_DLC'] & ~df['Is_Excluded']]
             
         # 3. Sorting
         sort_col = self.params['sort_col']
@@ -130,9 +135,14 @@ class DbLoaderWorker(QThread):
                 if 'Status_Flag' not in df.columns:
                     df['Status_Flag'] = 'NEW'
                     
+                # WHY: Guarantee Is_DLC resolves as a strict boolean for Pandas processing.
+                if 'Is_DLC' not in df.columns: df['Is_DLC'] = False
+                else: df['Is_DLC'] = df['Is_DLC'].astype(str).str.lower().isin(['true', '1'])
+                    
                 # WHY: Pass 1 - Strictly parse dates using the globally configured Regional Format to prevent day/month swapping.
                 
-                # WHY: Apply Exclusion Words globally to naturally fix the sidebar counter and permanently hide non-games from the UI.
+                # WHY: Targeted Update - Instead of destructively dropping rows, strictly flag them via 'Is_Excluded' so they remain in memory.
+                df['Is_Excluded'] = False
                 lib_settings_file = get_library_settings_file()
                 if os.path.exists(lib_settings_file):
                     try:
@@ -141,7 +151,8 @@ class DbLoaderWorker(QThread):
                             exclusions = settings.get("exclusion_words", [])
                             if exclusions:
                                 pattern = '|'.join([re.escape(w) for w in exclusions])
-                                df = df[~df['Clean_Title'].str.contains(pattern, case=False, na=False)]
+                                mask = df['Clean_Title'].str.contains(pattern, case=False, na=False)
+                                df.loc[mask, 'Is_Excluded'] = True
                     except Exception as e:
                         logging.error(f"Error applying exclusions: {e}")
 

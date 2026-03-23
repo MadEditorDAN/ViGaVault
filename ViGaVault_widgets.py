@@ -322,17 +322,36 @@ class Sidebar(QWidget):
         # WHY: Add a stretch spacer to push the "Show NEW" checkbox to the far right edge of the layout.
         filters_header_layout.addStretch()
 
-        # --- SHOW NEW CHECKBOX (Moved here) ---
-        self.chk_show_new = QCheckBox(translator.tr("sidebar_chk_show_new"))
-        self.chk_show_review = QCheckBox(translator.tr("sidebar_chk_show_review"))
-        self.btn_approve_review = QPushButton(translator.tr("sidebar_btn_approve_review"))
-        self.btn_approve_review.setStyleSheet("padding: 2px 8px; font-weight: bold;")
+        # WHY: Add a 'Show :' label to clearly define the purpose of the adjacent filter toggles.
+        self.lbl_show = QLabel(translator.tr("sidebar_lbl_show"))
+        self.lbl_show.setObjectName("sidebar_lbl_show")
+        filters_header_layout.addWidget(self.lbl_show)
+
+        # --- MUTUAL EXCLUSIVE VIEW TOGGLES ---
+        self.btn_toggle_new = QPushButton(translator.tr("sidebar_btn_toggle_new"))
+        self.btn_toggle_dlc = QPushButton(translator.tr("sidebar_btn_toggle_dlc"))
+        self.btn_toggle_review = QPushButton(translator.tr("sidebar_btn_toggle_review"))
         
-        self.chk_show_new.setLayoutDirection(Qt.RightToLeft)
-        self.chk_show_review.setLayoutDirection(Qt.RightToLeft)
-        filters_header_layout.addWidget(self.chk_show_new, 0, Qt.AlignRight)
-        filters_header_layout.addWidget(self.chk_show_review, 0, Qt.AlignRight)
-        filters_header_layout.addWidget(self.btn_approve_review, 0, Qt.AlignRight)
+        toggle_style = """
+            QPushButton { padding: 4px 8px; border: 1px solid palette(dark); border-radius: 4px; background-color: palette(button); }
+            QPushButton:checked { background-color: palette(highlight); color: palette(highlighted-text); font-weight: bold; }
+        """
+        
+        for btn in [self.btn_toggle_new, self.btn_toggle_dlc, self.btn_toggle_review]:
+            btn.setCheckable(True)
+            btn.setStyleSheet(toggle_style)
+            btn.setCursor(Qt.PointingHandCursor)
+            filters_header_layout.addWidget(btn)
+            
+        # WHY: Handled manually instead of QButtonGroup so the user can easily un-toggle everything to revert to the default safe view.
+        self.btn_toggle_new.toggled.connect(lambda checked: self.handle_view_toggle(self.btn_toggle_new, checked))
+        self.btn_toggle_dlc.toggled.connect(lambda checked: self.handle_view_toggle(self.btn_toggle_dlc, checked))
+        self.btn_toggle_review.toggled.connect(lambda checked: self.handle_view_toggle(self.btn_toggle_review, checked))
+
+        self.btn_approve_review = QPushButton(translator.tr("sidebar_btn_approve_review"))
+        self.btn_approve_review.setStyleSheet("padding: 4px 8px; font-weight: bold; border: 1px solid palette(dark); border-radius: 4px; background-color: palette(button);")
+        self.btn_approve_review.setCursor(Qt.PointingHandCursor)
+        filters_header_layout.addWidget(self.btn_approve_review)
 
         filters_frame_layout.addLayout(filters_header_layout)
 
@@ -494,8 +513,6 @@ class Sidebar(QWidget):
         self.combo_sort.currentIndexChanged.connect(self.parent.request_filter_update)
         self.btn_toggle_sort.clicked.connect(self.parent.toggle_sort_order)
         self.btn_full_scan.clicked.connect(self.parent.start_full_scan)
-        self.chk_show_new.toggled.connect(self.parent.request_filter_update)
-        self.chk_show_review.toggled.connect(self.parent.request_filter_update)
         self.btn_approve_review.clicked.connect(self.parent.approve_reviews)
         self.btn_scan_settings.clicked.connect(self.parent.open_scan_settings)
         self.btn_close_scan_settings.clicked.connect(self.parent.close_scan_settings)
@@ -525,6 +542,15 @@ class Sidebar(QWidget):
         if hasattr(self, 'parent') and hasattr(self.parent, 'filter_controller'):
             self.parent.filter_controller.reflow_filters()
         self.adjust_scan_log_font()
+
+    def handle_view_toggle(self, toggled_btn, checked):
+        if checked:
+            for btn in [self.btn_toggle_new, self.btn_toggle_dlc, self.btn_toggle_review]:
+                if btn != toggled_btn:
+                    btn.blockSignals(True)
+                    btn.setChecked(False)
+                    btn.blockSignals(False)
+        self.parent.request_filter_update()
 
     def adjust_scan_log_font(self):
         """WHY: Dynamically calculates the perfect pixel size required to fit exactly 80 monospace characters in the list width."""
@@ -589,7 +615,11 @@ class Sidebar(QWidget):
         self.combo_sort.setItemText(2, translator.tr("sidebar_sort_date_added"))
         self.update_sort_button(self.parent.sort_desc)
         self.findChild(QLabel, "sidebar_filters_label").setText(translator.tr("sidebar_filters_label"))
-        self.chk_show_new.setText(translator.tr("sidebar_chk_show_new"))
+        # WHY: Retranslate the newly added 'Show :' label dynamically.
+        self.lbl_show.setText(translator.tr("sidebar_lbl_show"))
+        self.btn_toggle_new.setText(translator.tr("sidebar_btn_toggle_new"))
+        self.btn_toggle_dlc.setText(translator.tr("sidebar_btn_toggle_dlc"))
+        self.btn_toggle_review.setText(translator.tr("sidebar_btn_toggle_review"))
         self.btn_approve_review.setText(translator.tr("sidebar_btn_approve_review"))
         self.btn_scan_settings.setText(translator.tr("sidebar_btn_scan_settings"))
         self.findChild(QLabel, "scan_settings_title_lbl").setText(translator.tr("scan_settings_title"))
