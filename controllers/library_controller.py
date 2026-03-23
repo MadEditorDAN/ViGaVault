@@ -8,8 +8,8 @@ from PySide6.QtCore import QObject, Slot, QByteArray, Qt, QPoint, QTimer
 from PySide6.QtWidgets import QFileDialog, QMessageBox, QApplication, QCheckBox
 
 from backend.library import LibraryManager
-from ViGaVault_utils import (get_db_path, get_library_settings_file, build_scanner_config, 
-                             get_platform_config, apply_theme, translator, DEFAULT_DISPLAY_SETTINGS)
+from ViGaVault_utils import (get_db_path, get_library_settings_file, build_scanner_config, get_platform_config, 
+                             apply_theme, translator, DEFAULT_DISPLAY_SETTINGS, normalize_genre)
 from ViGaVault_utils import get_image_path, get_video_path
 from ViGaVault_workers import DbLoaderWorker, StartupSyncWorker
 from dialogs import ConflictDialog
@@ -244,9 +244,12 @@ class LibraryController(QObject):
             logging.info(f"{'DB BACKUP':<15} : Backup created at {backup_file}")
         
         try:
-            df_to_save = self.mw.master_df.drop(columns=['temp_sort_date', 'temp_sort_title'], errors='ignore')
-            df_to_save.to_csv(db_path, sep=';', index=False, encoding='utf-8')
-            logging.info(f"{'DB SAVE':<15} : Database saved to {db_path} ({len(self.mw.master_df)} games).")
+            # WHY: Because master_df now safely drops excluded games for UI counter accuracy, 
+            # we MUST route the manual save exclusively through LibraryManager to prevent permanently deleting them from the CSV.
+            manager = LibraryManager(build_scanner_config())
+            manager.load_db()
+            manager.save_db()
+            logging.info(f"{'DB SAVE':<15} : Database saved to {db_path} ({len(manager.games)} physical games).")
             QMessageBox.information(self.mw, "Save Complete", translator.tr("msg_save_success", db_path=db_path))
         except PermissionError:
              QMessageBox.warning(self.mw, "File Locked", translator.tr("msg_file_locked", db_path=db_path))
@@ -402,6 +405,91 @@ class LibraryController(QObject):
         self.save_settings()
         logging.info(f"{'Deleted':<15} : {folder_name}")
 
+    def batch_delete_games(self, folder_names):
+        """
+        WHY: Single Responsibility - Optimized batch deletion that loops purely through memory and physical media, 
+        but saves the database to the disk strictly ONCE at the end.
+        """
+        manager = LibraryManager(build_scanner_config())
+        manager.load_db()
+        
+        for folder_name in folder_names:
+            game_obj = manager.games.get(folder_name)
+            if game_obj:
+                img_name = game_obj.data.get('Image_Link', '')
+                vid_name = game_obj.data.get('Path_Video', '')
+                
+                if img_name:
+                    try: os.remove(os.path.join(get_image_path(), os.path.basename(img_name)))
+                    except: pass
+                if vid_name:
+                    try: os.remove(os.path.join(get_video_path(), os.path.basename(vid_name)))
+                    except: pass
+                    
+                del manager.games[folder_name]
+                logging.info(f"{'Batch Deleted':<15} : {folder_name}")
+                
+        manager.save_db()
+        
+        # WHY: Targeted Update - Mathematically erase from Pandas in-memory and dynamically update visual list.
+        self.mw.master_df = self.mw.master_df[~self.mw.master_df['Folder_Name'].isin(folder_names)]
+        self.mw.current_df = self.mw.current_df[~self.mw.current_df['Folder_Name'].isin(folder_names)]
+        self.mw.list_controller.load_more_items()
+        self.update_status_checkboxes_state()
+        self.save_settings()
+
+    def batch_update_games(self, folder_names, new_data):
+        """
+        WHY: Applies user-provided metadata strictly to the selected games, updating 
+        the memory and saving the disk only once.
+        """
+        manager = LibraryManager(build_scanner_config())
+        manager.load_db()
+        
+        appendable_fields = ['Developer', 'Publisher', 'Genre', 'Collection']
+        
+        for folder_name in folder_names:
+            game_obj = manager.games.get(folder_name)
+            if game_obj:
+                old_title = game_obj.data.get('Clean_Title', '')
+                old_date = game_obj.data.get('Original_Release_Date', '')
+                for key, value in new_data.items():
+                    if key in appendable_fields:
+                        # WHY: Safely append new values to designated list-based metadata fields without obliterating existing data.
+                        existing = str(game_obj.data.get(key, ""))
+                        existing_list = [x.strip().lower() for x in existing.split(',')] if existing else []
+                        new_list = [x.strip() for x in str(value).split(',')]
+                        
+                        for v in new_list:
+                            if v and v.lower() not in existing_list:
+                                existing = f"{existing}, {v}" if existing else v
+                                existing_list.append(v.lower())
+                                
+                        if key == 'Genre':
+                            existing = normalize_genre(existing)
+                            
+                        game_obj.data[key] = existing
+                    else:
+                        game_obj.data[key] = value
+                game_obj.update_media_filenames(old_title, old_date)
+                # WHY: Targeted Update - Patch Pandas memory immediately per-game so the caller sees synchronous updates.
+                self.patch_memory_df(folder_name, game_obj.to_dict())
+
+        while True:
+            try:
+                manager.save_db()
+                break
+            except PermissionError:
+                reply = QMessageBox.warning(self.mw, "File Locked", translator.tr("msg_file_locked", db_path=get_db_path()), QMessageBox.Ok | QMessageBox.Cancel)
+                if reply == QMessageBox.Cancel: return
+        
+        # WHY: Fast UI Sync - Refresh the visible cards rather than executing a hard async DB reload, 
+        # ensuring synchronous dialogs (like Game Manager) see the updated master_df immediately.
+        self.mw.list_controller.update_visible_widgets()
+        self.update_status_checkboxes_state()
+        self.save_settings()
+        logging.info(f"{'Batch Updated':<15} : {len(folder_names)} games")
+
     def batch_delete_metadata(self, field, items_to_delete):
         """
         WHY: Performs a safe string-based batch deletion of metadata tags across the entire DB.
@@ -509,7 +597,8 @@ class LibraryController(QObject):
             "sidebar_chk_gog_web": self.mw.sidebar.chk_scan_gog_web.isChecked(),
             "sidebar_chk_epic": self.mw.sidebar.chk_scan_epic.isChecked(),
             "sidebar_chk_local": self.mw.sidebar.chk_scan_local.isChecked(),
-            "sidebar_chk_folders": checked_folders
+            "sidebar_chk_folders": checked_folders,
+            "download_images": self.mw.sidebar.chk_scan_dl_images.isChecked()
         })
 
         if "platform_map" not in lib_settings:
@@ -605,10 +694,23 @@ class LibraryController(QObject):
             if not gog_enabled: self.mw.sidebar.chk_scan_gog_web.setChecked(False)
             else: self.mw.sidebar.chk_scan_gog_web.setChecked(lib_settings.get("sidebar_chk_gog_web", False))
 
+            # WHY: Strict Token Check - Evaluate Epic Games login status on boot to prevent permanent checkbox lockouts.
+            try:
+                from backend.epic.login_epic import is_epic_connected
+                epic_enabled = is_epic_connected()
+            except ImportError: epic_enabled = False
+            self.mw.epic_connected_cache = epic_enabled
+            
+            self.mw.sidebar.chk_scan_epic.setEnabled(epic_enabled)
+            if not epic_enabled: self.mw.sidebar.chk_scan_epic.setChecked(False)
+            else: self.mw.sidebar.chk_scan_epic.setChecked(lib_settings.get("sidebar_chk_epic", False))
             
             self.mw.sidebar.chk_scan_local.setEnabled(enable_local)
             if not enable_local: self.mw.sidebar.chk_scan_local.setChecked(False)
             else: self.mw.sidebar.chk_scan_local.setChecked(lib_settings.get("sidebar_chk_local", False))
+            
+            # WHY: Sync the new Scan Options checkbox with the loaded JSON settings perfectly on boot.
+            self.mw.sidebar.chk_scan_dl_images.setChecked(lib_settings.get("download_images", True))
             
             # WHY: Update the scan button state based on the loaded checkbox configuration
             self.mw.sidebar.update_scan_button_state()

@@ -1,5 +1,5 @@
 {
-    "geometry": "AdnQywADAAAAABQAAAAAegAAG38AAASJAAAUAQAAAKEAABcgAAAC+AAAAAICAAAAB4AAABQAAAAAmQAAG38AAASJ",
+    "geometry": "AdnQywADAAAAABQAAAAAegAAG38AAASJAAAYXwAAAKEAABt+AAAC+AAAAAICAAAAB4AAABQAAAAAmQAAG38AAASJ",
     "checked_platforms": [
         "Amazon",
         "Battle.net",
@@ -12,13 +12,13 @@
     "theme": "System",
     "language": "English",
     "card_size": 200,
-    "db_path": "C:/Users/mad_e/OneDrive/Batch Collection/ViGaVault/VGVDB.csv",
+    "db_path": "C:/Users/mad_e/OneDrive/Batch Collection/ViGaVault/dan.csv",
     "card_image_size": 175,
     "card_button_size": 50,
     "card_text_size": 20,
     "date_format": "DD/MM/YYYY",
     "splitter_sizes": [
-        1391,
-        525
+        1276,
+        640
     ]
 }

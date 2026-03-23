@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QMessageBox, QApplication
 from PySide6.QtGui import QAction, QPalette
 
 from ViGaVault_utils import translator
-from dialogs import MediaManagerDialog, StatisticsDialog, SettingsDialog, DocumentationDialog, MetadataManagerDialog
+from dialogs import MediaManagerDialog, StatisticsDialog, SettingsDialog, DocumentationDialog, MetadataManagerDialog, GameManagerDialog
 
 class MenuController(QObject):
     def __init__(self, main_window):
@@ -48,6 +48,10 @@ class MenuController(QObject):
         action_metadata_manager.triggered.connect(self.show_metadata_manager)
         tools_menu.addAction(action_metadata_manager)
         
+        action_game_manager = QAction(translator.tr("menu_tools_game_manager"), self.mw)
+        action_game_manager.triggered.connect(self.show_game_manager)
+        tools_menu.addAction(action_game_manager)
+        
         action_stats = QAction(translator.tr("menu_tools_stats"), self.mw)
         action_stats.triggered.connect(self.show_statistics)
         tools_menu.addAction(action_stats)
@@ -84,6 +88,14 @@ class MenuController(QObject):
             QMessageBox.warning(self.mw, "Warning", translator.tr("msg_wait_for_scan"))
             return
         dlg = MetadataManagerDialog(self.mw)
+        dlg.exec()
+
+    def show_game_manager(self):
+        # WHY: Block game manager access during a full scan to prevent data corruption via race conditions during batch edits.
+        if self.mw.full_scan_in_progress:
+            QMessageBox.warning(self.mw, "Warning", translator.tr("msg_wait_for_scan"))
+            return
+        dlg = GameManagerDialog(self.mw)
         dlg.exec()
 
     def show_statistics(self):

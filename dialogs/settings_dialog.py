@@ -631,7 +631,7 @@ class SettingsDialog(QDialog):
         simple_layout.addWidget(self.btn_switch_advanced, 1, 0, 1, 4)
         
         self.struct_layout.addWidget(self.mode_simple_widget, 2, 0, 1, 4)
-
+ 
         self.mode_advanced_widget = QWidget()
         
         adv_layout = QVBoxLayout(self.mode_advanced_widget)
@@ -755,8 +755,12 @@ class SettingsDialog(QDialog):
         self.galaxy_db_input.setText(lib_settings.get("galaxy_db_path", self.galaxy_db_input.text()))
         self.toggle_galaxy_input(self.chk_enable_galaxy.isChecked())
         
-        # WHY: Ensure the dialog reads the saved state from disk on open.
-        self.chk_download_images.setChecked(lib_settings.get("download_images", False))
+        # WHY: Smart Sync - Read the live RAM state directly from the sidebar UI if it exists, bypassing the slower disk state to prevent desyncs.
+        if self.parent_window and hasattr(self.parent_window, 'sidebar'):
+            self.chk_download_images.setChecked(self.parent_window.sidebar.chk_scan_dl_images.isChecked())
+        else:
+            self.chk_download_images.setChecked(lib_settings.get("download_images", True))
+            
         default_image_path = os.path.join(BASE_DIR, "images")
         self.image_path_input.setText(lib_settings.get("image_path", default_image_path))
         self.original_image_path = self.image_path_input.text()
@@ -916,6 +920,11 @@ class SettingsDialog(QDialog):
             self.parent_window.sidebar.update_scan_button_state()
             self.initial_galaxy = new_galaxy
             self.initial_gog_web = new_gog_web
+            
+        # WHY: Push the dialog's visual state back into the Sidebar's live physical checkbox.
+        new_dl_images = self.chk_download_images.isChecked()
+        if self.parent_window and hasattr(self.parent_window, 'sidebar'):
+            self.parent_window.sidebar.chk_scan_dl_images.setChecked(new_dl_images)
             
         if self.parent_window and hasattr(self.parent_window, 'library_controller'):
             self.parent_window.library_controller.refresh_scan_folders_ui()

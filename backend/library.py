@@ -131,7 +131,18 @@ class LibraryManager:
         # Windows case-sensitivity bug where 'Game.jpg' in DB didn't match 'game.jpg' on disk, 
         # causing the app to erroneously flag the image as missing and trigger massive re-downloads.
         img_set = {f.lower() for f in os.listdir(self.config.get('image_path', ''))} if os.path.exists(self.config.get('image_path', '')) else set()
-        root_accessible = os.path.exists(self.config.get('root_path', ''))
+        
+        root_path = self.config.get('root_path', '')
+        root_accessible = os.path.exists(root_path)
+
+        # WHY: Smart Refresh - Instead of hitting os.path.exists() on a NAS drive for every single game's subfolder,
+        # we perform one single os.listdir() on the root path and cache the existing folders in RAM.
+        # This turns a potential 30-second network I/O bottleneck into a 0.01-second memory lookup.
+        local_folders_cache = set()
+        if root_accessible:
+            try:
+                local_folders_cache = {f for f in os.listdir(root_path)}
+            except: pass
 
         for folder, game in self.games.items():
             old_img = str(game.data.get('Has_Image')).lower() in ['true', '1']
@@ -143,7 +154,15 @@ class LibraryManager:
             new_loc = old_loc
             if root_accessible:
                 path_root = game.data.get('Path_Root', '')
-                new_loc = bool(path_root and os.path.exists(path_root))
+                if path_root:
+                    try:
+                        rel_path = os.path.relpath(path_root, root_path)
+                        top_folder = rel_path.split(os.sep)[0]
+                        new_loc = top_folder in local_folders_cache
+                    except:
+                        new_loc = os.path.exists(path_root)
+                else:
+                    new_loc = False
 
             if new_img != old_img or new_loc != old_loc:
                 game.data['Has_Image'] = new_img
@@ -203,6 +222,8 @@ class LibraryManager:
                 cover_url_raw = game.data.get('Cover_URL', '')
                 if cover_url_raw:
                     url_candidates = [u.strip() for u in cover_url_raw.split('|') if u.strip().startswith('http')]
+                    active_candidates = url_candidates.copy()
+                    success = False
                     for cover_url in url_candidates:
                         try:
                             # WHY: Clean the URL of trailing parameters for a safe file extension extraction.
@@ -218,10 +239,12 @@ class LibraryManager:
                                 game.data['Image_Link'] = f"{safe_filename}{ext}"
                                 game.data['Has_Image'] = True
                                 changes_made = True
+                                success = True
                                 break
                                 
                             headers = {'User-Agent': 'Mozilla/5.0'}
-                            response = requests.get(cover_url, stream=True, timeout=10, headers=headers)
+                            # WHY: Reduce timeout strictly to 3 seconds to prevent massive delays when a server is unresponsive.
+                            response = requests.get(cover_url, stream=True, timeout=3, headers=headers)
                             if response.status_code == 200:
                                 os.makedirs(images_dir, exist_ok=True)
                                 with open(save_path, 'wb') as f:
@@ -230,11 +253,24 @@ class LibraryManager:
                                 game.data['Has_Image'] = True
                                 stats['downloads'] += 1
                                 changes_made = True
+                                success = True
                                 
                                 action_title = f"Cover Download : {folder}"
                                 logging.info(f"|{action_title[:55]:<55}| Img: Yes | Trl: --- |")
                                 break # Stop trying fallbacks once we succeed!
+                            elif response.status_code in [404, 403]:
+                                # WHY: If the link is permanently dead (404/403), remove it from active candidates.
+                                if cover_url in active_candidates:
+                                    active_candidates.remove(cover_url)
                         except Exception as e: pass
+                    
+                    if not success:
+                        # WHY: If all downloads failed, overwrite the Cover_URL field in the DB to physically 
+                        # erase dead links. This prevents the scanner from infinitely retrying them on every scan.
+                        new_cover_raw = "|".join(active_candidates)
+                        if game.data.get('Cover_URL') != new_cover_raw:
+                            game.data['Cover_URL'] = new_cover_raw
+                            changes_made = True
 
         if changes_made: self.save_db()
         

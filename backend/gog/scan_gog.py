@@ -77,13 +77,17 @@ def scan_gog_account(config, games_dict, worker_thread=None):
                 existing_gog_map[int(gid[4:])] = game
 
     cloud_ids = set(cloud_games.keys())
-    new_ids = cloud_ids - set(existing_gog_map.keys())
+    
+    # WHY: Targeted Update - Skip games purely based on whether they already possess the GOG ID. 
+    # This completely prevents infinite "Merge" loops on Goodie packs or DLCs that lack IGDB metadata and fall into NEEDS_ATTENTION.
+    skip_ids = set(existing_gog_map.keys())
+    new_ids = cloud_ids - skip_ids
 
     changes_made = False
 
     stats = {
         'total_cloud': len(cloud_ids),
-        'already_in_db': len(set(existing_gog_map.keys()) & cloud_ids),
+        'already_in_db': len(cloud_ids & skip_ids),
         'new_to_fetch': len(new_ids),
         'matched_smart': 0,
         'new_added': 0,

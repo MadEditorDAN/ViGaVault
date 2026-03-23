@@ -10,7 +10,7 @@
     },
     "enable_galaxy_db": false,
     "galaxy_db_path": "C:\\ProgramData\\GOG.com\\Galaxy\\storage\\galaxy-2.0.db",
-    "download_images": false,
+    "download_images": true,
     "image_path": "c:\\Users\\mad_e\\OneDrive\\Batch Collection\\ViGaVault\\images",
     "sort_desc": true,
     "sort_index": 0,
@@ -22,7 +22,7 @@
         "Platforms": false,
         "Genre": false
     },
-    "sidebar_chk_galaxy": false,
+    "sidebar_chk_galaxy": true,
     "sidebar_chk_gog_web": true,
     "sidebar_chk_epic": true,
     "sidebar_chk_local": false,

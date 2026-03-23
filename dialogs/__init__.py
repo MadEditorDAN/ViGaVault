@@ -8,6 +8,7 @@ from .statistics_dialog import StatisticsDialog, ProgressBarDelegate
 from .utility_dialogs import SelectionDialog, DocumentationDialog
 from .media_manager_dialog import MediaManagerDialog
 from .metadata_manager_dialog import MetadataManagerDialog
+from .game_manager_dialog import GameManagerDialog
 
 # Conditionally import WebEngine to prevent fatal crashes if the module isn't installed yet.
 try: from .login_browser_dialog import LoginBrowserDialog

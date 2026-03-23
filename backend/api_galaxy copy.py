@@ -348,33 +348,14 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
     
     if not (worker_thread and worker_thread.isInterruptionRequested()):
         ghosts_to_delete = []
-        
-        # WHY: Persistent Jurisdiction Check. Instead of relying on the temporary UI checkbox state, 
-        # physically check if the user has an active session for the native web scanners.
-        try:
-            from backend.gog.login_gog import is_gog_connected
-            gog_active = is_gog_connected()
-        except ImportError: gog_active = False
-            
-        try:
-            from backend.epic.login_epic import is_epic_connected
-            epic_active = is_epic_connected()
-        except ImportError: epic_active = False
-        
         for folder_name, game in games_dict.items():
             if not game.data.get('Path_Root'):
                 
-                # WHY: Absolute immunity for any game the user explicitly curated and locked.
-                if game.data.get('Status_Flag') == 'LOCKED':
-                    continue
-
-                platforms = [p.strip().lower() for p in game.data.get('Platforms', '').split(',') if p.strip()]
-                
-                # WHY: If native connectors are authenticated, forbid Galaxy from deleting their DLCs/Goodies
-                # even if the user temporarily unchecked them in the UI for a quick scan.
-                if 'gog' in platforms and gog_active:
-                    continue
-                if ('epic games store' in platforms or 'epic' in platforms) and epic_active:
+                # WHY: Jurisdiction Check - If the standalone GOG Web connector is active, 
+                # it acts as the absolute master for GOG games. Galaxy is forbidden from deleting 
+                # them just because they are Goodies or omitted from the Galaxy SQLite DB.
+                platforms = [p.strip() for p in game.data.get('Platforms', '').split(',') if p.strip()]
+                if 'GOG' in platforms and config.get('enable_gog_web', False):
                     continue
 
                 game_ids = [x.strip() for x in game.data.get('game_ID', '').split(',') if x.strip()]

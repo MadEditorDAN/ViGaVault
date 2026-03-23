@@ -46,10 +46,21 @@ def scan_epic_account(config, games_dict, worker_thread=None):
         cursor = meta.get("nextCursor") or data.get("nextCursor") or data.get("cursor")
         if not cursor: break
 
+    # WHY: Pre-calculate existing Epic games to rapidly skip known entries, avoiding heavy per-game API requests.
+    existing_epic_set = set()
+    for game in games_dict.values():
+        gids = game.data.get('game_ID', '').split(',')
+        for gid in gids:
+            gid = gid.strip()
+            if gid.startswith('epic_'):
+                existing_epic_set.add(gid.replace('epic_', ''))
+
     changes_made = False
+    igdb_token = None
 
     stats = {
         'total_cloud': len(records),
+        'already_in_db': 0,
         'processed': 0,
         'new_added': 0,
         'matched_smart': 0,
@@ -69,6 +80,12 @@ def scan_epic_account(config, games_dict, worker_thread=None):
         if not namespace or not catalog_item_id:
             stats['skipped'] += 1
             stats['ignored_titles'].append(str(app_name))
+            continue
+            
+        # WHY: Fast-path skip. If the game already has this exact Epic ID attached in the database, 
+        # strictly skip it regardless of Status_Flag to prevent infinite merge loops on DLCs/Unscrappable games.
+        if catalog_item_id in existing_epic_set:
+            stats['already_in_db'] += 1
             continue
             
         # WHY: Skip known developer tools and Engine components inherently polluting the library.
@@ -208,8 +225,12 @@ def scan_epic_account(config, games_dict, worker_thread=None):
             # WHY: Check if any core metadata is missing, and scan with IGDB to backfill.
             # We added Trailer_Link to the requirements so IGDB will fetch a YouTube trailer if Epic didn't provide an MP4.
             missing_meta = not all([game_obj.data.get(f) for f in ['Developer', 'Publisher', 'Genre', 'Summary', 'Original_Release_Date', 'Trailer_Link']])
-            if (missing_meta or not game_obj.data.get('Cover_URL')) and igdb_token:
-                game_obj.fill_missing_metadata(igdb_token)
+            if (missing_meta or not game_obj.data.get('Cover_URL')):
+                # WHY: Lazy load the IGDB token only when actually needed to minimize unneeded auth requests.
+                if not igdb_token:
+                    igdb_token = get_igdb_access_token()
+                if igdb_token:
+                    game_obj.fill_missing_metadata(igdb_token)
                 
             game_obj.data['Status_Flag'] = 'OK'
             img_ok = "Yes" if game_obj.data.get('Cover_URL') or game_obj.data.get('Image_Link') else "No "
@@ -229,6 +250,7 @@ def scan_epic_account(config, games_dict, worker_thread=None):
     # WHY: Dynamically append captured titles using exact space formatting so they cleanly indent under the colons.
     report = f"{' REPORT ':=^80}\n"
     report += f"Total Cloud    : {stats['total_cloud']}\n"
+    report += f"Already in DB  : {stats['already_in_db']}\n"
     report += f"New Added      : {stats['new_added']}\n"
     report += f"Smart Merged   : {stats['matched_smart']}\n"
     for t in stats['merged_titles']: report += f"                 {t}\n"

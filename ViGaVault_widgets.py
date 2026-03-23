@@ -9,14 +9,90 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, Q
                              QPushButton, QScrollArea, QFrame, QSizePolicy, QCheckBox, 
                              QLineEdit, QComboBox, QListWidget, QListWidgetItem, 
                              QMessageBox, QGroupBox, QApplication, QAbstractItemView, QMenu, QToolButton)
-from PySide6.QtCore import Qt, QSize, QEvent, QTimer
-from PySide6.QtGui import QIcon, QPixmap, QFont, QFontMetrics
+from PySide6.QtCore import Qt, QSize, QEvent, QTimer, Signal
+from PySide6.QtGui import QIcon, QPixmap, QFont, QFontMetrics, QStandardItemModel, QStandardItem
 
 from ViGaVault_utils import translator, get_image_path, get_root_path, DEFAULT_DISPLAY_SETTINGS
-from dialogs import ActionDialog
 from ViGaVault_workers import ImageLoader
 
 # --- CUSTOM WIDGETS ---
+class CheckableComboBox(QComboBox):
+    """WHY: Single Responsibility - Provides an Excel-style multi-select dropdown for column filtering."""
+    selection_changed = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setModel(QStandardItemModel(self))
+
+        # WHY: Make the combo box editable to naturally act as a search box with a dropdown arrow.
+        self.setEditable(True)
+        self.lineEdit().textEdited.connect(self.filter_items)
+        # WHY: Prevent the combo box from automatically selecting the first item and overriding our search text.
+        self.setInsertPolicy(QComboBox.NoInsert)
+
+        # WHY: Native model dataChanged accurately captures direct checkbox interactions.
+        self.model().dataChanged.connect(self.on_data_changed)
+        # WHY: Intercept clicks purely on the dropdown list to toggle checkboxes without forcibly closing the popup.
+        self.view().viewport().installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        if obj == self.view().viewport():
+            if event.type() == QEvent.MouseButtonRelease:
+                index = self.view().indexAt(event.pos())
+                if index.isValid():
+                    item = self.model().itemFromIndex(index)
+                    new_state = Qt.Unchecked if item.checkState() == Qt.Checked else Qt.Checked
+                    item.setCheckState(new_state)
+                # WHY: Always consume the release event to stop the QComboBox from natively closing.
+                return True
+            elif event.type() == QEvent.MouseButtonPress:
+                return True # Consume press to prevent native item selection from closing the popup
+        return super().eventFilter(obj, event)
+
+    def on_data_changed(self, topLeft, bottomRight, roles):
+        if Qt.CheckStateRole in roles or not roles:
+            self.selection_changed.emit()
+            self.reset_text()
+
+    def filter_items(self, text):
+        # WHY: Smart Refresh - Dynamically hide/show items in the dropdown list based on the search text.
+        search = text.lower()
+        for i in range(self.model().rowCount()):
+            item = self.model().item(i)
+            self.view().setRowHidden(i, search not in item.text().lower())
+
+    def hidePopup(self):
+        super().hidePopup()
+        self.reset_text()
+        # WHY: Clear the filter when the popup closes so the next time it opens, all options are visible.
+        self.filter_items("")
+
+    def reset_text(self):
+        # WHY: Display a clean translated summary of active filters when the box is closed.
+        checked = len(self.get_checked_items())
+        if checked > 0:
+            self.lineEdit().setText(translator.tr("filter_selected_count", count=checked))
+        else:
+            self.lineEdit().clear()
+
+    def get_checked_items(self):
+        checked = []
+        for i in range(self.model().rowCount()):
+            item = self.model().item(i)
+            if item.checkState() == Qt.Checked:
+                checked.append(item.text())
+        return checked
+
+    def add_item(self, text, checked=False):
+        item = QStandardItem(text)
+        item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+        item.setCheckState(Qt.Checked if checked else Qt.Unchecked)
+        self.model().appendRow(item)
+        
+    def clear_items(self):
+        self.model().clear()
+        self.lineEdit().clear()
+
 # A custom group box that can collapse its content to save space in the sidebar.
 class CollapsibleFilterGroup(QGroupBox):
     def __init__(self, title, parent_layout, parent=None):
@@ -366,6 +442,16 @@ class Sidebar(QWidget):
 
         # WHY: Add the group box without stretch, and append a stretch below it to push the groups to the top.
         self.scan_settings_layout.addWidget(self.grp_scan_local)
+        
+        # --- SCAN OPTIONS SECTION ---
+        self.grp_scan_options = QGroupBox(translator.tr("scan_settings_options"))
+        self.layout_scan_options = QGridLayout(self.grp_scan_options)
+        self.layout_scan_options.setAlignment(Qt.AlignTop)
+        
+        self.chk_scan_dl_images = QCheckBox(translator.tr("settings_data_media_download_images"))
+        self.layout_scan_options.addWidget(self.chk_scan_dl_images, 0, 0)
+        
+        self.scan_settings_layout.addWidget(self.grp_scan_options)
         self.scan_settings_layout.addStretch()
         
         self.btn_close_scan_settings = QPushButton(translator.tr("btn_close"))
@@ -509,6 +595,8 @@ class Sidebar(QWidget):
         self.findChild(QLabel, "scan_settings_title_lbl").setText(translator.tr("scan_settings_title"))
         self.grp_scan_platforms.setTitle(translator.tr("scan_settings_platforms"))
         self.grp_scan_local.setTitle(translator.tr("scan_settings_local"))
+        self.grp_scan_options.setTitle(translator.tr("scan_settings_options"))
+        self.chk_scan_dl_images.setText(translator.tr("settings_data_media_download_images"))
         self.btn_close_scan_settings.setText(translator.tr("btn_close"))
         self.btn_full_scan.setText(translator.tr("sidebar_btn_full_scan"))
         # Scan panel
@@ -895,6 +983,8 @@ class GameCard(QWidget):
                 self.buttons['folder'].setEnabled(False)
 
     def edit_game(self):
+        # WHY: Lazy import to completely break the circular dependency chain between the widget library and the dialogs package.
+        from dialogs import ActionDialog
         dlg = ActionDialog("dialog_edit_title", self.data, self.parent_window)
         if dlg.exec():
             new_data = dlg.get_data()

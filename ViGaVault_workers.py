@@ -8,18 +8,20 @@ from PySide6.QtCore import QThread, Signal, QRunnable, QObject
 from PySide6.QtGui import QImage
 
 from backend.library import LibraryManager
-from ViGaVault_utils import get_db_path, build_scanner_config
+from ViGaVault_utils import get_db_path, build_scanner_config, get_library_settings_file
+import json
 
 # --- WORKER THREADS ---
 # Operations like scanning or filtering can take time. We run them in separate threads
 # to prevent the GUI from freezing (becoming unresponsive) while they process.
 class FullScanWorker(QThread):
-    def __init__(self, do_galaxy=True, do_local=True, do_gog_web=False, do_epic=False, target_folders=None, parent=None):
+    def __init__(self, do_galaxy=True, do_local=True, do_gog_web=False, do_epic=False, do_download_images=True, target_folders=None, parent=None):
         super().__init__(parent)
         self.do_galaxy = do_galaxy
         self.do_local = do_local
         self.do_gog_web = do_gog_web
         self.do_epic = do_epic
+        self.do_download_images = do_download_images
         self.target_folders = target_folders
         self.config = build_scanner_config()
 
@@ -30,6 +32,7 @@ class FullScanWorker(QThread):
         self.config['enable_galaxy_db'] = self.do_galaxy
         self.config['enable_gog_web'] = self.do_gog_web
         self.config['enable_epic_web'] = self.do_epic
+        self.config['download_images'] = self.do_download_images
         
         if 'local_scan_config' not in self.config:
             self.config['local_scan_config'] = {}
@@ -128,6 +131,20 @@ class DbLoaderWorker(QThread):
                     df['Status_Flag'] = 'NEW'
                     
                 # WHY: Pass 1 - Strictly parse dates using the globally configured Regional Format to prevent day/month swapping.
+                
+                # WHY: Apply Exclusion Words globally to naturally fix the sidebar counter and permanently hide non-games from the UI.
+                lib_settings_file = get_library_settings_file()
+                if os.path.exists(lib_settings_file):
+                    try:
+                        with open(lib_settings_file, "r", encoding='utf-8') as f:
+                            settings = json.load(f)
+                            exclusions = settings.get("exclusion_words", [])
+                            if exclusions:
+                                pattern = '|'.join([re.escape(w) for w in exclusions])
+                                df = df[~df['Clean_Title'].str.contains(pattern, case=False, na=False)]
+                    except Exception as e:
+                        logging.error(f"Error applying exclusions: {e}")
+
                 parsed_dates = pd.to_datetime(df['Original_Release_Date'], format=date_fmt, errors='coerce')
                 # WHY: Pass 2 - Catch dates that failed (like pure "2020" years) and fallback to generic parsing.
                 mask = parsed_dates.isna() & (df['Original_Release_Date'] != '')
