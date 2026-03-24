@@ -6,8 +6,13 @@ __pycache__/
 # Tes logs et bases de données et images
 *.log
 *.csv
-./*.json
-./*.csv
+
+# retire les json du root
+/*.json 
+# mais garde ceux des sous-dossiers
+!/**/ *.json
+
+# Dossiers a ignorer
 images/
 videos/
 tools/
