@@ -1,5 +1,5 @@
 {
-    "geometry": "AdnQywADAAAAABQAAAAAegAAG38AAASJAAAYXwAAAKEAABt+AAAC+AAAAAICAAAAB4AAABQAAAAAmQAAG38AAASJ",
+    "geometry": "AdnQywADAAAAABQAAAAAegAAG38AAASJAAAUFwAAAQUAABpWAAAEiAAAAAICAAAAB4AAABQAAAAAmQAAG38AAASJ",
     "checked_platforms": [
         "Amazon",
         "Battle.net",
@@ -18,7 +18,7 @@
     "card_text_size": 20,
     "date_format": "DD/MM/YYYY",
     "splitter_sizes": [
-        1276,
-        640
+        1437,
+        479
     ]
 }

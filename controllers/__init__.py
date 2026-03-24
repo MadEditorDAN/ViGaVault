@@ -3,3 +3,5 @@ from .library_controller import LibraryController
 from .list_controller import ListController
 from .filter_controller import FilterController
 from .scan_controller import ScanController
+from .settings_controller import SettingsController
+from .game_operations_controller import GameOperationsController

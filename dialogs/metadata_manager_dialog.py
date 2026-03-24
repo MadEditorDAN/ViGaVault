@@ -149,6 +149,6 @@ class MetadataManagerDialog(QDialog):
         
         if reply == QMessageBox.Yes:
             field = self.combo_field.currentText()
-            if hasattr(self.parent_window, 'library_controller'):
-                self.parent_window.library_controller.batch_delete_metadata(field, items_to_delete)
+            if hasattr(self.parent_window, 'game_operations_controller'):
+                self.parent_window.game_operations_controller.batch_delete_metadata(field, items_to_delete)
             self.populate_list()

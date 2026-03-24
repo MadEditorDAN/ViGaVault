@@ -1,7 +1,7 @@
 import pandas as pd
 from PySide6.QtCore import Qt, QTimer, QObject, QAbstractListModel, QModelIndex, QSize
 from PySide6.QtWidgets import QStyledItemDelegate, QAbstractItemView
-from ViGaVault_widgets import GameCard
+from widgets import GameCard
 from ViGaVault_utils import DEFAULT_DISPLAY_SETTINGS
 
 class GameListModel(QAbstractListModel):

@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                                QHeaderView, QCheckBox, QFormLayout, QMessageBox, QStyledItemDelegate)
 from PySide6.QtCore import Qt, QAbstractTableModel, QTimer, Signal
 from ViGaVault_utils import translator, get_library_settings_file, center_window
-from ViGaVault_widgets import CheckableComboBox
+from widgets import CheckableComboBox
 
 class ReadOnlyTextDelegate(QStyledItemDelegate):
     """WHY: Single Responsibility - Provides a read-only text editor to allow users to select and copy partial text without risking accidental modifications."""
@@ -321,8 +321,8 @@ class GameManagerDialog(QDialog):
             QMessageBox.No
         )
         if reply == QMessageBox.Yes:
-            if hasattr(self.parent_window, 'library_controller'):
-                self.parent_window.library_controller.batch_delete_games(selected_folders)
+            if hasattr(self.parent_window, 'game_operations_controller'):
+                self.parent_window.game_operations_controller.batch_delete_games(selected_folders)
             self.load_data()
 
     def request_batch_edit(self):
@@ -332,8 +332,8 @@ class GameManagerDialog(QDialog):
         dlg = BatchEditDialog(len(selected_folders), self)
         if dlg.exec():
             new_data = dlg.get_data()
-            if new_data and hasattr(self.parent_window, 'library_controller'):
-                self.parent_window.library_controller.batch_update_games(selected_folders, new_data)
+            if new_data and hasattr(self.parent_window, 'game_operations_controller'):
+                self.parent_window.game_operations_controller.batch_update_games(selected_folders, new_data)
                 self.load_data()
 
     def load_exclusions(self):

@@ -2,7 +2,7 @@ import os
 import json
 from PySide6.QtCore import QObject, Qt, Slot, QTimer
 from PySide6.QtWidgets import QPushButton, QCheckBox, QApplication, QSizePolicy, QAbstractItemView
-from ViGaVault_widgets import CollapsibleFilterGroup
+from widgets import CollapsibleFilterGroup
 from ViGaVault_workers import FilterWorker
 from ViGaVault_utils import get_library_settings_file
 
