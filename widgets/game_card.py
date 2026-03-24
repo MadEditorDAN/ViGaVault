@@ -221,7 +221,7 @@ class GameCard(QWidget):
             if not props['enabled'] and name in ['youtube', 'folder']:
                 icon_to_load = f"{name}_disabled"
 
-            icon_path = f"assets/{icon_to_load}.png"
+            icon_path = f"assets/images/{icon_to_load}.png"
             if not os.path.exists(icon_path):
                 icon_path = f"icons/{icon_to_load}.png"
 

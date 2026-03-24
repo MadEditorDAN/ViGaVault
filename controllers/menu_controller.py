@@ -108,7 +108,7 @@ class MenuController(QObject):
                     content = f.read()
                     assets_dir = os.path.join(base_path, "assets").replace("\\", "/")
                     bg_color = QApplication.palette().color(QPalette.Window)
-                    logo_file = "MadEditor_Logo_Dark.png" if bg_color.lightness() < 128 else "MadEditor_Logo_Light.png"
+                    logo_file = "images/MadEditor_Logo_Dark.png" if bg_color.lightness() < 128 else "images/MadEditor_Logo_Light.png"
                     content = content.replace("{assets_path}", assets_dir)
                     return content.replace("{logo_filename}", logo_file)
             except Exception as e:

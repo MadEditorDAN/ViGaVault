@@ -155,7 +155,7 @@ class MediaManagerDialog(QDialog):
         # WHY: Smart Refresh - Freeze layout, pre-allocate rows, and cache disk items to prevent a repaint avalanche.
         self.table.setUpdatesEnabled(False)
         self.table.setRowCount(len(missing_games))
-        folder_icon = QIcon("assets/folder.png") if os.path.exists("assets/folder.png") else None
+        folder_icon = QIcon("assets/images/folder.png") if os.path.exists("assets/images/folder.png") else None
         
         for row, game_info in enumerate(sorted(missing_games, key=lambda x: x['title'].lower())):
             self.add_table_row(row, game_info, check_img, check_trl, folder_icon)
