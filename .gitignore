@@ -8,6 +8,7 @@ __pycache__/
 *.csv
 images/
 videos/
+tools/
 INSTRUCTIONS.md
 todo.txt
 DAN-todo.txt
