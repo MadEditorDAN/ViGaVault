@@ -1,0 +1,24 @@
+{
+    "geometry": "AdnQywADAAAAABQAAAAAegAAG38AAASJAAAUFwAAAQUAABpWAAAEiAAAAAICAAAAB4AAABQAAAAAmQAAG38AAASJ",
+    "checked_platforms": [
+        "Amazon",
+        "Battle.net",
+        "Epic Games Store"
+    ],
+    "scroll_value": 0,
+    "chk_new": false,
+    "chk_a_tester": false,
+    "chk_vr": false,
+    "theme": "System",
+    "language": "English",
+    "card_size": 200,
+    "db_path": "C:/Users/mad_e/OneDrive/Batch Collection/ViGaVault/VGVDB.csv",
+    "card_image_size": 175,
+    "card_button_size": 50,
+    "card_text_size": 20,
+    "date_format": "DD/MM/YYYY",
+    "splitter_sizes": [
+        1437,
+        479
+    ]
+}

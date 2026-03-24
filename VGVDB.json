@@ -1,0 +1,418 @@
+{
+    "sort_desc": true,
+    "sort_index": 2,
+    "checked_platforms": [
+        "Amazon",
+        "Battle.net",
+        "Epic Games Store"
+    ],
+    "search_text": "",
+    "scroll_value": 164084,
+    "chk_new": false,
+    "chk_a_tester": false,
+    "chk_vr": false,
+    "platform_map": {
+        "gog": "GOG",
+        "steam": "Steam",
+        "epic": "Epic Games Store",
+        "epic games store": "Epic Games Store",
+        "uplay": "Uplay",
+        "ubisoft": "Uplay",
+        "ubisoft connect": "Uplay",
+        "origin": "Origin",
+        "ea": "EA",
+        "ea app": "EA",
+        "amazon": "Amazon",
+        "amazon prime": "Amazon",
+        "battlenet": "Battle.net",
+        "battle.net": "Battle.net",
+        "rockstar": "Rockstar",
+        "bethesda": "Bethesda",
+        "itch": "itch.io",
+        "itch.io": "itch.io",
+        "discord": "Discord",
+        "ffxiv": "Final Fantasy XIV",
+        "kartridge": "Kartridge",
+        "minecraft": "Minecraft",
+        "oculus": "Oculus",
+        "paradox": "Paradox",
+        "riot": "Riot Games",
+        "stadia": "Stadia",
+        "totalwar": "Total War",
+        "twitch": "Twitch",
+        "wargaming": "Wargaming.net",
+        "winstore": "Windows Store",
+        "windows store": "Windows Store",
+        "beamdog": "Beamdog"
+    },
+    "ignored_prefixes": [
+        "humble",
+        "gmg",
+        "fanatical",
+        "nuuvem",
+        "indiegala",
+        "d2d",
+        "direct2drive",
+        "dotemu",
+        "fxstore",
+        "gamehouse",
+        "gamesessions",
+        "gameuk",
+        "playfire",
+        "weplay"
+    ],
+    "card_size": 200,
+    "root_path": "\\\\madhdd02\\Software\\GAMES",
+    "local_scan_config": {
+        "enable_local_scan": true,
+        "ignore_hidden": true,
+        "scan_mode": "advanced",
+        "global_type": "Genre",
+        "global_filter": true,
+        "folder_rules": {
+            "GAMES": {
+                "type": "Genre",
+                "filter": true,
+                "scan": true,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "GAMES COMPIL": {
+                "type": "Collection",
+                "filter": true,
+                "scan": true,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "GAMES VR": {
+                "type": "Genre",
+                "filter": true,
+                "scan": true,
+                "inject_enabled": true,
+                "inject_field": "Collection",
+                "inject_value": "V.R."
+            },
+            "GOG REPO": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "_TEMP": {
+                "type": "None",
+                "filter": false,
+                "scan": true,
+                "inject_enabled": true,
+                "inject_field": "Genre",
+                "inject_value": "_Not Tested Yet"
+            },
+            "1": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "11": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "12": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "13": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "2": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "3": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "4": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "5": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "6": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "7": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "70": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "8": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "9": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "ACTION": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "ARCADE": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "AVENTURE": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "BALL GAMES": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "COOP": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "DUNGEON CRAWLER": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "FIGHTING": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "FPS": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "KINGDOM-LIKE": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "ORIGINAL EXPERIENCE": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "PLATFORM": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "RACING": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "RAGE GAMES": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "REFLEXION": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "REMAKES": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "RPG": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "SIMULATIONS": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "SPACE SIM": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "SPORT": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "STRATEGY": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            },
+            "SURVIVAL": {
+                "type": "None",
+                "filter": false,
+                "scan": false,
+                "inject_enabled": false,
+                "inject_field": "Genre",
+                "inject_value": ""
+            }
+        }
+    },
+    "gog_db_path": "C:\\ProgramData\\GOG.com\\Galaxy\\storage\\galaxy-2.0.db",
+    "download_videos": false,
+    "scan_new": false,
+    "filter_states": {},
+    "enable_gog_db": true,
+    "video_path": "D:\\ViGaVault\\Videos",
+    "filter_expansion": {
+        "Platforms": false,
+        "Genre": false,
+        "Collection": false
+    },
+    "image_path": "D:\\ViGaVault\\Images",
+    "download_images": false,
+    "anchor_folder": "Dink Smallwood HD",
+    "sidebar_chk_gog": true,
+    "sidebar_chk_local": false,
+    "enable_galaxy_db": true,
+    "galaxy_db_path": "C:\\ProgramData\\GOG.com\\Galaxy\\storage\\galaxy-2.0.db",
+    "sidebar_chk_galaxy": false,
+    "sidebar_chk_gog_web": false,
+    "sidebar_chk_folders": [
+        "GAMES",
+        "GAMES COMPIL",
+        "GAMES VR",
+        "_TEMP"
+    ],
+    "sidebar_chk_epic": false,
+    "exclusion_words": [],
+    "view_new": false,
+    "view_dlc": false,
+    "view_review": false
+}
