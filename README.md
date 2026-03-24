@@ -36,9 +36,8 @@ ViGaVault is built on **Python** using the **PySide6 (Qt)** framework for a resp
 ViGaVault is actively evolving. Planned features include:
 
 *   **Migration to SQLite**: Transitioning the core database backend from CSV to SQLite. This will improve data integrity, handle even larger libraries more efficiently, and allow users to utilize tools like *DB Browser for SQLite* for manual administration.
-*   **Expanded Storefront Integrations**: Implementing native scanners for additional platforms currently stubbed in the UI, such as Amazon Games, Ubisoft Connect (Uplay), Battle.net, EA/Origin, Xbox, and PSN.
-*   **Pre-Scan Discovery Environment**: A robust data discovery tool that allows users to preview a platform's raw data dump *before* importing, giving granular control over exactly which metadata or media files are accepted into the vault.
-*   **Enhanced GameCard Customization**: Support for downloading and applying high-resolution background images (e.g., from GOG's repository) to serve as immersive backdrops for individual GameCards.
+*   **Expanded Storefront Integrations**: Implementing native scanners for additional platforms currently stubbed in the UI, such as Amazon Games, Ubisoft Connect (Uplay), Battle.net, EA/Origin, Xbox, etc...
+*   **Mobile version** : making a fully autonomous android version is the ultimate goal.
 
 ---
 
