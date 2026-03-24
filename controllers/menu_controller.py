@@ -3,7 +3,7 @@ from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QMessageBox, QApplication
 from PySide6.QtGui import QAction, QPalette
 
-from ViGaVault_utils import translator
+from ViGaVault_utils import translator, BASE_DIR
 from dialogs import MediaManagerDialog, StatisticsDialog, SettingsDialog, DocumentationDialog, MetadataManagerDialog, GameManagerDialog
 
 class MenuController(QObject):
@@ -99,14 +99,14 @@ class MenuController(QObject):
         dlg.exec()
 
     def load_html_asset(self, filename):
-        # Resolves path by going up one level out of the controllers folder
-        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        asset_path = os.path.join(base_path, "assets", filename)
+        # WHY: DRY Principle & Portability - Always use the centralized BASE_DIR instead of relative __file__ leaps 
+        # so path resolution remains perfectly accurate whether running as a script or compiled .exe.
+        asset_path = os.path.join(BASE_DIR, "assets", filename)
         if os.path.exists(asset_path):
             try:
                 with open(asset_path, "r", encoding="utf-8") as f:
                     content = f.read()
-                    assets_dir = os.path.join(base_path, "assets").replace("\\", "/")
+                    assets_dir = os.path.join(BASE_DIR, "assets").replace("\\", "/")
                     bg_color = QApplication.palette().color(QPalette.Window)
                     logo_file = "images/MadEditor_Logo_Dark.png" if bg_color.lightness() < 128 else "images/MadEditor_Logo_Light.png"
                     content = content.replace("{assets_path}", assets_dir)

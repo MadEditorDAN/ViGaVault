@@ -4,8 +4,9 @@ import os
 import json
 import requests
 import logging
+from ViGaVault_utils import BASE_DIR
 
-EPIC_DIR = os.path.dirname(os.path.abspath(__file__))
+EPIC_DIR = os.path.join(BASE_DIR, "backend", "epic")
 SESSION_FILE = os.path.join(EPIC_DIR, "epic_session.json")
 
 def is_epic_connected():

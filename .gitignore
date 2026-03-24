@@ -14,6 +14,7 @@ __pycache__/
 
 # Dossiers a ignorer
 images/
+dist/
 !assets/images/
 videos/
 tools/

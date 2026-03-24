@@ -2,8 +2,9 @@
 import os
 import json
 import requests
+from ViGaVault_utils import BASE_DIR
 
-GOG_DIR = os.path.dirname(os.path.abspath(__file__))
+GOG_DIR = os.path.join(BASE_DIR, "backend", "gog")
 SESSION_FILE = os.path.join(GOG_DIR, "gog_session.json")
 
 def is_gog_connected():

@@ -1,6 +1,7 @@
 # WHY: Extracted utility, configuration, and theming logic into a separate module 
 # to keep the main UI file cleaner and more maintainable.
 import os
+import sys
 import json
 import re
 import logging
@@ -10,7 +11,13 @@ from PySide6.QtWidgets import QApplication, QStyleFactory
 from PySide6.QtGui import QPalette, QColor
 from PySide6.QtCore import Qt, QObject, Signal
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if getattr(sys, 'frozen', False):
+    # WHY: When compiled with PyInstaller in "One-Folder" mode, the application runs directly from the .exe.
+    # This anchors all generated data (settings, DB, images) physically next to the executable, ensuring true portability.
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 
 
@@ -276,7 +283,8 @@ class Translator:
     def __init__(self):
         self.translations = {}
         self.language = "English"
-        self.base_path = os.path.dirname(os.path.abspath(__file__))
+        # WHY: DRY Principle - Safely inherits the centralized environment path instead of risking __file__ archive traps.
+        self.base_path = BASE_DIR
 
     def load_language(self, language):
         self.language = language
