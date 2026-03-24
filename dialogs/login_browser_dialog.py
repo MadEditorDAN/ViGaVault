@@ -15,11 +15,7 @@ class SilentWebEnginePage(QWebEnginePage):
 
 class LoginBrowserDialog(QDialog):
     def __init__(self, start_url, target_cookies=None, success_url=None, parent=None):
-        # WHY: Passing None caused the dialog to detach from the main window. When it lost focus, 
-        # it fell behind the main app, creating an invisible modal block (causing the Windows error beeps).
-        # We restore the parent hierarchy so it stays firmly locked on top of the Settings window.
         super().__init__(parent)
-        logging.info(f"[LOGIN BROWSER] Initializing dialog. Target cookies: {target_cookies}, Success URL: {success_url}")
         self.setWindowTitle("Secure Platform Login")
         self.resize(*DIALOG_STD_SIZE)
         center_window(self, parent)
@@ -35,11 +31,7 @@ class LoginBrowserDialog(QDialog):
         layout.setContentsMargins(0, 0, 0, 0)
         
         self.browser = QWebEngineView()
-        
-        # WHY: Now that we use the async dlg.open() in the parent, the C++ memory crash is fixed. 
-        # We can safely return to an Off-The-Record (Incognito) profile. This completely eliminates 
-        # the asynchronous disk-read race condition that caused the Epic CSRF "Incorrect response" mismatch!
-        self.profile = QWebEngineProfile(self)
+        self.profile = QWebEngineProfile()
         
         # WHY: Explicitly force full capabilities so third-party CAPTCHAs (hCaptcha/Arkose) don't get blocked.
         settings = self.profile.settings()
@@ -54,15 +46,15 @@ class LoginBrowserDialog(QDialog):
         default_ua = self.profile.httpUserAgent()
         stealth_ua = re.sub(r'QtWebEngine/[\d\.]+\s', '', default_ua)
         self.profile.setHttpUserAgent(stealth_ua)
-        logging.info(f"[LOGIN BROWSER] Default UA: {default_ua}")
-        logging.info(f"[LOGIN BROWSER] Stealth UA: {stealth_ua}")
         
         self.cookie_store = self.profile.cookieStore()
+        self.page = SilentWebEnginePage(self.profile, self.browser)
+        # WHY: Explicitly make the profile a child of the page. This guarantees that the profile's memory outlives the page,
+        # preventing the "Release of profile requested" C++ warning during shutdown by enforcing a clean destruction order.
+        self.profile.setParent(self.page)
         
         # WHY: Off-The-Record profiles start completely empty in RAM, so we don't need deleteAllCookies().
         self.cookie_store.cookieAdded.connect(self.on_cookie_added)
-        
-        self.page = SilentWebEnginePage(self.profile, self.browser)
         self.browser.setPage(self.page)
         self.browser.urlChanged.connect(self.on_url_changed)
         
@@ -71,12 +63,10 @@ class LoginBrowserDialog(QDialog):
         layout.addWidget(self.browser)
 
     def keyPressEvent(self, event):
-        logging.info(f"[LOGIN BROWSER] Key pressed: {event.key()}")
         # WHY: QDialog inherently closes itself when Enter or Escape is pressed. 
         # We intercept and ignore these keys so that typing Enter in the Epic 
         # login forms submits the web form instead of violently terminating the dialog.
         if event.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Escape):
-            logging.info("[LOGIN BROWSER] Blocked QDialog auto-close from Enter/Escape key.")
             # WHY: Explicitly accept the event so it doesn't bubble up and accidentally trigger the parent dialog's default buttons.
             event.accept()
             return
@@ -86,7 +76,6 @@ class LoginBrowserDialog(QDialog):
         name = cookie.name().data().decode('utf-8')
         val = cookie.value().data().decode('utf-8')
         self.cookies[name] = val
-        logging.info(f"[LOGIN BROWSER] Cookie received: {name}")
         
         # WHY: A persistent profile asynchronously loads old cookies from disk on boot.
         # To prevent instantly false-triggering on an old EPIC_SSO ghost cookie before deleteAllCookies() 
@@ -94,17 +83,12 @@ class LoginBrowserDialog(QDialog):
         # and log in within 3 seconds, so any target cookie arriving this early is definitively a ghost.
         if not self.success_triggered and name in self.target_cookies:
             time_passed = time.time() - self.boot_time
-            logging.info(f"[LOGIN BROWSER] Target cookie '{name}' matched! Time since boot: {time_passed:.2f}s")
             if time_passed > 3.0:
-                logging.info("[LOGIN BROWSER] Grace period passed. Triggering success.")
                 self.trigger_success()
-            else:
-                logging.info("[LOGIN BROWSER] Ignored as a ghost cookie (arrived too fast).")
             
     def on_url_changed(self, url):
         # WHY: Fallback success detection. If the user lands on their account page, we know they logged in successfully.
         url_str = url.toString()
-        logging.info(f"[LOGIN BROWSER] URL changed to: {url_str}")
         if not self.success_triggered and self.success_url and self.success_url in url_str:
             from urllib.parse import urlparse, parse_qs
             parsed_url = urlparse(url_str)
@@ -114,58 +98,19 @@ class LoginBrowserDialog(QDialog):
             active_page = f"{parsed_url.netloc}{parsed_url.path}"
             
             if self.success_url in active_page:
-                logging.info(f"[LOGIN BROWSER] Success URL '{self.success_url}' matched in active page!")
                 qs = parse_qs(parsed_url.query)
                 if 'code' in qs:
                     self.auth_code = qs['code'][0]
-                    logging.info("[LOGIN BROWSER] Auth code extracted from URL.")
                 self.trigger_success()
             
     def trigger_success(self):
         self.success_triggered = True
         # WHY: Wait 1.5 seconds before closing. This ensures all lingering cookies from the final HTTP response 
         # are fully intercepted and written to our dictionary before the web engine shuts down.
-        logging.info("[LOGIN BROWSER] trigger_success() called. Dialog will accept() in 1.5 seconds.")
         QTimer.singleShot(1500, self.accept)
         
     def closeEvent(self, event):
-        logging.info("[LOGIN BROWSER] closeEvent triggered. Shutting down browser...")
+        # WHY: Simplified cleanup. Qt's parent-child memory management will now handle the destruction
+        # of the page and profile in the correct order when the dialog is deleted.
         self.browser.stop()
-        
-        # WHY: Reverting to the exact C++ parent detachment sequence that successfully solved this issue for GOG.
-        self.browser.setPage(None)
-
-        if getattr(self, 'page', None):
-            self.page.deleteLater()
-            self.page = None
-            
-        if getattr(self, 'profile', None):
-            self.profile.setParent(None)
-            self.profile.deleteLater()
-            self.profile = None
-        
         super().closeEvent(event)
-
-    # =========================================================================
-    # WHY: DIAGNOSTIC TRACEBACKS
-    # These overrides will physically intercept the closure commands and dump 
-    # the exact Python/C++ call stack that ordered the window to die.
-    # =========================================================================
-    def done(self, r):
-        logging.error(f"[LOGIN BROWSER] >>> done({r}) WAS CALLED! Generating Traceback: <<<")
-        import traceback
-        for line in traceback.format_stack()[:-1]:
-            logging.error("    " + line.strip().replace('\n', ' | '))
-        super().done(r)
-        
-    def accept(self):
-        logging.error("[LOGIN BROWSER] >>> accept() WAS CALLED! <<<")
-        super().accept()
-        
-    def reject(self):
-        logging.error("[LOGIN BROWSER] >>> reject() WAS CALLED! <<<")
-        super().reject()
-        
-    def hideEvent(self, event):
-        logging.info(f"[LOGIN BROWSER] hideEvent triggered. Spontaneous: {event.spontaneous()}")
-        super().hideEvent(event)

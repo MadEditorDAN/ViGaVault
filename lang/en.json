@@ -233,8 +233,6 @@
     "dialog_switch_lib_exist_title": "Existing Database",
     "dialog_switch_lib_exist_msg": "This is an existing database.\nDo you want to load this file?",
     "msg_local_path_mandatory": "A Main Path is mandatory to scan for local copies.",
-    "msg_epic_login_instructions": "To securely connect Epic Games, we will use your Browser:\n\n1 - Your browser will open (Chrome, Firefox, Edge, etc...)\n2 - Log in to Epic Games Store\n3 - After login in, you will see some text.\n4 - Copy the whole text (Click on the page, CTRL-A, CTRL-C)\n5 - Paste the text (CTRL-V) in the Token windows (CTRL-V)\n\nClick OK to open your browser.",
-    "msg_epic_login_title": "Epic Games Store",
     "msg_epic_input_title": "Token",
     "msg_epic_input_prompt": "Paste the text (CTRL-V) here:",
     "msg_epic_invalid_code": "Could not find a valid 32-character authorization code in your input.",

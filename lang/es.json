@@ -233,8 +233,6 @@
     "dialog_switch_lib_exist_title": "Base de datos existente",
     "dialog_switch_lib_exist_msg": "Esta es una base de datos existente.\n¿Desea cargar este archivo?",
     "msg_local_path_mandatory": "Es obligatorio especificar una Ruta Principal para escanear copias locales.",
-    "msg_epic_login_instructions": "Para conectar Epic Games de forma segura, usaremos su navegador:\n\n1 - Su navegador se abrirá (Chrome, Firefox, Edge, etc...)\n2 - Inicie sesión en Epic Games Store\n3 - Después de iniciar sesión, verá un texto.\n4 - Copie todo el texto (Haga clic en la página, CTRL-A, CTRL-C)\n5 - Pegue el texto (CTRL-V) en la ventana Token (CTRL-V)\n\nHaga clic en Aceptar para abrir su navegador.",
-    "msg_epic_login_title": "Epic Games Store",
     "msg_epic_input_title": "Token",
     "msg_epic_input_prompt": "Pegue el texto (CTRL-V) aquí:",
     "msg_epic_invalid_code": "No se pudo encontrar un código de autorización válido de 32 caracteres en su entrada.",

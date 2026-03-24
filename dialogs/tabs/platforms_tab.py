@@ -63,6 +63,11 @@ class PlatformsTabWidget(QWidget):
                     from backend.epic.login_epic import is_epic_connected
                     is_connected = is_epic_connected()
                 except ImportError: pass
+            elif p_id == "steam":
+                try:
+                    from backend.steam.login_steam import is_steam_connected
+                    is_connected = is_steam_connected()
+                except ImportError: pass
             
             btn_connect = QPushButton()
             self.update_platform_btn_ui(btn_connect, is_connected)
@@ -100,7 +105,10 @@ class PlatformsTabWidget(QWidget):
                 self.connection_changed.emit("gog", False)
             else:
                 oauth_url = "https://auth.gog.com/auth?client_id=46899977096215655&redirect_uri=https://embed.gog.com/on_login_success%3Forigin%3Dclient&response_type=code&layout=client2"
-                dlg = LoginBrowserDialog(oauth_url, success_url="on_login_success", parent=self)
+                # WHY: Set parent to None and use ApplicationModal to create a non-blocking but globally modal window, preventing both deadlocks and input rejection.
+                dlg = LoginBrowserDialog(oauth_url, success_url="on_login_success", parent=None)
+                dlg.setWindowModality(Qt.ApplicationModal)
+                self._active_dlg = dlg
                 
                 def on_gog_finished(result):
                     def handle_gog_result():
@@ -110,12 +118,13 @@ class PlatformsTabWidget(QWidget):
                                 save_gog_session(token_data)
                                 self.update_platform_btn_ui(btn, True)
                                 self.connection_changed.emit("gog", True)
-                            else: QMessageBox.warning(self, "Login Failed", "Failed to negotiate OAuth token with GOG.")
-                        else: QMessageBox.warning(self, "Login Failed", translator.tr("msg_login_failed"))
+                            else: QMessageBox.warning(self.window(), "Login Failed", "Failed to negotiate OAuth token with GOG.")
+                        else: QMessageBox.warning(self.window(), "Login Failed", translator.tr("msg_login_failed"))
                         dlg.deleteLater()
                     QTimer.singleShot(100, handle_gog_result)
+                    self._active_dlg = None
                 dlg.finished.connect(on_gog_finished)
-                dlg.open()
+                dlg.show()
                 
         elif platform_id == "epic":
             from backend.epic.login_epic import is_epic_connected, disconnect_epic, exchange_code_for_token, save_epic_session
@@ -124,24 +133,53 @@ class PlatformsTabWidget(QWidget):
                 self.update_platform_btn_ui(btn, False)
                 self.connection_changed.emit("epic", False)
             else:
-                instruction_msg = translator.tr("msg_epic_login_instructions")
-                reply = QMessageBox.information(self, translator.tr("msg_epic_login_title"), instruction_msg, QMessageBox.Ok | QMessageBox.Cancel)
-                if reply == QMessageBox.Ok:
-                    oauth_url = "https://www.epicgames.com/id/login?redirectUrl=https%3A%2F%2Fwww.epicgames.com%2Fid%2Fapi%2Fredirect%3FclientId%3D34a02cf8f4414e29b15921876da36f9a%26responseType%3Dcode"
-                    webbrowser.open(oauth_url)
-                    def prompt_token():
-                        code_input, ok = QInputDialog.getText(self, translator.tr("msg_epic_input_title"), translator.tr("msg_epic_input_prompt"))
-                        if ok and code_input:
-                            match = re.search(r'([a-fA-F0-9]{32})', code_input)
-                            if match:
-                                auth_code = match.group(1)
-                                token_data = exchange_code_for_token(auth_code)
-                                if token_data and 'access_token' in token_data:
-                                    save_epic_session(token_data)
-                                    self.update_platform_btn_ui(btn, True)
-                                    self.connection_changed.emit("epic", True)
-                                else: QMessageBox.warning(self, "Login Failed", translator.tr("msg_epic_token_failed"))
-                            else: QMessageBox.warning(self, "Login Failed", translator.tr("msg_epic_invalid_code"))
-                    QTimer.singleShot(200, prompt_token)
+                # WHY: Bypassed the instructional popup to instantly launch the external browser.
+                oauth_url = "https://www.epicgames.com/id/login?redirectUrl=https%3A%2F%2Fwww.epicgames.com%2Fid%2Fapi%2Fredirect%3FclientId%3D34a02cf8f4414e29b15921876da36f9a%26responseType%3Dcode"
+                webbrowser.open(oauth_url)
+                def prompt_token():
+                    # WHY: Bind strictly to self.window() to ensure the input dialog stays firmly on top of Settings.
+                    code_input, ok = QInputDialog.getText(self.window(), translator.tr("msg_epic_input_title"), translator.tr("msg_epic_input_prompt"))
+                    if ok and code_input:
+                        match = re.search(r'([a-fA-F0-9]{32})', code_input)
+                        if match:
+                            auth_code = match.group(1)
+                            token_data = exchange_code_for_token(auth_code)
+                            if token_data and 'access_token' in token_data:
+                                save_epic_session(token_data)
+                                self.update_platform_btn_ui(btn, True)
+                                self.connection_changed.emit("epic", True)
+                            else: QMessageBox.warning(self.window(), "Login Failed", translator.tr("msg_epic_token_failed"))
+                        else: QMessageBox.warning(self.window(), "Login Failed", translator.tr("msg_epic_invalid_code"))
+                QTimer.singleShot(200, prompt_token)
+        elif platform_id == "steam":
+            try: from dialogs.login_browser_dialog import LoginBrowserDialog 
+            except ImportError:
+                QMessageBox.critical(self, "Missing Dependency", "Please install PySide6-WebEngine to use platform connections:\n\npip install PySide6-WebEngine")
+                return
+                
+            from backend.steam.login_steam import is_steam_connected, disconnect_steam, save_steam_session
+            if is_steam_connected():
+                disconnect_steam()
+                self.update_platform_btn_ui(btn, False)
+                self.connection_changed.emit("steam", False)
+            else:
+                url = "https://steamcommunity.com/login/home/?goto="
+                # WHY: Set parent to None and use ApplicationModal to create a non-blocking but globally modal window.
+                dlg = LoginBrowserDialog(url, target_cookies=["steamLoginSecure"], parent=None)
+                dlg.setWindowModality(Qt.ApplicationModal)
+                self._active_dlg = dlg
+                
+                def on_steam_finished(result):
+                    def handle_steam_result():
+                        if dlg.success_triggered and 'steamLoginSecure' in dlg.cookies:
+                            save_steam_session(dlg.cookies)
+                            self.update_platform_btn_ui(btn, True)
+                            self.connection_changed.emit("steam", True)
+                        else: QMessageBox.warning(self.window(), "Login Failed", translator.tr("msg_login_failed"))
+                        dlg.deleteLater()
+                    QTimer.singleShot(100, handle_steam_result)
+                    self._active_dlg = None
+                dlg.finished.connect(on_steam_finished)
+                dlg.show()
         else:
-            QMessageBox.information(self, "Info", translator.tr("tools_platform_not_impl"))
+            QMessageBox.information(self.window(), "Info", translator.tr("tools_platform_not_impl"))
