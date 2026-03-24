@@ -6,6 +6,8 @@ __pycache__/
 # Tes logs et bases de données et images
 *.log
 *.csv
+*.json
+*.csv
 images/
 videos/
 tools/
