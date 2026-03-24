@@ -14,6 +14,7 @@ from .api_igdb import get_igdb_access_token, query_igdb_api
 from .api_galaxy import sync_galaxy_database
 from .gog.scan_gog import scan_gog_account
 from .epic.scan_epic import scan_epic_account
+from .steam.scan_steam import scan_steam_account
 from .local_copy_scanner import scan_local_system
 
 BACKUP_DIR = os.path.join(BASE_DIR, "backups")
@@ -40,6 +41,7 @@ class LibraryManager:
         do_galaxy = self.config.get("enable_galaxy_db", True)
         do_gog = self.config.get("enable_gog_web", False)
         do_epic = self.config.get("enable_epic_web", False)
+        do_steam = self.config.get("enable_steam_web", False)
         local_cfg = self.config.get('local_scan_config', {})
         do_local = local_cfg.get("enable_local_scan", True)
         target_folders = local_cfg.get("target_folders")
@@ -49,6 +51,7 @@ class LibraryManager:
         checklist += f"{'Galaxy Sync':<16}: {'ON' if do_galaxy else 'OFF'}\n"
         checklist += f"{'GOG':<16}: {'ON' if do_gog else 'OFF'}\n"
         checklist += f"{'Epic Games':<16}: {'ON' if do_epic else 'OFF'}\n"
+        checklist += f"{'Steam':<16}: {'ON' if do_steam else 'OFF'}\n"
         if do_local:
             checklist += f"{'Local Folders':<16}: ON\n"
             if target_folders is not None and len(target_folders) > 0:
@@ -74,6 +77,11 @@ class LibraryManager:
         if do_epic:
             epic_changes = scan_epic_account(self.config, self.games, worker_thread=worker_thread)
             if epic_changes: self.save_db()
+            if worker_thread and worker_thread.isInterruptionRequested(): return
+
+        if do_steam:
+            steam_changes = scan_steam_account(self.config, self.games, worker_thread=worker_thread)
+            if steam_changes: self.save_db()
             if worker_thread and worker_thread.isInterruptionRequested(): return
 
         if do_local:

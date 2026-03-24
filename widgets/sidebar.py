@@ -246,14 +246,16 @@ class Sidebar(QWidget):
         self.chk_scan_gog_web = QCheckBox("GOG.com")
         # WHY: Renamed strictly to "Epic" to align with the visual consistency of the other short-named platforms.
         self.chk_scan_epic = QCheckBox("Epic")
+        self.chk_scan_steam = QCheckBox("Steam")
         
         self.layout_scan_platforms.addWidget(self.chk_scan_galaxy, 0, 0)
         self.layout_scan_platforms.addWidget(self.chk_scan_gog_web, 0, 1)
         self.layout_scan_platforms.addWidget(self.chk_scan_epic, 1, 0)
+        self.layout_scan_platforms.addWidget(self.chk_scan_steam, 1, 1)
 
         # WHY: Inject placeholders for all upcoming platforms in a clean 2-column grid.
-        dummies = ["Steam", "Amazon", "Uplay", "Battle.net", "Origin", "Itch", "Xbox", "PSN"]
-        r, c = 1, 1
+        dummies = ["Amazon", "Uplay", "Battle.net", "Origin", "Itch", "Xbox", "PSN"]
+        r, c = 2, 0
         for d in dummies:
             chk = QCheckBox(d)
             chk.setEnabled(False)
@@ -390,8 +392,7 @@ class Sidebar(QWidget):
     def update_scan_button_state(self):
         """WHY: Single Responsibility - Enables or disables the Scan button based on selected sources."""
         if getattr(self.parent, 'full_scan_in_progress', False): return
-        # WHY: Added self.chk_scan_epic.isChecked() so the button activates when Epic is selected.
-        has_source = self.chk_scan_galaxy.isChecked() or self.chk_scan_gog_web.isChecked() or self.chk_scan_epic.isChecked() or self.chk_scan_local.isChecked()
+        has_source = self.chk_scan_galaxy.isChecked() or self.chk_scan_gog_web.isChecked() or self.chk_scan_epic.isChecked() or self.chk_scan_steam.isChecked() or self.chk_scan_local.isChecked()
         self.btn_full_scan.setEnabled(has_source)
 
     def set_search_target(self, target, ph_key):

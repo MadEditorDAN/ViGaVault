@@ -75,7 +75,10 @@ class LoginBrowserDialog(QDialog):
     def on_cookie_added(self, cookie):
         name = cookie.name().data().decode('utf-8')
         val = cookie.value().data().decode('utf-8')
+        domain = cookie.domain()
+        
         self.cookies[name] = val
+        self.cookies[f"{domain}_{name}"] = val
         
         # WHY: A persistent profile asynchronously loads old cookies from disk on boot.
         # To prevent instantly false-triggering on an old EPIC_SSO ghost cookie before deleteAllCookies() 

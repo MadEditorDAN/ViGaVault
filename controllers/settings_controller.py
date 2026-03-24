@@ -38,7 +38,7 @@ class SettingsController(QObject):
         global_settings, lib_settings = self.get_user_settings()
         
         global_settings.update(display_state)
-        local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "view_new", "view_dlc", "view_review", "filter_states", "filter_expansion", "sidebar_chk_galaxy", "sidebar_chk_gog_web", "sidebar_chk_epic", "sidebar_chk_local", "sidebar_chk_folders", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_galaxy_db", "galaxy_db_path", "download_images", "download_videos", "image_path", "video_path"]
+        local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "view_new", "view_dlc", "view_review", "filter_states", "filter_expansion", "sidebar_chk_galaxy", "sidebar_chk_gog_web", "sidebar_chk_epic", "sidebar_chk_steam", "sidebar_chk_local", "sidebar_chk_folders", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_galaxy_db", "galaxy_db_path", "download_images", "download_videos", "image_path", "video_path"]
         for k in local_keys: global_settings.pop(k, None)
         
         try:
@@ -88,7 +88,7 @@ class SettingsController(QObject):
         global_settings.update({"geometry": self.mw.saveGeometry().toBase64().data().decode()})
         global_settings.update({"splitter_sizes": self.mw.splitter.sizes()})
         
-        local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "view_new", "view_dlc", "view_review", "filter_states", "filter_expansion", "sidebar_chk_galaxy", "sidebar_chk_gog_web", "sidebar_chk_epic", "sidebar_chk_local", "sidebar_chk_folders", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_galaxy_db", "galaxy_db_path", "download_images", "download_videos", "image_path", "video_path"]
+        local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "view_new", "view_dlc", "view_review", "filter_states", "filter_expansion", "sidebar_chk_galaxy", "sidebar_chk_gog_web", "sidebar_chk_epic", "sidebar_chk_steam", "sidebar_chk_local", "sidebar_chk_folders", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_galaxy_db", "galaxy_db_path", "download_images", "download_videos", "image_path", "video_path"]
         for k in local_keys: global_settings.pop(k, None)
         
         try:
@@ -136,6 +136,7 @@ class SettingsController(QObject):
             "sidebar_chk_galaxy": self.mw.sidebar.chk_scan_galaxy.isChecked(),
             "sidebar_chk_gog_web": self.mw.sidebar.chk_scan_gog_web.isChecked(),
             "sidebar_chk_epic": self.mw.sidebar.chk_scan_epic.isChecked(),
+            "sidebar_chk_steam": self.mw.sidebar.chk_scan_steam.isChecked(),
             "sidebar_chk_local": self.mw.sidebar.chk_scan_local.isChecked(),
             "sidebar_chk_folders": checked_folders,
             "download_images": self.mw.sidebar.chk_scan_dl_images.isChecked()
@@ -165,6 +166,42 @@ class SettingsController(QObject):
             self.mw.display_settings['image'] = global_settings.get("card_image_size", DEFAULT_DISPLAY_SETTINGS['image'])
             self.mw.display_settings['button'] = global_settings.get("card_button_size", DEFAULT_DISPLAY_SETTINGS['button'])
             self.mw.display_settings['text'] = global_settings.get("card_text_size", DEFAULT_DISPLAY_SETTINGS['text'])
+            
+            # WHY: Restore UI checkboxes cleanly
+            self.mw.sidebar.chk_scan_galaxy.setChecked(lib_settings.get("sidebar_chk_galaxy", False))
+            self.mw.sidebar.chk_scan_local.setChecked(lib_settings.get("sidebar_chk_local", False))
+            
+            # WHY: Check live connection status to physically forbid the user from toggling scanners for disconnected platforms.
+            try:
+                from backend.gog.login_gog import is_gog_connected
+                gog_enabled = is_gog_connected()
+            except ImportError: gog_enabled = False
+            self.mw.gog_connected_cache = gog_enabled
+            self.mw.sidebar.chk_scan_gog_web.setEnabled(gog_enabled)
+            if not gog_enabled: self.mw.sidebar.chk_scan_gog_web.setChecked(False)
+            else: self.mw.sidebar.chk_scan_gog_web.setChecked(lib_settings.get("sidebar_chk_gog_web", False))
+
+            try:
+                from backend.epic.login_epic import is_epic_connected
+                epic_enabled = is_epic_connected()
+            except ImportError: epic_enabled = False
+            self.mw.epic_connected_cache = epic_enabled
+            self.mw.sidebar.chk_scan_epic.setEnabled(epic_enabled)
+            if not epic_enabled: self.mw.sidebar.chk_scan_epic.setChecked(False)
+            else: self.mw.sidebar.chk_scan_epic.setChecked(lib_settings.get("sidebar_chk_epic", False))
+
+            try:
+                from backend.steam.login_steam import is_steam_connected
+                steam_enabled = is_steam_connected()
+            except ImportError: steam_enabled = False
+            self.mw.steam_connected_cache = steam_enabled
+            
+            if hasattr(self.mw.sidebar, 'chk_scan_steam'):
+                self.mw.sidebar.chk_scan_steam.setEnabled(steam_enabled)
+                if not steam_enabled: self.mw.sidebar.chk_scan_steam.setChecked(False)
+                else: self.mw.sidebar.chk_scan_steam.setChecked(lib_settings.get("sidebar_chk_steam", False))
+                
+            self.mw.sidebar.update_scan_button_state()
             
             return lib_settings.get("anchor_folder")
         except Exception as e:

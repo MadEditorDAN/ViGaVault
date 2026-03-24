@@ -7,6 +7,8 @@ import time
 import re
 import requests
 import shutil
+import html
+import urllib.parse
 
 # WHY: Setup paths to import the cookie parser and utilities from ViGaVault natively.
 TOOLS_STEAM_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -21,45 +23,110 @@ def analyze_steam_data():
     print(f"{' STEAM DATA DISCOVERY DUMP ':=^80}")
     
     # 1. Extract SteamID64 from the intercepted cookie
-    session = get_steam_session()
-    secure_cookie = session.get('steamLoginSecure')
+    raw_session = get_steam_session()
+    
+    secure_cookie = None
+    for k, v in raw_session.items():
+        if 'steamcommunity.com' in k and k.endswith('steamLoginSecure'):
+            secure_cookie = v
+            break
+            
+    if not secure_cookie:
+        secure_cookie = raw_session.get('steamLoginSecure')
     
     if not secure_cookie:
         print("ERROR: No Steam session found. Please connect Steam in the ViGaVault Platform Manager first.")
         sys.exit(1)
         
-    # WHY: The cookie format is SteamID64%7C... or SteamID64||... We extract the first part.
-    steam_id = secure_cookie.split('%7C')[0].split('||')[0]
+    # WHY: We strictly decode the cookie purely to extract the SteamID64 for our URL.
+    # We do NOT save the decoded version, to preserve the exact cryptographic signature for the HTTP request.
+    steam_id = urllib.parse.unquote(secure_cookie).split('||')[0]
     print(f"Extracted SteamID64: {steam_id}")
     
     # 2. Fetch the user's game library HTML page
     url = f"https://steamcommunity.com/profiles/{steam_id}/games/?tab=all"
     
-    # WHY: Recycle the stealth User-Agent to masquerade as organic browser traffic
+    # WHY: We MUST send the ENTIRE cookie jar (browserid, steamCountry, steamRefresh_steam).
+    # Stripping these out caused the Community server to reject the session as a bot forgery and redirect to /login/.
+    clean_session = {k: v for k, v in raw_session.items() if not k.startswith('.')}
+    
+    # WHY: Explicitly override the generic 'steamLoginSecure' (which is the Store token) 
+    # with the domain-specific Community token we extracted earlier. 
+    # This fixes the bug where we successfully found the token but forgot to actually inject it!
+    clean_session['steamLoginSecure'] = secure_cookie
+    
+    raw_cookie_string = "; ".join([f"{k}={v}" for k, v in clean_session.items()])
+    
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Cookie': raw_cookie_string
     }
     
     print("Fetching Steam Library page...")
-    response = requests.get(url, cookies=session, headers=headers)
+    
+    # WHY: Diagnostic Logging. Prove exactly what we are sending so we never fly blind again.
+    print(f"DEBUG OUTGOING COOKIE STRING: {raw_cookie_string}")
+    
+    # WHY: Removed the cookies= parameter. The raw cookie string is now injected directly into the headers.
+    response = requests.get(url, headers=headers)
     
     if response.status_code != 200:
         print(f"ERROR: Failed to fetch library. HTTP {response.status_code}")
         sys.exit(1)
+
+    html_text = response.text
+    print(f"DEBUG: Fetched HTML length: {len(html_text)} characters")
         
-    # 3. Parse the embedded JSON array (rgGames) using regex
-    # WHY: Steam embeds the entire library as a Javascript array variable in the page source. 
-    # Extracting it saves us from making hundreds of individual pagination requests.
-    match = re.search(r'var rgGames = (\[.*?\]);\r?\n', response.text, re.DOTALL)
-    if not match:
-        print("ERROR: Could not find rgGames array in the page source. Is the profile Private?")
-        sys.exit(1)
-        
-    rg_games = json.loads(match.group(1))
-    print(f"Successfully extracted {len(rg_games)} games from library.")
+    # 3. Indestructible Extraction Logic
+    # WHY: Steam migrated to React and SSR state injection. 
+    # The JSON is now safely embedded within window.SSR.renderContext.
+    rg_games = []
     
-    # Limit to the first 20 games for discovery
-    games_to_process = rg_games[:20]
+    # Attempt A: Parse the React-Query SSR state directly
+    ssr_match = re.search(r'window\.SSR\.renderContext\s*=\s*JSON\.parse\("(.*?)"\)\s*;?\s*</script>', html_text)
+    if ssr_match:
+        try:
+            print("DEBUG: Found window.SSR.renderContext, decoding JSON...")
+            json_str = json.loads('"' + ssr_match.group(1) + '"')
+            render_context = json.loads(json_str)
+            query_data_str = render_context.get("queryData", "{}")
+            query_data = json.loads(query_data_str)
+            
+            for query in query_data.get("queries", []):
+                q_key = query.get("queryKey", [])
+                if isinstance(q_key, list) and len(q_key) > 0 and q_key[0] == "OwnedGames":
+                    games_list = query.get("state", {}).get("data", [])
+                    if games_list:
+                        rg_games = games_list
+                        print(f"Successfully extracted {len(rg_games)} games from SSR renderContext.")
+                    break
+        except Exception as e:
+            print(f"DEBUG: Failed to parse SSR renderContext: {e}")
+            
+    # Attempt B: Universal Regex for deeply escaped JSON fragments (Fallback)
+    if not rg_games:
+        print("DEBUG: Falling back to regex extraction...")
+        matches = re.finditer(r'(?:\\*)"appid(?:\\*)"\s*:\s*(\d+)\s*,\s*(?:\\*)"name(?:\\*)"\s*:\s*(?:\\*)"([^"\\]*(?:\\.[^"\\]*)*)(?:\\*)"', html_text)
+        for match in matches:
+            appid = match.group(1)
+            raw_name = match.group(2)
+            try:
+                clean_name = json.loads(f'"{raw_name}"')
+            except:
+                clean_name = raw_name
+            rg_games.append({"appid": int(appid), "name": clean_name})
+            
+        if rg_games:
+            print(f"Successfully extracted {len(rg_games)} AppIDs using Regex.")
+        
+    if not rg_games:
+        print("ERROR: Could not extract any AppIDs from the page.")
+        sys.exit(1)
+    
+    # WHY: Process ALL games for the full metadata dump, removing the previous 20-game test limit.
+    games_to_process = rg_games
     api_dump = {}
     
     # 4. Deep Fetching from the Steam Store API
@@ -67,7 +134,7 @@ def analyze_steam_data():
         appid = game['appid']
         name = game.get('name', 'Unknown')
         safe_name = get_safe_filename(name)
-        print(f"\n[{index+1}/20] Fetching data for: {name} (AppID: {appid})")
+        print(f"\n[{index+1}/{len(games_to_process)}] Fetching data for: {name} (AppID: {appid})")
         
         app_url = f"https://store.steampowered.com/api/appdetails?appids={appid}"
         try:
@@ -78,45 +145,6 @@ def analyze_steam_data():
                 data = app_data[str(appid)]['data']
                 api_dump[str(appid)] = data
                 
-                # 5. Download Images into organized subfolders
-                # WHY: Isolating images per game prevents a massive unreadable folder dump.
-                img_dir = os.path.join(TOOLS_STEAM_DIR, "images", f"{appid}_{safe_name}")
-                os.makedirs(img_dir, exist_ok=True)
-                
-                def download_img(img_url, filename):
-                    if not img_url: return
-                    # Remove trailing query params for clean extension extraction
-                    clean_url = img_url.split('?')[0]
-                    ext = os.path.splitext(clean_url)[1]
-                    if not ext: ext = '.jpg'
-                    filepath = os.path.join(img_dir, f"{filename}{ext}")
-                    print(f"  -> Downloading {filename}{ext}")
-                    try:
-                        r = requests.get(img_url, stream=True, headers=headers, timeout=5)
-                        if r.status_code == 200:
-                            with open(filepath, 'wb') as f:
-                                shutil.copyfileobj(r.raw, f)
-                        else:
-                            print(f"     Failed HTTP {r.status_code}")
-                    except Exception as e:
-                        print(f"     Failed: {e}")
-
-                # Download standard hero/capsule artwork
-                download_img(data.get('header_image'), "header_image")
-                download_img(data.get('capsule_image'), "capsule_image")
-                download_img(data.get('capsule_imagev5'), "capsule_imagev5")
-                download_img(data.get('library_hero'), "library_hero") # Sometimes present
-                download_img(data.get('background'), "background")
-                download_img(data.get('background_raw'), "background_raw")
-                
-                # Download screenshots
-                for i, screenshot in enumerate(data.get('screenshots', [])):
-                    download_img(screenshot.get('path_full'), f"screenshot_{i+1}")
-                    
-                # Download movie thumbnails (Trailers themselves are mapped in JSON, we only download their poster)
-                for i, movie in enumerate(data.get('movies', [])):
-                    download_img(movie.get('thumbnail'), f"movie_thumbnail_{i+1}")
-                    
             else:
                 print("  -> Failed: API returned success=false (Game might be delisted or region locked)")
                 api_dump[str(appid)] = {"error": "Failed to fetch or success=false", "library_data": game}
@@ -136,7 +164,6 @@ def analyze_steam_data():
         
     print(f"\n{' DISCOVERY FINISHED ':=^80}")
     print(f"API Dump saved to: {dump_path}")
-    print(f"Images saved to  : {os.path.join(TOOLS_STEAM_DIR, 'images')}")
 
 if __name__ == "__main__":
     analyze_steam_data()

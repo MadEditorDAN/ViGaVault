@@ -70,6 +70,10 @@ class SettingsDialog(QDialog):
                 self.parent_window.sidebar.chk_scan_gog_web.setEnabled(is_connected)
                 if not is_connected: self.parent_window.sidebar.chk_scan_gog_web.setChecked(False)
                 self.parent_window.gog_connected_cache = is_connected
+            elif platform_id == "steam":
+                self.parent_window.sidebar.chk_scan_steam.setEnabled(is_connected)
+                if not is_connected: self.parent_window.sidebar.chk_scan_steam.setChecked(False)
+                self.parent_window.steam_connected_cache = is_connected
             self.parent_window.sidebar.update_scan_button_state()
         self.mark_changed()
 
@@ -99,6 +103,8 @@ class SettingsDialog(QDialog):
         self.initial_txt_size = global_settings.get("card_text_size", DEFAULT_DISPLAY_SETTINGS['text'])
         self.initial_galaxy = lib_settings.get("enable_galaxy_db", False)
         self.initial_gog_web = lib_settings.get("sidebar_chk_gog_web", False)
+        self.initial_epic_web = lib_settings.get("sidebar_chk_epic", False)
+        self.initial_steam_web = lib_settings.get("sidebar_chk_steam", False)
         self.initial_local = lib_settings.get("local_scan_config", {}).get("enable_local_scan", False)
         
         if self.btn_apply:
@@ -156,10 +162,12 @@ class SettingsDialog(QDialog):
                 
         new_galaxy = data_state["enable_galaxy_db"]
         new_gog_web = self.parent_window.sidebar.chk_scan_gog_web.isChecked() if self.parent_window else self.initial_gog_web
+        new_epic_web = self.parent_window.sidebar.chk_scan_epic.isChecked() if self.parent_window else self.initial_epic_web
+        new_steam_web = self.parent_window.sidebar.chk_scan_steam.isChecked() if self.parent_window else self.initial_steam_web
         new_local = data_state["local_scan_config"]["enable_local_scan"]
         
         # WHY: Dynamically push disabled states back to the quick-toggles in the sidebar
-        if new_galaxy != self.initial_galaxy or new_local != self.initial_local or new_gog_web != self.initial_gog_web:
+        if new_galaxy != self.initial_galaxy or new_local != self.initial_local or new_gog_web != self.initial_gog_web or new_epic_web != self.initial_epic_web or new_steam_web != self.initial_steam_web:
             if self.parent_window and hasattr(self.parent_window, 'sidebar'):
                 self.parent_window.sidebar.chk_scan_galaxy.setEnabled(new_galaxy)
                 if not new_galaxy: self.parent_window.sidebar.chk_scan_galaxy.setChecked(False)
@@ -168,6 +176,8 @@ class SettingsDialog(QDialog):
             self.parent_window.sidebar.update_scan_button_state()
             self.initial_galaxy = new_galaxy
             self.initial_gog_web = new_gog_web
+            self.initial_epic_web = new_epic_web
+            self.initial_steam_web = new_steam_web
             
         # WHY: Push the dialog's visual state back into the Sidebar's live physical checkbox.
         new_dl_images = data_state["download_images"]
