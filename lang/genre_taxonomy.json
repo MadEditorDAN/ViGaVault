@@ -1,0 +1,47 @@
+{
+    "Adventure": [
+        "aventure"
+    ],
+    "Card & Board Game": [
+        "card board game"
+    ],
+    "Co-Op": [
+        "coop"
+    ],
+    "FPS": [
+        "first person shooter",
+        "fps"
+    ],
+    "Hack and Slash/Beat 'em up": [
+        "hack and slash/beat 'em up"
+    ],
+    "MOBA": [
+        "moba"
+    ],
+    "Platformer": [
+        "platform"
+    ],
+    "Point-and-Click": [
+        "point-and-click"
+    ],
+    "Rage Game": [
+        "rage games"
+    ],
+    "RTS": [
+        "real time strategy",
+        "real time strategy (rts)"
+    ],
+    "RPG": [
+        "role playing games",
+        "role-playing (rpg)",
+        "rpg"
+    ],
+    "Simulation": [
+        "simulations",
+        "simulator"
+    ],
+    "TBS": [
+        "turn-based strategy",
+        "turn-based strategy (tbs)"
+    ]
+}

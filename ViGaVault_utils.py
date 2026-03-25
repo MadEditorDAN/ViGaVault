@@ -54,7 +54,7 @@ def is_hidden(filepath):
         return False
 
 GENRE_MAP = {}
-TAXONOMY_FILE = os.path.join(BASE_DIR, "backend", "genre_taxonomy.json")
+TAXONOMY_FILE = os.path.join(BASE_DIR, "lang", "genre_taxonomy.json")
 
 def load_genre_taxonomy():
     """WHY: Loads the user-configurable taxonomy JSON to strictly enforce spelling and capitalization rules."""

@@ -5,7 +5,7 @@ a = Analysis(
     ['ViGaVault_UI.py'],
     pathex=[],
     binaries=[],
-    datas=[('assets', 'assets'), ('lang', 'lang'), ('backend/genre_taxonomy.json', 'backend')],
+    datas=[],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
