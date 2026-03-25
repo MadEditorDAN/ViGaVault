@@ -22,6 +22,7 @@ todo.txt
 DAN-todo.txt
 *.log
 *.csv
+*.spec
 
 # Dossier VS Code
 .vscode/
