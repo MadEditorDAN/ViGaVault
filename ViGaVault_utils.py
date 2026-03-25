@@ -257,6 +257,21 @@ def build_scanner_config():
         'date_format': date_format
     }
 
+class LogFilter(logging.Filter):
+    """WHY: Prevents temporary UI animation states from cluttering the physical permanent .log file on the hard drive."""
+    def filter(self, record):
+        if isinstance(record.msg, str) and record.msg.startswith("UI_START|"):
+            return False
+        return True
+
+class CleanFormatter(logging.Formatter):
+    """WHY: Single Responsibility - Strips internal UI routing tags from the final string right before it writes to the disk, leaving the original memory object intact for the UI Handler."""
+    def format(self, record):
+        msg = super().format(record)
+        if msg.startswith("UI_UPDATE|"):
+            return msg.replace("UI_UPDATE|", "")
+        return msg
+
 def setup_logging():
     """Sets up file logging for the application."""
     os.makedirs(LOG_DIR, exist_ok=True)
@@ -266,14 +281,18 @@ def setup_logging():
         os.remove(logs.pop(0))
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = os.path.join(LOG_DIR, f"scan_{timestamp}.log")
+    
+    file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    file_handler.addFilter(LogFilter())
+    file_handler.setFormatter(CleanFormatter('%(message)s'))
+    
+    stream_handler = logging.StreamHandler()
+    stream_handler.addFilter(LogFilter())
+    stream_handler.setFormatter(CleanFormatter('%(message)s'))
+    
     logging.basicConfig(
         level=logging.INFO, 
-        # WHY: Removed standard %(asctime)s to allow perfectly aligned ASCII art and tables in both the UI and the physical text file.
-        format='%(message)s', 
-        handlers=[
-            logging.FileHandler(log_file, encoding='utf-8'), 
-            logging.StreamHandler()
-        ]
+        handlers=[file_handler, stream_handler]
     )
 
 # --- TRANSLATION ---

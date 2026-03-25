@@ -186,9 +186,14 @@ class FilterController(QObject):
             if checkboxes and not all(chk.isChecked() for chk in checkboxes):
                 active_filters[col] = [chk.text() for chk in checkboxes if chk.isChecked()]
 
+        # WHY: Safety Guard - Truncate excessively long search strings to prevent the regex engine from crashing on malformed text.
+        search_text = self.mw.sidebar.search_bar.text()
+        if len(search_text) > 80:
+            search_text = search_text[:80]
+
         params = {
             'search_target': getattr(self.mw.sidebar, 'search_target', 'Name'),
-            'search_text': self.mw.sidebar.search_bar.text(),
+            'search_text': search_text,
             'active_filters': active_filters,
             'sort_col': sort_col_map[self.mw.sidebar.combo_sort.currentIndex()],
             'sort_desc': self.mw.sort_desc,

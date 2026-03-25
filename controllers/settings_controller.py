@@ -85,8 +85,12 @@ class SettingsController(QObject):
                     global_settings = json.load(f)
             except: pass
 
-        global_settings.update({"geometry": self.mw.saveGeometry().toBase64().data().decode()})
-        global_settings.update({"splitter_sizes": self.mw.splitter.sizes()})
+        try:
+            global_settings.update({"geometry": self.mw.saveGeometry().toBase64().data().decode()})
+            global_settings.update({"splitter_sizes": self.mw.splitter.sizes()})
+        except RuntimeError:
+            # WHY: Safely ignore C++ teardown errors if save_settings is fired during application closure.
+            pass
         
         local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "view_new", "view_dlc", "view_review", "filter_states", "filter_expansion", "sidebar_chk_galaxy", "sidebar_chk_gog_web", "sidebar_chk_epic", "sidebar_chk_steam", "sidebar_chk_local", "sidebar_chk_folders", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_galaxy_db", "galaxy_db_path", "download_images", "download_videos", "image_path", "video_path"]
         for k in local_keys: global_settings.pop(k, None)
@@ -107,40 +111,44 @@ class SettingsController(QObject):
         global_keys = ["geometry", "theme", "language", "card_image_size", "card_button_size", "card_text_size", "db_path", "splitter_sizes"]
         for k in global_keys: lib_settings.pop(k, None)
 
-        filter_states = {}
-        if hasattr(self.mw.filter_controller, 'dynamic_filters'):
-            for col, checkboxes in self.mw.filter_controller.dynamic_filters.items():
-                if checkboxes and not all(chk.isChecked() for chk in checkboxes):
-                    filter_states[col] = [chk.text() for chk in checkboxes if chk.isChecked()]
+        try:
+            filter_states = {}
+            if hasattr(self.mw.filter_controller, 'dynamic_filters'):
+                for col, checkboxes in self.mw.filter_controller.dynamic_filters.items():
+                    if checkboxes and not all(chk.isChecked() for chk in checkboxes):
+                        filter_states[col] = [chk.text() for chk in checkboxes if chk.isChecked()]
 
-        saved_expansion = {}
-        layout = self.mw.sidebar.filters_layout
-        for i in range(layout.count()):
-            item = layout.itemAt(i)
-            if item.widget() and hasattr(item.widget(), 'toggle_btn') and hasattr(item.widget(), 'title'):
-                group = item.widget()
-                saved_expansion[group.title] = group.toggle_btn.isChecked()
+            saved_expansion = {}
+            layout = self.mw.sidebar.filters_layout
+            for i in range(layout.count()):
+                item = layout.itemAt(i)
+                if item.widget() and hasattr(item.widget(), 'toggle_btn') and hasattr(item.widget(), 'title'):
+                    group = item.widget()
+                    saved_expansion[group.title] = group.toggle_btn.isChecked()
 
-        checked_folders = [f for f, chk in self.mw.sidebar.chk_scan_folders.items() if chk.isChecked()]
+            checked_folders = [f for f, chk in self.mw.sidebar.chk_scan_folders.items() if chk.isChecked()]
 
-        lib_settings.update({
-            "sort_desc": self.mw.sort_desc,
-            "sort_index": self.mw.sidebar.combo_sort.currentIndex(),
-            "search_text": self.mw.sidebar.search_bar.text(),
-            "anchor_folder": self.mw.library_controller.get_second_visible_folder(),
-            "view_new": self.mw.sidebar.btn_toggle_new.isChecked(),
-            "view_dlc": self.mw.sidebar.btn_toggle_dlc.isChecked(),
-            "view_review": self.mw.sidebar.btn_toggle_review.isChecked(),
-            "filter_states": filter_states,
-            "filter_expansion": saved_expansion,
-            "sidebar_chk_galaxy": self.mw.sidebar.chk_scan_galaxy.isChecked(),
-            "sidebar_chk_gog_web": self.mw.sidebar.chk_scan_gog_web.isChecked(),
-            "sidebar_chk_epic": self.mw.sidebar.chk_scan_epic.isChecked(),
-            "sidebar_chk_steam": self.mw.sidebar.chk_scan_steam.isChecked(),
-            "sidebar_chk_local": self.mw.sidebar.chk_scan_local.isChecked(),
-            "sidebar_chk_folders": checked_folders,
-            "download_images": self.mw.sidebar.chk_scan_dl_images.isChecked()
-        })
+            lib_settings.update({
+                "sort_desc": self.mw.sort_desc,
+                "sort_index": self.mw.sidebar.combo_sort.currentIndex(),
+                "search_text": self.mw.sidebar.search_bar.text(),
+                "anchor_folder": self.mw.library_controller.get_second_visible_folder(),
+                "view_new": self.mw.sidebar.btn_toggle_new.isChecked(),
+                "view_dlc": self.mw.sidebar.btn_toggle_dlc.isChecked(),
+                "view_review": self.mw.sidebar.btn_toggle_review.isChecked(),
+                "filter_states": filter_states,
+                "filter_expansion": saved_expansion,
+                "sidebar_chk_galaxy": self.mw.sidebar.chk_scan_galaxy.isChecked(),
+                "sidebar_chk_gog_web": self.mw.sidebar.chk_scan_gog_web.isChecked(),
+                "sidebar_chk_epic": self.mw.sidebar.chk_scan_epic.isChecked(),
+                "sidebar_chk_steam": self.mw.sidebar.chk_scan_steam.isChecked(),
+                "sidebar_chk_local": self.mw.sidebar.chk_scan_local.isChecked(),
+                "sidebar_chk_folders": checked_folders,
+                "download_images": self.mw.sidebar.chk_scan_dl_images.isChecked()
+            })
+        except RuntimeError:
+            # WHY: Safely ignore UI reads if the function is called while PySide6 is violently destroying the main window.
+            pass
 
         if "platform_map" not in lib_settings:
              pm, ip = get_platform_config()
@@ -170,6 +178,9 @@ class SettingsController(QObject):
             # WHY: Restore UI checkboxes cleanly
             self.mw.sidebar.chk_scan_galaxy.setChecked(lib_settings.get("sidebar_chk_galaxy", False))
             self.mw.sidebar.chk_scan_local.setChecked(lib_settings.get("sidebar_chk_local", False))
+            
+            # WHY: Ensure the standalone images checkbox physically restores its memory state on boot.
+            self.mw.sidebar.chk_scan_dl_images.setChecked(lib_settings.get("download_images", True))
             
             # WHY: Check live connection status to physically forbid the user from toggling scanners for disconnected platforms.
             try:

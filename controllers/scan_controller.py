@@ -19,8 +19,19 @@ class ScanController(QObject):
         self.qt_log_handler = None
 
     def update_sync_log(self, message):
-        self.mw.sidebar.scan_results.addItem(message)
-        self.mw.sidebar.scan_results.scrollToBottom()
+        # WHY: Targeted Update - Dynamically animates the log by replacing the text of the last item in place.
+        if message.startswith("UI_START|"):
+            clean_msg = message.replace("UI_START|", "")
+            self.mw.sidebar.scan_results.addItem(clean_msg)
+            self.mw.sidebar.scan_results.scrollToBottom()
+        elif message.startswith("UI_UPDATE|"):
+            clean_msg = message.replace("UI_UPDATE|", "")
+            if self.mw.sidebar.scan_results.count() > 0:
+                last_item = self.mw.sidebar.scan_results.item(self.mw.sidebar.scan_results.count() - 1)
+                last_item.setText(clean_msg)
+        else:
+            self.mw.sidebar.scan_results.addItem(message)
+            self.mw.sidebar.scan_results.scrollToBottom()
 
     def open_scan_settings(self):
         # WHY: Roll up the filters smoothly instead of making them vanish abruptly.
@@ -54,7 +65,8 @@ class ScanController(QObject):
             return
 
         has_source = self.mw.sidebar.chk_scan_galaxy.isChecked() or self.mw.sidebar.chk_scan_gog_web.isChecked() or self.mw.sidebar.chk_scan_epic.isChecked() or self.mw.sidebar.chk_scan_steam.isChecked() or self.mw.sidebar.chk_scan_local.isChecked()
-        if not has_source:
+        has_dl_images = self.mw.sidebar.chk_scan_dl_images.isChecked()
+        if not has_source and not has_dl_images:
             QMessageBox.warning(self.mw, translator.tr("scan_settings_title"), translator.tr("msg_scan_disabled_source"))
             # WHY: Auto-open the scan settings panel so the user knows exactly where to look.
             self.open_scan_settings()
@@ -160,6 +172,12 @@ class ScanController(QObject):
         self.mw.sidebar.scan_panel.show()
         self.mw.sidebar.scan_settings_panel.hide()
         self.mw.filter_controller.set_filters_ui_state(False)
+        
+        # WHY: Explicitly wire the Cancel button to the inline scan closure logic. 
+        # Since the Full Scan dynamically overwrites this button's connection, we must guarantee it is bound correctly here.
+        try: self.mw.sidebar.btn_cancel.clicked.disconnect()
+        except: pass
+        self.mw.sidebar.btn_cancel.clicked.connect(self.cancel_inline_scan)
         
         # WHY: Disable the main scan UI elements during a manual scan to prevent accidental clicks and conflicting tasks.
         self.mw.sidebar.btn_full_scan.setEnabled(False)

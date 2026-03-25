@@ -162,54 +162,85 @@ class Game:
             return expected_filename
         return existing_name
 
-    def fetch_metadata(self, token):
-        search_term = self.data.get('Search_Title') or self.data.get('Clean_Title') or self.data.get('Folder_Name')
-        local_year = self.data.get('Year_Folder', '')
-        results = query_igdb_api(token, search_term=search_term, limit=5)
+    def _score_igdb_candidate(self, g, search_term):
+        """WHY: DRY Principle & Tiered Weighting - A single intelligent scoring engine.
+        Strictly weights Name and Year highest, uses Dev/Pub as a secondary check, 
+        and relegates Media purely to a tie-breaker role to prevent false positives."""
+        score = 0
         
-        # WHY: "Smart Exception" keyword detector. If the folder implies a special edition,
-        # we disable the standard penalty against bundles and remasters to ensure it matches accurately.
+        # 1. Exact Match Supremacy (Max 100)
+        ratio = difflib.SequenceMatcher(None, search_term.lower(), g.get('name', '').lower()).ratio()
+        score += int(ratio * 100)
+        
+        # 2. Category Multipliers (Max 15)
         folder_lower = self.data.get('Folder_Name', '').lower()
         edition_keywords = ['goty', 'remaster', 'definitive', 'complete', 'edition', 'director', 'redux', 'anniversary']
         has_edition_keyword = any(kw in folder_lower for kw in edition_keywords)
         
+        cat = g.get('category', 0)
+        if cat == 0: score += 15
+        elif cat in [1, 2]: score -= 30
+        elif cat in [3, 8, 9] and not has_edition_keyword: score -= 20
+        
+        # 3. Temporal Priority (Max 40)
+        local_year = self.data.get('Year_Folder', '')
+        if local_year:
+            dates = g.get('release_dates', [])
+            if dates:
+                try:
+                    api_year = datetime.utcfromtimestamp(min([d['date'] for d in dates if 'date' in d])).strftime('%Y')
+                    if str(local_year) == str(api_year): score += 40
+                    elif abs(int(local_year) - int(api_year)) <= 1: score += 20
+                except: pass
+        
+        # 4. Creator Validation via Fuzzy Matching (Max 20)
+        local_dev = self.data.get('Developer', '').lower()
+        local_pub = self.data.get('Publisher', '').lower()
+        
+        def fuzzy_match(local_val, api_list):
+            if not local_val: return False
+            local_clean = re.sub(r'[^a-z0-9]', '', local_val)
+            for api_str in api_list:
+                api_clean = re.sub(r'[^a-z0-9]', '', api_str.lower())
+                if difflib.SequenceMatcher(None, local_clean, api_clean).ratio() > 0.8:
+                    return True
+            return False
+            
+        companies = g.get('involved_companies', [])
+        api_devs = [c.get('company', {}).get('name', '') for c in companies if c.get('developer') and c.get('company', {}).get('name')]
+        api_pubs = [c.get('company', {}).get('name', '') for c in companies if c.get('publisher') and c.get('company', {}).get('name')]
+        
+        if fuzzy_match(local_dev, api_devs) or fuzzy_match(local_pub, api_pubs):
+            score += 20
+            
+        # 5. Media Tie-Breakers (Max 7)
+        if 'cover' in g and 'url' in g['cover']: score += 5
+        if 'videos' in g and g['videos']: score += 2
+        
+        return score
+
+    def fetch_metadata(self, token):
+        search_term = self.data.get('Search_Title') or self.data.get('Clean_Title') or self.data.get('Folder_Name')
+        results = query_igdb_api(token, search_term=search_term, limit=5)
+        
         if results:
             best_match, best_score = None, -1
             for g in results:
-                score = 0
-                
-                # WHY: Exact match supremacy. Base the score heavily on text comparison (up to 100 points).
-                ratio = difflib.SequenceMatcher(None, search_term.lower(), g.get('name', '').lower()).ratio()
-                score += int(ratio * 100)
-                
-                # WHY: Category Multiplier logic acts as an intelligent tie-breaker.
-                cat = g.get('category', 0)
-                if cat == 0: score += 15 # Main Game boost
-                elif cat in [1, 2]: score -= 30 # Heavy penalty for DLCs and Expansions
-                elif cat in [3, 8, 9] and not has_edition_keyword: score -= 20 # Penalty for Bundles/Remasters unless requested
-                
-                api_year = None
-                dates = g.get('release_dates', [])
-                if dates:
-                    try:
-                        ts = min([d['date'] for d in dates if 'date' in d])
-                        api_year = datetime.utcfromtimestamp(ts).strftime('%Y')
-                    except: pass
-                if local_year and api_year:
-                    if local_year == api_year: score += 20
-                    elif abs(int(local_year) - int(api_year)) <= 1: score += 10
+                score = self._score_igdb_candidate(g, search_term)
                 if score > best_score:
                     best_score, best_match = score, g
             
-            if best_match:
+            # WHY: Minimum Confidence Threshold. Reject the match if it scores less than 80 points,
+            # preventing garbage data from being applied when IGDB returns a single, poorly-matched result.
+            if best_match and best_score >= 80:
                 g = best_match
                 self.data['Clean_Title'] = g.get('name', self.data['Clean_Title'])
                 self.data['Summary'] = g.get('summary', '')
-                self.data['Genre'] = normalize_genre(", ".join([ge['name'] for ge in g.get('genres', [])]))
+                self.data['Genre'] = normalize_genre(", ".join([ge.get('name', '') for ge in g.get('genres', [])]))
                 
                 companies = g.get('involved_companies', [])
-                self.data['Developer'] = ", ".join([c['company']['name'] for c in companies if c.get('developer')])
-                self.data['Publisher'] = ", ".join([c['company']['name'] for c in companies if c.get('publisher')])
+                self.data['Developer'] = ", ".join([c.get('company', {}).get('name', '') for c in companies if c.get('developer') and c.get('company', {}).get('name')])
+                self.data['Publisher'] = ", ".join([c.get('company', {}).get('name', '') for c in companies if c.get('publisher') and c.get('company', {}).get('name')])
                 
                 videos = g.get('videos', [])
                 self.data['Trailer_Link'] = f"https://www.youtube.com/watch?v={videos[0]['video_id']}" if videos else ""
@@ -237,37 +268,31 @@ class Game:
             self.data['Status_Flag'] = 'NEEDS_ATTENTION'
         return False
 
-    def fill_missing_metadata(self, token):
+    def fill_missing_metadata(self, token, images_only=False):
         """
         WHY: Single Responsibility - Queries IGDB to strictly fill in any empty fields 
         for newly discovered games without overwriting their existing valid metadata.
         """
         search_term = self.data.get('Search_Title') or self.data.get('Clean_Title') or self.data.get('Folder_Name')
-        local_year = self.data.get('Year_Folder', '')
-        
-        folder_lower = self.data.get('Folder_Name', '').lower()
-        edition_keywords = ['goty', 'remaster', 'definitive', 'complete', 'edition', 'director', 'redux', 'anniversary']
-        has_edition_keyword = any(kw in folder_lower for kw in edition_keywords)
         
         results = query_igdb_api(token, search_term=search_term, limit=5)
         
         if results:
             best_match, best_score = None, -1
             for g in results:
-                score = 0
-                ratio = difflib.SequenceMatcher(None, search_term.lower(), g.get('name', '').lower()).ratio()
-                score += int(ratio * 100)
-                
-                cat = g.get('category', 0)
-                if cat == 0: score += 15
-                elif cat in [1, 2]: score -= 30
-                elif cat in [3, 8, 9] and not has_edition_keyword: score -= 20
+                score = self._score_igdb_candidate(g, search_term)
                 
                 if score > best_score:
                     best_score, best_match = score, g
             
-            if best_match:
+            if best_match and best_score >= 80:
                 g = best_match
+                
+                if images_only:
+                    # WHY: Do not check Image_Link string here. A physically deleted image still retains its filename in the DB.
+                    if not self.data.get('Cover_URL'):
+                        self.data['Image_Link'] = self._ensure_cover(g, silent=True)
+                    return True
                 
                 # WHY: For Local Copies that lack platform metadata, we allow IGDB to perfect the title capitalization and store the ID.
                 if self.data.get('Platforms') == 'Local Copy':
@@ -278,11 +303,11 @@ class Game:
                         self.data['game_ID'] = ", ".join(sorted(list(current_ids)))
                         
                 if not self.data.get('Summary'): self.data['Summary'] = g.get('summary', '')
-                if not self.data.get('Genre'): self.data['Genre'] = normalize_genre(", ".join([ge['name'] for ge in g.get('genres', [])]))
+                if not self.data.get('Genre'): self.data['Genre'] = normalize_genre(", ".join([ge.get('name', '') for ge in g.get('genres', [])]))
                 
                 companies = g.get('involved_companies', [])
-                if not self.data.get('Developer'): self.data['Developer'] = ", ".join([c['company']['name'] for c in companies if c.get('developer')])
-                if not self.data.get('Publisher'): self.data['Publisher'] = ", ".join([c['company']['name'] for c in companies if c.get('publisher')])
+                if not self.data.get('Developer'): self.data['Developer'] = ", ".join([c.get('company', {}).get('name', '') for c in companies if c.get('developer') and c.get('company', {}).get('name')])
+                if not self.data.get('Publisher'): self.data['Publisher'] = ", ".join([c.get('company', {}).get('name', '') for c in companies if c.get('publisher') and c.get('company', {}).get('name')])
                 
                 if not self.data.get('Trailer_Link'):
                     videos = g.get('videos', [])
@@ -296,56 +321,33 @@ class Game:
                             orig_ts = min(valid_dates)
                             self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime(self.config.get('date_format', '%d/%m/%Y'))
                 
-                if not self.data.get('Image_Link') and not self.data.get('Cover_URL'):
+                # WHY: Let _ensure_cover handle the physical disk check natively.
+                if not self.data.get('Cover_URL'):
                     self.data['Image_Link'] = self._ensure_cover(g, silent=True)
                 return True
         return False
 
     def fetch_smart_metadata(self, token, search_override=None):
         search_term = search_override or self.data.get('Search_Title') or self.data.get('Folder_Name')
-        local_dev = self.data.get('Developer', '').lower()
-        local_year = self.data.get('Year_Folder', '')
-        
-        folder_lower = self.data.get('Folder_Name', '').lower()
-        edition_keywords = ['goty', 'remaster', 'definitive', 'complete', 'edition', 'director', 'redux', 'anniversary']
-        has_edition_keyword = any(kw in folder_lower for kw in edition_keywords)
         
         results = query_igdb_api(token, search_term=search_term, limit=5)
         
         if results:
             best_match, best_score = None, -1
             for g in results:
-                score = 0
-                
-                # WHY: Exact match supremacy weighting.
-                ratio = difflib.SequenceMatcher(None, search_term.lower(), g.get('name', '').lower()).ratio()
-                score += int(ratio * 100)
-                
-                cat = g.get('category', 0)
-                if cat == 0: score += 15
-                elif cat in [1, 2]: score -= 30
-                elif cat in [3, 8, 9] and not has_edition_keyword: score -= 20
-                
-                devs = [c['company']['name'].lower() for c in g.get('involved_companies', []) if c.get('developer')]
-                if local_dev and any(local_dev in d for d in devs): score += 5
-                dates = g.get('release_dates', [])
-                if local_year and dates:
-                    try:
-                        api_year = datetime.utcfromtimestamp(min([d['date'] for d in dates if 'date' in d])).strftime('%Y')
-                        if local_year == api_year: score += 5
-                    except: pass
+                score = self._score_igdb_candidate(g, search_term)
                 if score > best_score:
                     best_score, best_match = score, g
 
-            if best_match:
+            if best_match and best_score >= 80:
                 g = best_match
                 self.data['Clean_Title'] = g.get('name', self.data['Clean_Title'])
                 self.data['Summary'] = g.get('summary', '')
-                self.data['Genre'] = normalize_genre(", ".join([ge['name'] for ge in g.get('genres', [])]))
+                self.data['Genre'] = normalize_genre(", ".join([ge.get('name', '') for ge in g.get('genres', [])]))
                 
                 companies = g.get('involved_companies', [])
-                self.data['Developer'] = ", ".join([c['company']['name'] for c in companies if c.get('developer')])
-                self.data['Publisher'] = ", ".join([c['company']['name'] for c in companies if c.get('publisher')])
+                self.data['Developer'] = ", ".join([c.get('company', {}).get('name', '') for c in companies if c.get('developer') and c.get('company', {}).get('name')])
+                self.data['Publisher'] = ", ".join([c.get('company', {}).get('name', '') for c in companies if c.get('publisher') and c.get('company', {}).get('name')])
                 
                 videos = g.get('videos', [])
                 self.data['Trailer_Link'] = f"https://www.youtube.com/watch?v={videos[0]['video_id']}" if videos else ""
@@ -365,11 +367,11 @@ class Game:
     def apply_candidate_data(self, g):
         self.data['Clean_Title'] = g.get('name', self.data.get('Clean_Title'))
         self.data['Summary'] = g.get('summary', '')
-        self.data['Genre'] = normalize_genre(", ".join([ge['name'] for ge in g.get('genres', [])]))
+        self.data['Genre'] = normalize_genre(", ".join([ge.get('name', '') for ge in g.get('genres', [])]))
         
         companies = g.get('involved_companies', [])
-        self.data['Developer'] = ", ".join([c['company']['name'] for c in companies if c.get('developer')])
-        self.data['Publisher'] = ", ".join([c['company']['name'] for c in companies if c.get('publisher')])
+        self.data['Developer'] = ", ".join([c.get('company', {}).get('name', '') for c in companies if c.get('developer') and c.get('company', {}).get('name')])
+        self.data['Publisher'] = ", ".join([c.get('company', {}).get('name', '') for c in companies if c.get('publisher') and c.get('company', {}).get('name')])
         
         videos = g.get('videos', [])
         self.data['Trailer_Link'] = f"https://www.youtube.com/watch?v={videos[0]['video_id']}" if videos else ""

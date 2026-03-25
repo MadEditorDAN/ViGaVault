@@ -36,7 +36,12 @@ class LibraryManager:
 
     def scan_full(self, worker_thread=None):
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        logging.info(f"[{now_str}] \n{' FULL INTELLIGENT SCAN STARTED ':=^80}")
+        
+        images_only = self.config.get('images_only', False)
+        if images_only:
+            logging.info(f"[{now_str}] \n{' STANDALONE MEDIA BACKFILL STARTED ':=^80}")
+        else:
+            logging.info(f"[{now_str}] \n{' FULL INTELLIGENT SCAN STARTED ':=^80}")
         
         do_galaxy = self.config.get("enable_galaxy_db", True)
         do_gog = self.config.get("enable_gog_web", False)
@@ -64,37 +69,41 @@ class LibraryManager:
         checklist += f"{'Images Download':<16}: {'ON' if self.config.get('download_images', True) else 'OFF'}"
         logging.info(checklist + "\n")
 
-        if do_galaxy:
-            sync_galaxy_database(self.config, self.games, worker_thread=worker_thread)
-            self.save_db()
-            if worker_thread and worker_thread.isInterruptionRequested(): return
-        
-        if do_gog:
-            gog_changes = scan_gog_account(self.config, self.games, worker_thread=worker_thread)
-            if gog_changes: self.save_db()
-            if worker_thread and worker_thread.isInterruptionRequested(): return
+        if not images_only:
+            if do_galaxy:
+                sync_galaxy_database(self.config, self.games, worker_thread=worker_thread)
+                self.save_db()
+                if worker_thread and worker_thread.isInterruptionRequested(): return
             
-        if do_epic:
-            epic_changes = scan_epic_account(self.config, self.games, worker_thread=worker_thread)
-            if epic_changes: self.save_db()
-            if worker_thread and worker_thread.isInterruptionRequested(): return
+            if do_gog:
+                gog_changes = scan_gog_account(self.config, self.games, worker_thread=worker_thread)
+                if gog_changes: self.save_db()
+                if worker_thread and worker_thread.isInterruptionRequested(): return
+                
+            if do_epic:
+                epic_changes = scan_epic_account(self.config, self.games, worker_thread=worker_thread)
+                if epic_changes: self.save_db()
+                if worker_thread and worker_thread.isInterruptionRequested(): return
 
-        if do_steam:
-            steam_changes = scan_steam_account(self.config, self.games, worker_thread=worker_thread)
-            if steam_changes: self.save_db()
-            if worker_thread and worker_thread.isInterruptionRequested(): return
+            if do_steam:
+                steam_changes = scan_steam_account(self.config, self.games, worker_thread=worker_thread)
+                if steam_changes: self.save_db()
+                if worker_thread and worker_thread.isInterruptionRequested(): return
 
-        if do_local:
-            scan_local_system(self.config, self.games, worker_thread=worker_thread)
-            self.save_db()
-            if worker_thread and worker_thread.isInterruptionRequested(): return
+            if do_local:
+                scan_local_system(self.config, self.games, worker_thread=worker_thread)
+                self.save_db()
+                if worker_thread and worker_thread.isInterruptionRequested(): return
         
         self.sync_media_flags_batch()
         # WHY: Run the unified IGDB scrapper engine after all platforms have finished their fast data intake.
-        self.run_igdb_scrapper(worker_thread=worker_thread)
+        self.run_igdb_scrapper(worker_thread=worker_thread, images_only=images_only)
         
         end_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        logging.info(f"{' FULL INTELLIGENT SCAN FINISHED ':=^80}\n[{end_str}]\n")
+        if images_only:
+            logging.info(f"{' STANDALONE MEDIA BACKFILL FINISHED ':=^80}\n[{end_str}]\n")
+        else:
+            logging.info(f"{' FULL INTELLIGENT SCAN FINISHED ':=^80}\n[{end_str}]\n")
 
     def scan_single_game(self, game_name, manual_search_term=None):
         token = get_igdb_access_token()
@@ -181,7 +190,7 @@ class LibraryManager:
         if changes_made: self.save_db()
         return changes_made
 
-    def run_igdb_scrapper(self, worker_thread=None):
+    def run_igdb_scrapper(self, worker_thread=None, images_only=False):
         """
         WHY: The Unified Scrapper Engine.
         Executes strictly after all platform scans have finished. It targets any games 
@@ -200,6 +209,7 @@ class LibraryManager:
         for folder, game in self.games.items():
             if worker_thread and worker_thread.isInterruptionRequested(): break
 
+            action_taken = False
             safe_filename = get_safe_filename(game.data.get('Folder_Name', ''))
             status = game.data.get('Status_Flag')
 
@@ -207,37 +217,58 @@ class LibraryManager:
             # WHY: Scrape NEW games, or existing games that physically lost their image and lack a backup Cover_URL.
             # This prevents Local Copies from remaining permanently broken if their images are manually deleted.
             db_has_img = str(game.data.get('Has_Image')).lower() in ['true', '1']
-            needs_cover_rescue = not db_has_img and not game.data.get('Cover_URL')
+            # WHY: Strictly check for an empty string so we don't infinitely retry games permanently marked as 'NOT_FOUND'.
+            needs_cover_rescue = not db_has_img and game.data.get('Cover_URL', '') == ''
             
-            if status == 'NEW' or needs_cover_rescue:
+            if images_only:
+                should_scrape = needs_cover_rescue
+            else:
+                should_scrape = (status == 'NEW' or needs_cover_rescue)
+                
+            if should_scrape:
+                action_taken = True
                 title_disp = game.data.get('Clean_Title', folder)
-                # WHY: Provide real-time visual feedback so the UI doesn't appear frozen during massive backlog scrapes.
-                logging.info(f"|{'Scraping : ' + title_disp[:45]:<56}|    Querying IGDB    |")
+                action_title = f"Scraping with IGDB : {title_disp}"
+                logging.info(f"UI_START||{action_title[:56]:<56}| Img: ... | Trl: ... |")
                 
                 if igdb_token is None: igdb_token = get_igdb_access_token()
                 
                 if igdb_token:
                     # fill_missing_metadata intelligently skips fields that are already populated
-                    if game.fill_missing_metadata(igdb_token):
+                    if game.fill_missing_metadata(igdb_token, images_only=images_only):
                         stats['scraped'] += 1
                         changes_made = True
+                        
+                # WHY: Circuit Breaker - If IGDB was queried but yielded no cover, permanently mark it 
+                # as NOT_FOUND so the scraper doesn't waste 300ms re-querying it every single scan forever.
+                if game.data.get('Cover_URL', '') == '':
+                    game.data['Cover_URL'] = 'NOT_FOUND'
+                    changes_made = True
                 
-                # Evaluate final completion status
-                missing_meta = not all([game.data.get(f) for f in ['Developer', 'Publisher', 'Genre', 'Summary', 'Original_Release_Date']])
-                has_cover = bool(game.data.get('Cover_URL')) or bool(game.data.get('Image_Link'))
-                
-                if missing_meta or not has_cover:
-                    game.data['Status_Flag'] = 'NEEDS_ATTENTION'
-                    stats['needs_attention'] += 1
-                else:
-                    game.data['Status_Flag'] = 'OK'
-                    stats['ok'] += 1
+                if not images_only:
+                    # Evaluate final completion status
+                    missing_meta = not all([game.data.get(f) for f in ['Developer', 'Publisher', 'Genre', 'Summary', 'Original_Release_Date']])
+                    has_cover = bool(game.data.get('Cover_URL')) or bool(game.data.get('Image_Link'))
+                    
+                    if missing_meta or not has_cover:
+                        game.data['Status_Flag'] = 'NEEDS_ATTENTION'
+                        stats['needs_attention'] += 1
+                    else:
+                        game.data['Status_Flag'] = 'OK'
+                        stats['ok'] += 1
                 changes_made = True
 
             # --- PHASE 2: MEDIA DOWNLOADING ---
             if dl_images and not (str(game.data.get('Has_Image')).lower() in ['true', '1']):
                 cover_url_raw = game.data.get('Cover_URL', '')
-                if cover_url_raw:
+                if cover_url_raw and cover_url_raw != 'NOT_FOUND':
+                    
+                    if not action_taken:
+                        title_disp = game.data.get('Clean_Title', folder)
+                        action_title = f"Scraping with IGDB : {title_disp}"
+                        logging.info(f"UI_START||{action_title[:56]:<56}| Img: ... | Trl: ... |")
+                        action_taken = True
+                        
                     url_candidates = [u.strip() for u in cover_url_raw.split('|') if u.strip().startswith('http')]
                     active_candidates = url_candidates.copy()
                     success = False
@@ -271,9 +302,7 @@ class LibraryManager:
                                 stats['downloads'] += 1
                                 changes_made = True
                                 success = True
-                                
-                                action_title = f"Cover Download : {folder}"
-                                logging.info(f"|{action_title[:55]:<55}| Img: Yes | Trl: --- |")
+                                action_taken = True
                                 break # Stop trying fallbacks once we succeed!
                             elif response.status_code in [404, 403]:
                                 # WHY: If the link is permanently dead (404/403), remove it from active candidates.
@@ -282,12 +311,22 @@ class LibraryManager:
                         except Exception as e: pass
                     
                     if not success:
-                        # WHY: If all downloads failed, overwrite the Cover_URL field in the DB to physically 
-                        # erase dead links. This prevents the scanner from infinitely retrying them on every scan.
-                        new_cover_raw = "|".join(active_candidates)
+                        # WHY: If all downloads failed, overwrite the Cover_URL field in the DB with NOT_FOUND. 
+                        # This permanently severs the infinite retry loop for dead links.
+                        new_cover_raw = "|".join(active_candidates) if active_candidates else 'NOT_FOUND'
                         if game.data.get('Cover_URL') != new_cover_raw:
                             game.data['Cover_URL'] = new_cover_raw
                             changes_made = True
+                            
+            # WHY: Smart Refresh Logging - Update the previously emitted UI line to strictly maintain ONE line per game.
+            if action_taken:
+                title_disp = game.data.get('Clean_Title', folder)
+                action_title = f"Scraping with IGDB : {title_disp}"
+                has_img_now = str(game.data.get('Has_Image')).lower() in ['true', '1']
+                has_trl_now = bool(game.data.get('Trailer_Link') and str(game.data.get('Trailer_Link')).startswith('http'))
+                img_str = "Yes" if has_img_now else "No "
+                trl_str = "Yes" if has_trl_now else "No "
+                logging.info(f"UI_UPDATE||{action_title[:56]:<56}| Img: {img_str[:3]:<3} | Trl: {trl_str[:3]:<3} |")
 
         if changes_made: self.save_db()
         

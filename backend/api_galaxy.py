@@ -361,6 +361,12 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
             epic_active = is_epic_connected()
         except ImportError: epic_active = False
         
+        # WHY: Extend jurisdiction immunity to Steam so Galaxy doesn't infinitely delete uninstalled digital Steam games.
+        try:
+            from backend.steam.login_steam import is_steam_connected
+            steam_active = is_steam_connected()
+        except ImportError: steam_active = False
+        
         for folder_name, game in games_dict.items():
             if not game.data.get('Path_Root'):
                 
@@ -376,6 +382,8 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
                     continue
                 if ('epic games store' in platforms or 'epic' in platforms) and epic_active:
                     continue
+                if 'steam' in platforms and steam_active:
+                    continue
 
                 game_ids = [x.strip() for x in game.data.get('game_ID', '').split(',') if x.strip()]
                 is_valid = False
@@ -388,7 +396,8 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
 
         for folder in ghosts_to_delete:
             action_title = f"Ghost Delete : {folder}"
-            logging.info(f"|{action_title[:56]:<56}| Img: No  | Trl: No  |")
+            # WHY: Simplified ghost deletion logging to match the new local scanner format.
+            logging.info(f"|{action_title[:78]:<78}|")
             del games_dict[folder]
             stats['deleted_ghosts'] += 1
             # WHY: Fixed unexpected indent to properly align with the loop's execution block.

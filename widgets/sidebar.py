@@ -338,8 +338,11 @@ class Sidebar(QWidget):
         self.btn_scan_settings.clicked.connect(self.parent.open_scan_settings)
         self.btn_close_scan_settings.clicked.connect(self.parent.close_scan_settings)
         
-        # WHY: Reverted to explicit signal connections. Removing instantaneous saving 
-        # so settings are batched and saved on application close just like the GOG checkbox.
+        # WHY: Bind instantaneous saving back to the checkboxes so the user's scan choices are safely persisted immediately.
+        # This completely bypasses PySide6's notorious C++ object teardown race conditions during closeEvent.
+        for chk in [self.chk_scan_galaxy, self.chk_scan_gog_web, self.chk_scan_epic, self.chk_scan_steam, self.chk_scan_local, self.chk_scan_dl_images]:
+            chk.toggled.connect(self.parent.save_settings)
+            
         self.chk_scan_galaxy.toggled.connect(self.update_scan_button_state)
         self.chk_scan_gog_web.toggled.connect(self.update_scan_button_state)
         self.chk_scan_epic.toggled.connect(self.update_scan_button_state)

@@ -36,6 +36,9 @@ class FullScanWorker(QThread):
         self.config['enable_steam_web'] = self.do_steam
         self.config['download_images'] = self.do_download_images
         
+        # WHY: Dynamic execution flag. If no platforms are checked but images are requested, trigger the standalone media backfill mode.
+        self.config['images_only'] = not any([self.do_galaxy, self.do_local, self.do_gog_web, self.do_epic, self.do_steam]) and self.do_download_images
+        
         if 'local_scan_config' not in self.config:
             self.config['local_scan_config'] = {}
         self.config['local_scan_config']['enable_local_scan'] = self.do_local
@@ -66,16 +69,17 @@ class FilterWorker(QThread):
         
         if search:
             if search_target == 'Name':
-                mask_title = df['Clean_Title'].fillna('').str.lower().str.contains(search)
-                mask_folder = df['Folder_Name'].fillna('').str.lower().str.contains(search)
-                mask_search = df['Search_Title'].fillna('').str.lower().str.contains(search) if 'Search_Title' in df.columns else False
+                # WHY: regex=False treats the search as a literal string, preventing crashes from special characters.
+                mask_title = df['Clean_Title'].fillna('').str.lower().str.contains(search, regex=False)
+                mask_folder = df['Folder_Name'].fillna('').str.lower().str.contains(search, regex=False)
+                mask_search = df['Search_Title'].fillna('').str.lower().str.contains(search, regex=False) if 'Search_Title' in df.columns else False
                 df = df[mask_title | mask_folder | mask_search]
             elif search_target == 'Developer':
-                df = df[df['Developer'].fillna('').str.lower().str.contains(search)]
+                df = df[df['Developer'].fillna('').str.lower().str.contains(search, regex=False)]
             elif search_target == 'Publisher':
-                df = df[df['Publisher'].fillna('').str.lower().str.contains(search)]
+                df = df[df['Publisher'].fillna('').str.lower().str.contains(search, regex=False)]
             elif search_target == 'Summary':
-                df = df[df['Summary'].fillna('').str.lower().str.contains(search)]
+                df = df[df['Summary'].fillna('').str.lower().str.contains(search, regex=False)]
             
         is_scan_new = self.params.get('scan_new', False)
         is_scan_dlc = self.params.get('scan_dlc', False)

@@ -138,11 +138,10 @@ def scan_local_system(config, games_dict, worker_thread=None):
 
                 if act_str in ["Added", "Merged"]:
                     log_act = act_str
-                    img_str = "Yes" if game.data.get('Image_Link') else "No "
-                    trl_str = "Yes" if game.data.get('Trailer_Link') else "No "
                     
                     action_title = f"{log_act:<14} : {folder}"
-                    logging.info(f"|{action_title[:55]:<55}| Img: {img_str[:3]:<3} | Trl: {trl_str[:3]:<3} |")
+                    # WHY: Simplified local scanner logging to a single wide column as requested.
+                    logging.info(f"|{action_title[:78]:<78}|")
 
     existing_folders = list(games_dict.keys())
     for folder in existing_folders:
@@ -180,11 +179,12 @@ def scan_local_system(config, games_dict, worker_thread=None):
                 if 'Local Copy' in platform_list: platform_list.remove('Local Copy')
                 game_to_check.data['Platforms'] = ", ".join(sorted(platform_list))
                 action_title = f"{'Unlinked':<14} : {folder}"
-                logging.info(f"|{action_title[:55]:<55}| Img: No  | Trl: No  |")
+                # WHY: Simplified local scanner logging to a single wide column.
+                logging.info(f"|{action_title[:78]:<78}|")
                 stats['updated'] += 1
             else:
                 action_title = f"{'Deleted':<14} : {folder}"
-                logging.info(f"|{action_title[:55]:<55}| Img: No  | Trl: No  |")
+                logging.info(f"|{action_title[:78]:<78}|")
                 del games_dict[folder]
                 stats['deleted'] += 1
                 stats['deleted_titles'].append(folder)
