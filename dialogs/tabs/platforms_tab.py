@@ -36,11 +36,11 @@ class PlatformsTabWidget(QWidget):
         self.platform_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         
         platforms = [
-            ("gog", "GOG", "© CD Projekt"), ("epic", "Epic Games Store", "© Epic Games"), 
-            ("steam", "Steam", "© Valve Corporation"), ("amazon", "Amazon", "© Amazon.com, Inc."), 
-            ("uplay", "Uplay", "© Ubisoft"), ("battlenet", "Battle.net", "© Blizzard Entertainment"),
-            ("origin", "Origin", "© Electronic Arts"), ("itch", "itch.io", "© Itch Corp"), 
-            ("xbox", "Xbox", "© Microsoft"), ("psn", "PSN", "© Sony Interactive Entertainment")
+            ("igdb", "IGDB", "© Twitch Interactive"), ("gog", "GOG", "© CD Projekt"), 
+            ("epic", "Epic Games Store", "© Epic Games"), ("steam", "Steam", "© Valve Corporation"), 
+            ("amazon", "Amazon", "© Amazon.com, Inc."), ("uplay", "Uplay", "© Ubisoft"), 
+            ("battlenet", "Battle.net", "© Blizzard Entertainment"), ("origin", "Origin", "© Electronic Arts"), 
+            ("itch", "itch.io", "© Itch Corp"), ("xbox", "Xbox", "© Microsoft")
         ]
         
         self.platform_table.setRowCount(len(platforms))
@@ -53,7 +53,12 @@ class PlatformsTabWidget(QWidget):
             self.platform_table.setCellWidget(row, 0, lbl_name)
             
             is_connected = False
-            if p_id == "gog":
+            if p_id == "igdb":
+                try:
+                    from backend.igdb.login_igdb import is_igdb_connected
+                    is_connected = is_igdb_connected()
+                except ImportError: pass
+            elif p_id == "gog":
                 try:
                     from backend.gog.login_gog import is_gog_connected
                     is_connected = is_gog_connected()
@@ -92,7 +97,20 @@ class PlatformsTabWidget(QWidget):
             btn.setStyleSheet("")
 
     def handle_platform_action(self, platform_id, btn):
-        if platform_id == "gog":
+        if platform_id == "igdb":
+            from backend.igdb.login_igdb import is_igdb_connected, disconnect_igdb
+            if is_igdb_connected():
+                disconnect_igdb()
+                self.update_platform_btn_ui(btn, False)
+                self.connection_changed.emit("igdb", False)
+            else:
+                from dialogs.igdb_auth_dialog import IGDBAuthDialog
+                dlg = IGDBAuthDialog(self.window())
+                if dlg.exec():
+                    self.update_platform_btn_ui(btn, True)
+                    self.connection_changed.emit("igdb", True)
+                    
+        elif platform_id == "gog":
             try: from dialogs.login_browser_dialog import LoginBrowserDialog 
             except ImportError:
                 QMessageBox.critical(self, "Missing Dependency", "Please install PySide6-WebEngine to use platform connections:\n\npip install PySide6-WebEngine")
@@ -152,34 +170,16 @@ class PlatformsTabWidget(QWidget):
                         else: QMessageBox.warning(self.window(), "Login Failed", translator.tr("msg_epic_invalid_code"))
                 QTimer.singleShot(200, prompt_token)
         elif platform_id == "steam":
-            try: from dialogs.login_browser_dialog import LoginBrowserDialog 
-            except ImportError:
-                QMessageBox.critical(self, "Missing Dependency", "Please install PySide6-WebEngine to use platform connections:\n\npip install PySide6-WebEngine")
-                return
-                
-            from backend.steam.login_steam import is_steam_connected, disconnect_steam, save_steam_session
+            from backend.steam.login_steam import is_steam_connected, disconnect_steam
             if is_steam_connected():
                 disconnect_steam()
                 self.update_platform_btn_ui(btn, False)
                 self.connection_changed.emit("steam", False)
             else:
-                url = "https://steamcommunity.com/login/home/?goto="
-                # WHY: Set parent to None and use ApplicationModal to create a non-blocking but globally modal window.
-                dlg = LoginBrowserDialog(url, target_cookies=["steamLoginSecure"], parent=None)
-                dlg.setWindowModality(Qt.ApplicationModal)
-                self._active_dlg = dlg
-                
-                def on_steam_finished(result):
-                    def handle_steam_result():
-                        if dlg.success_triggered and 'steamLoginSecure' in dlg.cookies:
-                            save_steam_session(dlg.cookies)
-                            self.update_platform_btn_ui(btn, True)
-                            self.connection_changed.emit("steam", True)
-                        else: QMessageBox.warning(self.window(), "Login Failed", translator.tr("msg_login_failed"))
-                        dlg.deleteLater()
-                    QTimer.singleShot(100, handle_steam_result)
-                    self._active_dlg = None
-                dlg.finished.connect(on_steam_finished)
-                dlg.show()
+                from dialogs.steam_auth_dialog import SteamAuthDialog
+                dlg = SteamAuthDialog(self.window())
+                if dlg.exec():
+                    self.update_platform_btn_ui(btn, True)
+                    self.connection_changed.emit("steam", True)
         else:
             QMessageBox.information(self.window(), "Info", translator.tr("tools_platform_not_impl"))

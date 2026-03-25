@@ -21,9 +21,21 @@ class LibraryController(QObject):
     @Slot()
     def trigger_initial_settings(self):
         """WHY: Explicitly bound slot guarantees the PySide6 C++ engine retains the reference for the delayed timer."""
-        logging.info("[STARTUP] Triggering initial Settings Dialog...")
-        if hasattr(self.mw, 'menu_controller'):
-            self.mw.menu_controller.open_settings(tab_index=1)
+        try:
+            from backend.igdb.login_igdb import is_igdb_connected
+            igdb_ready = is_igdb_connected()
+        except ImportError:
+            igdb_ready = False
+            
+        if not igdb_ready:
+            logging.info("[STARTUP] Missing IGDB configuration detected. Redirecting user to Platform Manager.")
+            QMessageBox.information(self.mw, translator.tr("app_title"), translator.tr("msg_welcome_first_launch"))
+            if hasattr(self.mw, 'menu_controller'):
+                self.mw.menu_controller.open_settings(tab_index=2)
+        else:
+            logging.info("[STARTUP] Triggering initial Settings Dialog...")
+            if hasattr(self.mw, 'menu_controller'):
+                self.mw.menu_controller.open_settings(tab_index=1)
 
     def get_second_visible_folder(self):
         """WHY: Finds the second item visible at the top of the list to act as a stable layout anchor immune to pixel shifts."""
@@ -191,6 +203,15 @@ class LibraryController(QObject):
         self.mw.settings_controller.refresh_scan_folders_ui()
 
         if self.mw.is_startup:
+            # WHY: The first launch process must always trigger on boot if the IGDB keys are missing, 
+            # regardless of whether the local database and settings already exist.
+            try:
+                from backend.igdb.login_igdb import is_igdb_connected
+                if not is_igdb_connected():
+                    self.mw.force_settings_open = True
+            except ImportError:
+                pass
+                
             if not os.path.exists(lib_settings_file):
                 self.mw.force_settings_open = True            
             self.mw.filter_controller.start_filter_worker()

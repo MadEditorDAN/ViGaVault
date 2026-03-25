@@ -48,3 +48,24 @@ def exchange_code_for_token(exchange_code):
         if resp.status_code == 200: return resp.json()
     except: pass
     return None
+
+def refresh_epic_token():
+    """WHY: Automatically requests a fresh 36-hour access token using the 1-year master refresh token."""
+    session = get_epic_session()
+    refresh_token = session.get("refresh_token")
+    if not refresh_token: return None
+    
+    url = "https://account-public-service-prod.ol.epicgames.com/account/api/oauth/token"
+    headers = {
+        "Authorization": "Basic MzRhMDJjZjhmNDQxNGUyOWIxNTkyMTg3NmRhMzZmOWE6ZGFhZmJjY2M3Mzc3NDUwMzlkZmZlNTNkOTRmYzc2Y2Y=",
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    payload = {"grant_type": "refresh_token", "refresh_token": refresh_token}
+    try:
+        resp = requests.post(url, headers=headers, data=payload, timeout=10)
+        if resp.status_code == 200:
+            new_data = resp.json()
+            save_epic_session(new_data)
+            return new_data.get("access_token")
+    except: pass
+    return None

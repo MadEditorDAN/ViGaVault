@@ -41,6 +41,7 @@ class MediaManagerDialog(QDialog):
         self.chk_image = QCheckBox(translator.tr("media_manager_col_image"))
         self.chk_trailer = QCheckBox(translator.tr("media_manager_col_trailer"))
         self.chk_hidden = QCheckBox(translator.tr("media_manager_chk_show_hidden"))
+        
         self.chk_image.setChecked(True)
         self.chk_trailer.setChecked(True)
         self.chk_hidden.setChecked(False)
@@ -103,6 +104,37 @@ class MediaManagerDialog(QDialog):
         
         header.setSectionResizeMode(len(headers) - 2, QHeaderView.Stretch)
         header.setSectionResizeMode(len(headers) - 1, QHeaderView.ResizeToContents)
+        
+        # WHY: Smart Refresh - Automatically perform an O(1) hash map validation against the physical disk to instantly sync ghost assets.
+        if check_img:
+            images_dir = self.manager.config.get('image_path', os.path.join(BASE_DIR, 'images'))
+            disk_images = {f.lower() for f in os.listdir(images_dir)} if os.path.exists(images_dir) else set()
+            
+            discrepancies = []
+            for folder, game in self.manager.games.items():
+                db_has_image = str(game.data.get('Has_Image')).lower() in ['true', '1']
+                img_link = game.data.get('Image_Link', '')
+                img_basename = os.path.basename(img_link).lower()
+                
+                physical_exists = bool(img_basename and img_basename in disk_images)
+                if db_has_image != physical_exists:
+                    discrepancies.append((folder, physical_exists))
+                    
+            if discrepancies:
+                reply = QMessageBox.question(
+                    self, 
+                    translator.tr("media_manager_verify_title"), 
+                    translator.tr("media_manager_verify_msg", count=len(discrepancies)),
+                    QMessageBox.Yes | QMessageBox.No
+                )
+                if reply == QMessageBox.Yes:
+                    for folder, physical_exists in discrepancies:
+                        game = self.manager.games[folder]
+                        game.data['Has_Image'] = physical_exists
+                        if hasattr(self.parent_window, 'library_controller'):
+                            self.parent_window.library_controller.patch_memory_df(folder, {'Has_Image': physical_exists})
+                    self.manager.save_db()
+                    self.global_changes_made = True
         
         missing_img_count = 0
         missing_trl_count = 0

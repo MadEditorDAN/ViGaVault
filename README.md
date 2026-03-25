@@ -61,6 +61,8 @@ ViGaVault is actively evolving. Planned features include:
 
 ---
 
-## 📄 License
+## License / Copyright
 
-*(Specify your license here, e.g., MIT License, GPL-3.0, etc.)*
+Copyright (c) 2024-2026 MadEditorDAN. All rights reserved.
+
+Commercial or private use, modification, and distribution of this software are strictly prohibited without prior written permission from the copyright holder.

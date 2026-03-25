@@ -6,7 +6,7 @@ import difflib
 import re
 from datetime import datetime
 
-from .login_epic import get_epic_session
+from .login_epic import get_epic_session, refresh_epic_token
 from backend.api_igdb import get_igdb_access_token
 from backend.game import Game
 from ViGaVault_utils import get_safe_filename, normalize_genre
@@ -14,6 +14,13 @@ from ViGaVault_utils import get_safe_filename, normalize_genre
 def scan_epic_account(config, games_dict, worker_thread=None):
     session = get_epic_session()
     access_token = session.get("access_token")
+    
+    # WHY: Always refresh the token at the start of a scan to guarantee it hasn't expired.
+    fresh_token = refresh_epic_token()
+    if fresh_token:
+        access_token = fresh_token
+    else:
+        logging.warning("[EPIC GAMES] Could not refresh token. Attempting to use the existing one.")
     
     if not access_token:
         logging.error("[EPIC GAMES] No valid OAuth token found. Please connect your account in the Platform Manager.")

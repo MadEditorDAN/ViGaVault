@@ -204,8 +204,16 @@ class LibraryManager:
             status = game.data.get('Status_Flag')
 
             # --- PHASE 1: METADATA SCRAPING ---
-            # WHY: Only scrape games marked as NEW. This completely prevents infinite API loops on broken titles.
-            if status == 'NEW':
+            # WHY: Scrape NEW games, or existing games that physically lost their image and lack a backup Cover_URL.
+            # This prevents Local Copies from remaining permanently broken if their images are manually deleted.
+            db_has_img = str(game.data.get('Has_Image')).lower() in ['true', '1']
+            needs_cover_rescue = not db_has_img and not game.data.get('Cover_URL')
+            
+            if status == 'NEW' or needs_cover_rescue:
+                title_disp = game.data.get('Clean_Title', folder)
+                # WHY: Provide real-time visual feedback so the UI doesn't appear frozen during massive backlog scrapes.
+                logging.info(f"|{'Scraping : ' + title_disp[:45]:<56}|    Querying IGDB    |")
+                
                 if igdb_token is None: igdb_token = get_igdb_access_token()
                 
                 if igdb_token:

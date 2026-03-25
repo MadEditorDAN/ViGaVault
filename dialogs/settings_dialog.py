@@ -62,16 +62,22 @@ class SettingsDialog(QDialog):
     def on_platform_connection_changed(self, platform_id, is_connected):
         """WHY: Single Responsibility - Listens to the Platforms tab and updates the main sidebar state safely."""
         if self.parent_window and hasattr(self.parent_window, 'sidebar'):
+            if platform_id == "igdb":
+                self.parent_window.igdb_connected_cache = is_connected
+                self.parent_window.sidebar.update_scan_button_state()
             if platform_id == "epic":
                 self.parent_window.sidebar.chk_scan_epic.setEnabled(is_connected)
+                if is_connected: self.parent_window.sidebar.chk_scan_epic.setChecked(True)
                 if not is_connected: self.parent_window.sidebar.chk_scan_epic.setChecked(False)
                 self.parent_window.epic_connected_cache = is_connected
             elif platform_id == "gog":
                 self.parent_window.sidebar.chk_scan_gog_web.setEnabled(is_connected)
+                if is_connected: self.parent_window.sidebar.chk_scan_gog_web.setChecked(True)
                 if not is_connected: self.parent_window.sidebar.chk_scan_gog_web.setChecked(False)
                 self.parent_window.gog_connected_cache = is_connected
             elif platform_id == "steam":
                 self.parent_window.sidebar.chk_scan_steam.setEnabled(is_connected)
+                if is_connected: self.parent_window.sidebar.chk_scan_steam.setChecked(True)
                 if not is_connected: self.parent_window.sidebar.chk_scan_steam.setChecked(False)
                 self.parent_window.steam_connected_cache = is_connected
             self.parent_window.sidebar.update_scan_button_state()
@@ -170,9 +176,13 @@ class SettingsDialog(QDialog):
         if new_galaxy != self.initial_galaxy or new_local != self.initial_local or new_gog_web != self.initial_gog_web or new_epic_web != self.initial_epic_web or new_steam_web != self.initial_steam_web:
             if self.parent_window and hasattr(self.parent_window, 'sidebar'):
                 self.parent_window.sidebar.chk_scan_galaxy.setEnabled(new_galaxy)
-                if not new_galaxy: self.parent_window.sidebar.chk_scan_galaxy.setChecked(False)
+                if new_galaxy and not self.initial_galaxy: self.parent_window.sidebar.chk_scan_galaxy.setChecked(True)
+                elif not new_galaxy: self.parent_window.sidebar.chk_scan_galaxy.setChecked(False)
+                
                 self.parent_window.sidebar.chk_scan_local.setEnabled(new_local)
-                if not new_local: self.parent_window.sidebar.chk_scan_local.setChecked(False)
+                if new_local and not self.initial_local: self.parent_window.sidebar.chk_scan_local.setChecked(True)
+                elif not new_local: self.parent_window.sidebar.chk_scan_local.setChecked(False)
+                
             self.parent_window.sidebar.update_scan_button_state()
             self.initial_galaxy = new_galaxy
             self.initial_gog_web = new_gog_web

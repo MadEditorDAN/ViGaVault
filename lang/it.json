@@ -236,5 +236,9 @@
     "msg_epic_input_title": "Token",
     "msg_epic_input_prompt": "Incolla il testo (CTRL-V) qui:",
     "msg_epic_invalid_code": "Impossibile trovare un codice di autorizzazione valido di 32 caratteri nel tuo inserimento.",
-    "msg_epic_token_failed": "Impossibile negoziare il token OAuth. Il codice potrebbe essere scaduto."
+    "msg_epic_token_failed": "Impossibile negoziare il token OAuth. Il codice potrebbe essere scaduto.",
+    "media_manager_verify_title": "Discrepanze Trovate",
+    "media_manager_verify_msg": "La scansione ha rivelato che mancavano {count} immagini nella cartella delle immagini, Vuoi aggiornare il database?",
+    "msg_steam_instructions": "1. Vai alla <a href='https://steamcommunity.com/dev/apikey'><span style='color: #2196F3;'>Pagina della chiave API di Steam</span></a> per ottenere la tua chiave (Usa 'localhost' come dominio).<br>2. Inserisci la tua chiave API di Steam e l'<b>URL del tuo Profilo Steam</b> qui sotto.<br>3. Assicurati che l'impostazione sulla privacy 'Dettagli del gioco' del tuo profilo Steam sia impostata su <b>Pubblico</b>.",
+    "msg_steam_invalid_keys": "Chiave API Web di Steam o URL del profilo non validi oppure i dettagli del gioco non sono impostati su Pubblico."
 }

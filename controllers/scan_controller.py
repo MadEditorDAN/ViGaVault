@@ -43,6 +43,22 @@ class ScanController(QObject):
         if self.mw.full_scan_in_progress:
             QMessageBox.information(self.mw, "Info", translator.tr("msg_task_in_progress"))
             return
+            
+        # WHY: Interactive Prerequisite Checks. Since the button is always enabled, 
+        # we explicitly audit the environment here and popup a warning guiding the user if something is missing.
+        igdb_connected = getattr(self.mw, 'igdb_connected_cache', False)
+        if not igdb_connected:
+            QMessageBox.warning(self.mw, "IGDB Required", translator.tr("msg_scan_disabled_igdb"))
+            if hasattr(self.mw, 'menu_controller'):
+                self.mw.menu_controller.open_settings(tab_index=2)
+            return
+
+        has_source = self.mw.sidebar.chk_scan_galaxy.isChecked() or self.mw.sidebar.chk_scan_gog_web.isChecked() or self.mw.sidebar.chk_scan_epic.isChecked() or self.mw.sidebar.chk_scan_steam.isChecked() or self.mw.sidebar.chk_scan_local.isChecked()
+        if not has_source:
+            QMessageBox.warning(self.mw, translator.tr("scan_settings_title"), translator.tr("msg_scan_disabled_source"))
+            # WHY: Auto-open the scan settings panel so the user knows exactly where to look.
+            self.open_scan_settings()
+            return
 
         try:
             output = subprocess.check_output('tasklist', shell=True).decode(errors='ignore')

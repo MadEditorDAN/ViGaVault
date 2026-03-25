@@ -254,7 +254,7 @@ class Sidebar(QWidget):
         self.layout_scan_platforms.addWidget(self.chk_scan_steam, 1, 1)
 
         # WHY: Inject placeholders for all upcoming platforms in a clean 2-column grid.
-        dummies = ["Amazon", "Uplay", "Battle.net", "Origin", "Itch", "Xbox", "PSN"]
+        dummies = ["Amazon", "Uplay", "Battle.net", "Origin", "Itch", "Xbox"]
         r, c = 2, 0
         for d in dummies:
             chk = QCheckBox(d)
@@ -344,6 +344,7 @@ class Sidebar(QWidget):
         self.chk_scan_gog_web.toggled.connect(self.update_scan_button_state)
         self.chk_scan_epic.toggled.connect(self.update_scan_button_state)
         self.chk_scan_local.toggled.connect(self.update_scan_button_state)
+        self.chk_scan_steam.toggled.connect(self.update_scan_button_state)
 
         # Scan Connections
         self.scan_btn.clicked.connect(self.parent.on_manual_search_trigger)
@@ -390,10 +391,11 @@ class Sidebar(QWidget):
         self.scan_results.setStyleSheet(f"font-family: Consolas, 'Courier New', monospace; font-size: {best_size}px;")
 
     def update_scan_button_state(self):
-        """WHY: Single Responsibility - Enables or disables the Scan button based on selected sources."""
-        if getattr(self.parent, 'full_scan_in_progress', False): return
-        has_source = self.chk_scan_galaxy.isChecked() or self.chk_scan_gog_web.isChecked() or self.chk_scan_epic.isChecked() or self.chk_scan_steam.isChecked() or self.chk_scan_local.isChecked()
-        self.btn_full_scan.setEnabled(has_source)
+        """WHY: Single Responsibility - Safely restores the Scan button state. 
+        Since tooltips are forbidden, the button now stays enabled permanently so it can fire 
+        informative rejection popups instead of silently locking the user out."""
+        if not getattr(self.parent, 'full_scan_in_progress', False):
+            self.btn_full_scan.setEnabled(True)
 
     def set_search_target(self, target, ph_key):
         """Dynamically swaps the placeholder text and triggers an instant refilter."""

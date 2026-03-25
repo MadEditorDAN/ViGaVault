@@ -196,6 +196,13 @@ class SettingsController(QObject):
             except ImportError: steam_enabled = False
             self.mw.steam_connected_cache = steam_enabled
             
+            # WHY: Cache IGDB status immediately on load so the UI logic doesn't constantly ping the disk.
+            try:
+                from backend.igdb.login_igdb import is_igdb_connected
+                self.mw.igdb_connected_cache = is_igdb_connected()
+            except ImportError: 
+                self.mw.igdb_connected_cache = False
+        
             if hasattr(self.mw.sidebar, 'chk_scan_steam'):
                 self.mw.sidebar.chk_scan_steam.setEnabled(steam_enabled)
                 if not steam_enabled: self.mw.sidebar.chk_scan_steam.setChecked(False)
