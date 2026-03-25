@@ -3,13 +3,8 @@
 __pycache__/
 *.py[cod]
 
-# Tes logs et bases de données et images
-*.log
-*.csv
-
-# retire les json du root
+# .json du root
 /*.json 
-# mais garde ceux des sous-dossiers
 !/**/ *.json
 
 # Dossiers a ignorer
@@ -18,9 +13,14 @@ dist/
 !assets/images/
 videos/
 tools/
+build/
+
+# Fichiers a ignorer
 INSTRUCTIONS.md
 todo.txt
 DAN-todo.txt
+*.log
+*.csv
 
 # Dossier VS Code
 .vscode/
