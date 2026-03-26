@@ -69,9 +69,7 @@ ViGaVault is actively evolving. Key planned features include:
 
 ## License / Copyright
 
-Copyright (c) 2024-2026 MadEditor. All rights reserved.
-
-Commercial or private use, modification, and distribution of this software are strictly prohibited without prior written permission from the copyright holder.
+This project is licensed under the MIT License - see the license file for details.
 
 <p align="right">
   <img src="assets/images/MadEditor_Logo_Dark.png" alt="MadEditor Logo" width="500"/>
