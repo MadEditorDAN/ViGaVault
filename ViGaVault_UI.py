@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QListView, QWidget,
 from PySide6.QtCore import Qt, QTimer, QThreadPool, Slot
 from PySide6.QtGui import QFont
 
-from ViGaVault_utils import setup_logging, translator, apply_theme, MAIN_WINDOW_SIZE, DEFAULT_DISPLAY_SETTINGS
+from ViGaVault_utils import setup_logging, translator, apply_theme, MAIN_WINDOW_SIZE, DEFAULT_DISPLAY_SETTINGS, load_encrypted_json
 from widgets import Sidebar
 
 from controllers import MenuController, LibraryController, ListController, FilterController, ScanController, SettingsController, GameOperationsController
@@ -81,12 +81,7 @@ class MainWindow(QMainWindow):
         self.master_df['temp_sort_date'] = pd.to_datetime([])
         self.master_df['temp_sort_title'] = []
         
-        global_settings = {}
-        if os.path.exists("settings.json"):
-            try:
-                with open("settings.json", "r", encoding='utf-8') as f:
-                    global_settings = json.load(f)
-            except: pass
+        global_settings = load_encrypted_json(os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.dat"))
             
         self.date_format_str = global_settings.get("date_format", "DD/MM/YYYY")
         # WHY: Instantiate Controllers
@@ -110,12 +105,11 @@ class MainWindow(QMainWindow):
         self.library_controller.load_database_async()
         self.library_controller.update_library_info()
 
-        if os.path.exists("settings.json"):
-            # WHY: Point the startup loader to the new dedicated SettingsController.
-            saved_anchor = self.settings_controller.load_settings()
-            if saved_anchor:
-                self.pending_anchor_folder = saved_anchor
-        else:
+        saved_anchor = self.settings_controller.load_settings()
+        if saved_anchor:
+            self.pending_anchor_folder = saved_anchor
+            
+        if not os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.dat")):
             self.sidebar.combo_sort.setCurrentIndex(0)
 
     # =================================================================================
@@ -157,12 +151,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
 
     # Load and apply theme/language at startup
-    global_settings = {}
-    if os.path.exists("settings.json"):
-        try:
-            with open("settings.json", "r", encoding='utf-8') as f:
-                global_settings = json.load(f)
-        except: pass
+    global_settings = load_encrypted_json(os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.dat"))
     
     apply_theme(app, global_settings.get("theme", "System"))
     translator.load_language(global_settings.get("language", "English"))

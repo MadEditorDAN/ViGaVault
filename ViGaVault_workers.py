@@ -8,8 +8,7 @@ from PySide6.QtCore import QThread, Signal, QRunnable, QObject
 from PySide6.QtGui import QImage
 
 from backend.library import LibraryManager
-from ViGaVault_utils import get_db_path, build_scanner_config, get_library_settings_file
-import json
+from ViGaVault_utils import get_db_path, build_scanner_config, get_library_settings_file, load_encrypted_json
 
 # --- WORKER THREADS ---
 # Operations like scanning or filtering can take time. We run them in separate threads
@@ -150,17 +149,12 @@ class DbLoaderWorker(QThread):
                 # WHY: Targeted Update - Instead of destructively dropping rows, strictly flag them via 'Is_Excluded' so they remain in memory.
                 df['Is_Excluded'] = False
                 lib_settings_file = get_library_settings_file()
-                if os.path.exists(lib_settings_file):
-                    try:
-                        with open(lib_settings_file, "r", encoding='utf-8') as f:
-                            settings = json.load(f)
-                            exclusions = settings.get("exclusion_words", [])
-                            if exclusions:
-                                pattern = '|'.join([re.escape(w) for w in exclusions])
-                                mask = df['Clean_Title'].str.contains(pattern, case=False, na=False)
-                                df.loc[mask, 'Is_Excluded'] = True
-                    except Exception as e:
-                        logging.error(f"Error applying exclusions: {e}")
+                settings = load_encrypted_json(lib_settings_file)
+                exclusions = settings.get("exclusion_words", [])
+                if exclusions:
+                    pattern = '|'.join([re.escape(w) for w in exclusions])
+                    mask = df['Clean_Title'].str.contains(pattern, case=False, na=False)
+                    df.loc[mask, 'Is_Excluded'] = True
 
                 parsed_dates = pd.to_datetime(df['Original_Release_Date'], format=date_fmt, errors='coerce')
                 # WHY: Pass 2 - Catch dates that failed (like pure "2020" years) and fallback to generic parsing.

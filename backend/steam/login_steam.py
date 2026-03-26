@@ -1,12 +1,11 @@
 # WHY: Single Responsibility Principle - Strictly manages Steam API key storage and validation.
 import os
-import json
 import requests
 import re
-from ViGaVault_utils import BASE_DIR
+from ViGaVault_utils import BASE_DIR, save_encrypted_json, load_encrypted_json
 
 STEAM_DIR = os.path.join(BASE_DIR, "backend", "steam")
-SESSION_FILE = os.path.join(STEAM_DIR, "steam_session.json")
+SESSION_FILE = os.path.join(STEAM_DIR, "steam_session.dat")
 
 def is_steam_connected():
     """Checks if a valid API Key file exists for the Steam platform."""
@@ -20,15 +19,10 @@ def disconnect_steam():
 def save_steam_session(data_dict):
     """Securely dumps the Steam API key and SteamID into a local JSON file."""
     os.makedirs(STEAM_DIR, exist_ok=True)
-    with open(SESSION_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data_dict, f, indent=4)
+    save_encrypted_json(SESSION_FILE, data_dict)
         
 def get_steam_session():
-    if not is_steam_connected(): return {}
-    try:
-        with open(SESSION_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except: return {}
+    return load_encrypted_json(SESSION_FILE)
 
 def validate_steam_keys(api_key, steam_input):
     """WHY: Resolves the SteamID if a URL/Username was provided, then strictly validates it against the user's Privacy Settings."""

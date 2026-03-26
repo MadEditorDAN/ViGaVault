@@ -1,7 +1,6 @@
 # WHY: Single Responsibility Principle - Exclusively handles loading/saving application 
 # configurations (JSON), window geometry, themes, languages, and UI sidebar generation.
 import os
-import json
 import shutil
 import logging
 from datetime import datetime
@@ -10,7 +9,7 @@ from PySide6.QtWidgets import QApplication, QCheckBox
 
 from backend.library import LibraryManager
 from ViGaVault_utils import (get_library_settings_file, build_scanner_config, get_platform_config, 
-                             apply_theme, translator, DEFAULT_DISPLAY_SETTINGS)
+                             apply_theme, translator, DEFAULT_DISPLAY_SETTINGS, save_encrypted_json, load_encrypted_json)
 
 class SettingsController(QObject):
     def __init__(self, main_window):
@@ -18,20 +17,12 @@ class SettingsController(QObject):
         self.mw = main_window
 
     def get_user_settings(self):
-        global_settings = {}
-        if os.path.exists("settings.json"):
-            try:
-                with open("settings.json", "r", encoding='utf-8') as f:
-                    global_settings = json.load(f)
-            except: pass
-
-        lib_settings_file = get_library_settings_file()
-        lib_settings = {}
-        if os.path.exists(lib_settings_file):
-            try:
-                with open(lib_settings_file, "r", encoding='utf-8') as f:
-                    lib_settings = json.load(f)
-            except: pass
+        global_settings = load_encrypted_json(os.path.join(os.path.dirname(self.mw.sender().parent().parent().parent().objectName()) if False else os.path.abspath("."), "settings.dat")) if not hasattr(self, '_base_path') else load_encrypted_json(os.path.join(self._base_path, "settings.dat"))
+        
+        # WHY: Hard fallback directory generation to guarantee load path since PySide parent hierarchies can fluctuate during teardown.
+        base_path = os.path.abspath(".")
+        global_settings = load_encrypted_json(os.path.join(base_path, "settings.dat"))
+        lib_settings = load_encrypted_json(get_library_settings_file())
         return global_settings, lib_settings
 
     def save_user_settings(self, display_state, data_state, old_image_path=None, move_images=False):
@@ -41,10 +32,7 @@ class SettingsController(QObject):
         local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "view_new", "view_dlc", "view_review", "filter_states", "filter_expansion", "sidebar_chk_galaxy", "sidebar_chk_gog_web", "sidebar_chk_epic", "sidebar_chk_steam", "sidebar_chk_local", "sidebar_chk_folders", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_galaxy_db", "galaxy_db_path", "download_images", "download_videos", "image_path", "video_path"]
         for k in local_keys: global_settings.pop(k, None)
         
-        try:
-            with open("settings.json", "w", encoding='utf-8') as f:
-                json.dump(global_settings, f, indent=4)
-        except Exception as e: logging.error(f"Failed to save global settings: {e}")
+        save_encrypted_json(os.path.join(os.path.abspath("."), "settings.dat"), global_settings)
 
         global_keys = ["geometry", "theme", "language", "card_image_size", "card_button_size", "card_text_size", "db_path", "splitter_sizes"]
         for k in global_keys: lib_settings.pop(k, None)
@@ -67,10 +55,7 @@ class SettingsController(QObject):
                     shutil.move(src, dst)
             except Exception as e: logging.error(f"Failed to move media files: {e}")
         
-        try:
-            with open(get_library_settings_file(), "w", encoding='utf-8') as f:
-                json.dump(lib_settings, f, indent=4)
-        except Exception as e: logging.error(f"Failed to save library settings: {e}")
+        save_encrypted_json(get_library_settings_file(), lib_settings)
 
         if hasattr(self.mw, 'display_settings'):
             self.mw.display_settings['image'] = display_state['card_image_size']
@@ -78,12 +63,7 @@ class SettingsController(QObject):
             self.mw.display_settings['text'] = display_state['card_text_size']
 
     def save_settings(self):
-        global_settings = {}
-        if os.path.exists("settings.json"):
-            try:
-                with open("settings.json", "r", encoding='utf-8') as f:
-                    global_settings = json.load(f)
-            except: pass
+        global_settings = load_encrypted_json(os.path.join(os.path.abspath("."), "settings.dat"))
 
         try:
             global_settings.update({"geometry": self.mw.saveGeometry().toBase64().data().decode()})
@@ -95,18 +75,10 @@ class SettingsController(QObject):
         local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "view_new", "view_dlc", "view_review", "filter_states", "filter_expansion", "sidebar_chk_galaxy", "sidebar_chk_gog_web", "sidebar_chk_epic", "sidebar_chk_steam", "sidebar_chk_local", "sidebar_chk_folders", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_galaxy_db", "galaxy_db_path", "download_images", "download_videos", "image_path", "video_path"]
         for k in local_keys: global_settings.pop(k, None)
         
-        try:
-            with open("settings.json", "w", encoding='utf-8') as f:
-                json.dump(global_settings, f, indent=4)
-        except: pass
+        save_encrypted_json(os.path.join(os.path.abspath("."), "settings.dat"), global_settings)
 
         lib_settings_file = get_library_settings_file()
-        lib_settings = {}
-        if os.path.exists(lib_settings_file):
-             try:
-                with open(lib_settings_file, "r", encoding='utf-8') as f:
-                    lib_settings = json.load(f)
-             except: pass
+        lib_settings = load_encrypted_json(lib_settings_file)
 
         global_keys = ["geometry", "theme", "language", "card_image_size", "card_button_size", "card_text_size", "db_path", "splitter_sizes"]
         for k in global_keys: lib_settings.pop(k, None)
@@ -155,10 +127,7 @@ class SettingsController(QObject):
              lib_settings["platform_map"] = pm
              lib_settings["ignored_prefixes"] = ip
 
-        try:
-            with open(lib_settings_file, "w", encoding='utf-8') as f:
-                json.dump(lib_settings, f, indent=4)
-        except: pass
+        save_encrypted_json(lib_settings_file, lib_settings)
 
     def load_settings(self):
         global_settings, lib_settings = self.get_user_settings()
@@ -231,12 +200,7 @@ class SettingsController(QObject):
         folder_rules = config.get("local_scan_config", {}).get("folder_rules", {})
         
         lib_settings_file = get_library_settings_file()
-        lib_settings = {}
-        if os.path.exists(lib_settings_file):
-            try:
-                with open(lib_settings_file, "r", encoding='utf-8') as f:
-                    lib_settings = json.load(f)
-            except: pass
+        lib_settings = load_encrypted_json(lib_settings_file)
             
         was_saved = "sidebar_chk_folders" in lib_settings
         saved_checked = lib_settings.get("sidebar_chk_folders", [])

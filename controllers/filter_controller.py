@@ -1,10 +1,9 @@
 import os
-import json
 from PySide6.QtCore import QObject, Qt, Slot, QTimer
 from PySide6.QtWidgets import QPushButton, QCheckBox, QApplication, QSizePolicy, QAbstractItemView
 from widgets import CollapsibleFilterGroup
 from ViGaVault_workers import FilterWorker
-from ViGaVault_utils import get_library_settings_file
+from ViGaVault_utils import get_library_settings_file, load_encrypted_json
 
 class FilterController(QObject):
     def __init__(self, main_window):
@@ -28,16 +27,9 @@ class FilterController(QObject):
         rules = {}
         
         lib_settings_file = get_library_settings_file()
-        if os.path.exists(lib_settings_file):
-            try:
-                with open(lib_settings_file, "r", encoding='utf-8') as f:
-                    local_config = json.load(f).get("local_scan_config", {})
-            except: pass
-        elif os.path.exists("settings.json"):
-            try:
-                with open("settings.json", "r", encoding='utf-8') as f:
-                    local_config = json.load(f).get("local_scan_config", {})
-            except: pass
+        local_config = load_encrypted_json(lib_settings_file).get("local_scan_config", {})
+        if not local_config:
+            local_config = load_encrypted_json(os.path.join(os.path.abspath("."), "settings.dat")).get("local_scan_config", {})
             
         scan_mode = local_config.get("scan_mode", "advanced")
         rules = local_config.get("folder_rules", {})

@@ -1,13 +1,12 @@
 # WHY: Single Responsibility Principle - Dedicated view strictly for Batch Game Management and Exclusion List configuration.
 import os
-import json
 import re
 import pandas as pd
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                                QTableView, QLineEdit, QLabel, QGroupBox, QAbstractItemView,
                                QHeaderView, QCheckBox, QFormLayout, QMessageBox, QStyledItemDelegate)
 from PySide6.QtCore import Qt, QAbstractTableModel, QTimer, Signal
-from ViGaVault_utils import translator, get_library_settings_file, center_window
+from ViGaVault_utils import translator, get_library_settings_file, center_window, load_encrypted_json, save_encrypted_json
 from widgets import CheckableComboBox
 
 class ReadOnlyTextDelegate(QStyledItemDelegate):
@@ -338,32 +337,17 @@ class GameManagerDialog(QDialog):
 
     def load_exclusions(self):
         lib_settings_file = get_library_settings_file()
-        if os.path.exists(lib_settings_file):
-            try:
-                with open(lib_settings_file, "r", encoding='utf-8') as f:
-                    settings = json.load(f)
-                    words = settings.get("exclusion_words", [])
-                    self.exclusion_input.setText(", ".join(words))
-            except:
-                pass
+        settings = load_encrypted_json(lib_settings_file)
+        words = settings.get("exclusion_words", [])
+        self.exclusion_input.setText(", ".join(words))
 
     def save_exclusions(self):
         # WHY: Standardize exclusion list format. Convert to lowercase for reliable case-insensitive filtering.
         words = [w.strip().lower() for w in self.exclusion_input.text().split(',') if w.strip()]
         lib_settings_file = get_library_settings_file()
-        settings = {}
-        if os.path.exists(lib_settings_file):
-            try:
-                with open(lib_settings_file, "r", encoding='utf-8') as f:
-                    settings = json.load(f)
-            except:
-                pass
+        settings = load_encrypted_json(lib_settings_file)
         settings["exclusion_words"] = words
-        try:
-            with open(lib_settings_file, "w", encoding='utf-8') as f:
-                json.dump(settings, f, indent=4)
-        except:
-            pass
+        save_encrypted_json(lib_settings_file, settings)
         
         # WHY: Targeted update - Trigger a background reload to instantly drop the games from the main view and decrement the sidebar counter.
         if hasattr(self.parent_window, 'library_controller'):

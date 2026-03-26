@@ -6,6 +6,7 @@ import json
 import re
 import logging
 import ctypes
+from cryptography.fernet import Fernet
 from datetime import datetime
 from PySide6.QtWidgets import QApplication, QStyleFactory
 from PySide6.QtGui import QPalette, QColor
@@ -20,6 +21,27 @@ else:
 
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 
+# --- SECURE I/O ENGINE ---
+# A static symmetric encryption key embedded directly in the compiled bytecode.
+_FERNET_KEY = b'7-V8yWnNqXz8D9LgK2rV_P1T9mJ2QkXn4vM_W5Bv3Xg='
+_cipher = Fernet(_FERNET_KEY)
+
+def save_encrypted_json(filepath, data):
+    """WHY: Single Responsibility - Transparently encrypts JSON dictionaries before writing to disk."""
+    try:
+        json_str = json.dumps(data, indent=4)
+        encrypted_data = _cipher.encrypt(json_str.encode('utf-8'))
+        with open(filepath, 'wb') as f: f.write(encrypted_data)
+    except Exception as e: logging.error(f"Failed to encrypt and save {filepath}: {e}")
+
+def load_encrypted_json(filepath):
+    """WHY: Zero-Trust Decryption - Returns an empty dict instantly if the file is missing, tampered with, or not encrypted with our key."""
+    if not os.path.exists(filepath): return {}
+    try:
+        with open(filepath, 'rb') as f: return json.loads(_cipher.decrypt(f.read()).decode('utf-8'))
+    except Exception as e:
+        logging.warning(f"[SECURITY] Invalid or tampered data rejected at {filepath}.")
+        return {}
 
 # --- UI CONSTANTS ---
 # WHY: DRY Principle - Centralizes standard window sizes for easy global modification.
@@ -92,68 +114,36 @@ def normalize_genre(text):
     return ", ".join(clean_parts)
 
 def get_db_path():
-    """Reads the db_path from settings.json, falling back to the default."""
-    settings_file = os.path.join(BASE_DIR, "settings.json")
+    """Reads the db_path from settings.dat, falling back to the default."""
     default_db = os.path.join(BASE_DIR, "VGVDB.csv")
-    if os.path.exists(settings_file):
-        try:
-            with open(settings_file, "r", encoding='utf-8') as f:
-                settings = json.load(f)
-                return settings.get("db_path", default_db)
-        except Exception:
-            pass
-    return default_db
+    settings = load_encrypted_json(os.path.join(BASE_DIR, "settings.dat"))
+    return settings.get("db_path", default_db)
 
 def get_library_settings_file():
-    """Returns the path to the JSON settings file for the current library."""
+    """Returns the path to the encrypted .dat configuration file for the current library."""
     db_path = get_db_path()
-    return os.path.splitext(db_path)[0] + ".json"
+    return os.path.splitext(db_path)[0] + ".dat"
 
 def get_video_path():
     """Returns the configured video path or default 'videos' folder."""
-    settings_path = get_library_settings_file()
-    default_path = os.path.join(BASE_DIR, "videos")
-    if os.path.exists(settings_path):
-        try:
-            with open(settings_path, "r", encoding='utf-8') as f:
-                settings = json.load(f)
-                return settings.get("video_path", default_path)
-        except: pass
-    return default_path
+    settings = load_encrypted_json(get_library_settings_file())
+    return settings.get("video_path", os.path.join(BASE_DIR, "videos"))
 
 def get_image_path():
     """Returns the configured image path or default 'images' folder."""
-    settings_path = get_library_settings_file()
-    default_path = os.path.join(BASE_DIR, "images")
-    if os.path.exists(settings_path):
-        try:
-            with open(settings_path, "r", encoding='utf-8') as f:
-                settings = json.load(f)
-                return settings.get("image_path", default_path)
-        except: pass
-    return default_path
+    settings = load_encrypted_json(get_library_settings_file())
+    return settings.get("image_path", os.path.join(BASE_DIR, "images"))
 
 def get_root_path():
     """Returns the configured root path from the library's settings."""
-    settings_path = get_library_settings_file()
-    default_path = ""
-    if os.path.exists(settings_path):
-        try:
-            with open(settings_path, "r", encoding='utf-8') as f:
-                settings = json.load(f)
-                return settings.get("root_path", default_path)
-        except: pass
-    global_settings_path = os.path.join(BASE_DIR, "settings.json")
-    if os.path.exists(global_settings_path):
-         try:
-            with open(global_settings_path, "r", encoding='utf-8') as f:
-                settings = json.load(f)
-                return settings.get("root_path", default_path)
-         except: pass
-    return default_path
+    settings = load_encrypted_json(get_library_settings_file())
+    if "root_path" in settings: return settings.get("root_path", "")
+    
+    global_settings = load_encrypted_json(os.path.join(BASE_DIR, "settings.dat"))
+    return global_settings.get("root_path", "")
 
 def get_platform_config():
-    """Loads platform mapping and ignore list from settings.json or returns defaults."""
+    """Loads platform mapping and ignore list from settings.dat or returns defaults."""
     default_map = {
         'gog': 'GOG', 'steam': 'Steam', 'epic': 'Epic Games Store', 'epic games store': 'Epic Games Store',
         'uplay': 'Uplay', 'ubisoft': 'Uplay', 'ubisoft connect': 'Uplay', 'origin': 'Origin', 
@@ -171,20 +161,13 @@ def get_platform_config():
         'gamesessions', 'gameuk', 'playfire', 'weplay'
     ]
     settings_path = get_library_settings_file()
-    global_settings_path = os.path.join(BASE_DIR, "settings.json")
-    if not os.path.exists(settings_path):
-        settings_path = global_settings_path
-    if os.path.exists(settings_path):
-        try:
-            with open(settings_path, "r", encoding='utf-8') as f:
-                settings = json.load(f)
-                return settings.get("platform_map", default_map), settings.get("ignored_prefixes", default_ignore)
-        except Exception as e:
-            logging.error(f"Error loading settings.json: {e}")
-    return default_map, default_ignore
+    if not os.path.exists(settings_path): settings_path = os.path.join(BASE_DIR, "settings.dat")
+        
+    settings = load_encrypted_json(settings_path)
+    return settings.get("platform_map", default_map), settings.get("ignored_prefixes", default_ignore)
 
 def get_local_scan_config():
-    """Loads local scan configuration from settings.json."""
+    """Loads local scan configuration from settings.dat."""
     default_config = {
         "enable_local_scan": False,
         "ignore_hidden": True,
@@ -194,17 +177,10 @@ def get_local_scan_config():
         "folder_rules": {}
     }
     settings_path = get_library_settings_file()
-    global_settings_path = os.path.join(BASE_DIR, "settings.json")
-    if not os.path.exists(settings_path):
-        settings_path = global_settings_path
-    if os.path.exists(settings_path):
-        try:
-            with open(settings_path, "r", encoding='utf-8') as f:
-                settings = json.load(f)
-                return settings.get("local_scan_config", default_config)
-        except:
-            pass
-    return default_config
+    if not os.path.exists(settings_path): settings_path = os.path.join(BASE_DIR, "settings.dat")
+        
+    settings = load_encrypted_json(settings_path)
+    return settings.get("local_scan_config", default_config)
 
 def get_date_format_mapping():
     """WHY: Maps human-readable UI formats to strict Python datetime strftime formats."""
@@ -219,25 +195,16 @@ def build_scanner_config():
     p_map, p_ignore = get_platform_config()
     
     settings_path = get_library_settings_file()
-    global_settings_path = os.path.join(BASE_DIR, "settings.json")
-    if not os.path.exists(settings_path):
-        settings_path = global_settings_path
+    if not os.path.exists(settings_path): settings_path = os.path.join(BASE_DIR, "settings.dat")
         
-    enable_galaxy = False
     galaxy_path = os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db')
-    download_images = False
-    download_videos = False
-    date_format_str = "DD/MM/YYYY"
-    if os.path.exists(settings_path):
-        try:
-            with open(settings_path, "r", encoding='utf-8') as f:
-                settings = json.load(f)
-                enable_galaxy = settings.get("enable_galaxy_db", False)
-                galaxy_path = settings.get("galaxy_db_path", galaxy_path)
-                download_images = settings.get("download_images", False)
-                download_videos = settings.get("download_videos", False)
-                date_format_str = settings.get("date_format", "DD/MM/YYYY")
-        except: pass
+    settings = load_encrypted_json(settings_path)
+    
+    enable_galaxy = settings.get("enable_galaxy_db", False)
+    galaxy_path = settings.get("galaxy_db_path", galaxy_path)
+    download_images = settings.get("download_images", False)
+    download_videos = settings.get("download_videos", False)
+    date_format_str = settings.get("date_format", "DD/MM/YYYY")
 
     date_format = get_date_format_mapping().get(date_format_str, "%d/%m/%Y")
 

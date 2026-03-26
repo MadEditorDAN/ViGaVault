@@ -1,11 +1,10 @@
 # WHY: Single Responsibility Principle - Strictly manages GOG authentication states and secure local cookie storage.
 import os
-import json
 import requests
-from ViGaVault_utils import BASE_DIR
+from ViGaVault_utils import BASE_DIR, save_encrypted_json, load_encrypted_json
 
 GOG_DIR = os.path.join(BASE_DIR, "backend", "gog")
-SESSION_FILE = os.path.join(GOG_DIR, "gog_session.json")
+SESSION_FILE = os.path.join(GOG_DIR, "gog_session.dat")
 
 def is_gog_connected():
     """Checks if a valid session file exists for the GOG platform."""
@@ -20,16 +19,11 @@ def disconnect_gog():
 def save_gog_session(cookies_dict):
     """Securely dumps the intercepted browser cookies into a local JSON file."""
     os.makedirs(GOG_DIR, exist_ok=True)
-    with open(SESSION_FILE, 'w', encoding='utf-8') as f:
-        json.dump(cookies_dict, f, indent=4)
+    save_encrypted_json(SESSION_FILE, cookies_dict)
         
 def get_gog_cookies():
     """Returns the stored session cookies as a Python dictionary for the scanner to use."""
-    if not is_gog_connected(): return {}
-    try:
-        with open(SESSION_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except: return {}
+    return load_encrypted_json(SESSION_FILE)
 
 def exchange_code_for_token(auth_code):
     """WHY: Exchanges the temporary browser code for a persistent OAuth Bearer Token."""

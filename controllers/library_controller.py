@@ -1,7 +1,6 @@
 # WHY: Single Responsibility Principle - Strictly manages DataFrame memory, background asynchronous loaders, 
 # and primary disk-to-memory synchronization operations.
 import os
-import json
 import shutil
 import logging
 from datetime import datetime
@@ -10,7 +9,7 @@ from PySide6.QtCore import QObject, Slot, Qt, QPoint, QTimer
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from backend.library import LibraryManager
-from ViGaVault_utils import get_db_path, get_library_settings_file, build_scanner_config, translator
+from ViGaVault_utils import get_db_path, get_library_settings_file, build_scanner_config, translator, save_encrypted_json, load_encrypted_json
 from ViGaVault_workers import DbLoaderWorker, StartupSyncWorker
 
 class LibraryController(QObject):
@@ -101,13 +100,9 @@ class LibraryController(QObject):
             self.mw.settings_controller.save_settings()
             
             try:
-                settings = {}
-                if os.path.exists("settings.json"):
-                    with open("settings.json", "r", encoding='utf-8') as f:
-                        settings = json.load(f)
+                settings = load_encrypted_json(os.path.join(os.path.abspath("."), "settings.dat"))
                 settings['db_path'] = filePath
-                with open("settings.json", "w", encoding='utf-8') as f:
-                    json.dump(settings, f, indent=4)
+                save_encrypted_json(os.path.join(os.path.abspath("."), "settings.dat"), settings)
                 
                 if is_new_file:
                     self.mw.force_settings_open = True
@@ -119,7 +114,7 @@ class LibraryController(QObject):
                     ] + [f'platform_ID_{i:02d}' for i in range(1, 51)]
                     pd.DataFrame(columns=expected_columns).to_csv(filePath, sep=';', index=False, encoding='utf-8')
                     
-                    lib_settings_path = os.path.splitext(filePath)[0] + ".json"
+                    lib_settings_path = os.path.splitext(filePath)[0] + ".dat"
                     default_lib_settings = {
                         "root_path": "",
                         "local_scan_config": {"enable_local_scan": False, "ignore_hidden": True, "scan_mode": "simple", "global_type": "Genre", "global_filter": True, "folder_rules": {}},
@@ -127,8 +122,7 @@ class LibraryController(QObject):
                     # WHY: Set default download_images to True so fresh libraries automatically backfill covers from API scans.
                     "enable_galaxy_db": False, "download_images": True, "download_videos": False, "sort_desc": True, "sort_index": 0, "view_new": False, "view_dlc": False, "view_review": False, "filter_states": {}, "filter_expansion": {}
                     }
-                    with open(lib_settings_path, "w", encoding='utf-8') as f:
-                        json.dump(default_lib_settings, f, indent=4)
+                    save_encrypted_json(lib_settings_path, default_lib_settings)
 
                 self.reload_ui_for_new_library()
             except Exception as e:
@@ -159,13 +153,8 @@ class LibraryController(QObject):
         self.mw.master_df = df
         self.mw.sidebar.setEnabled(True)
         
-        lib_settings = {}
         lib_settings_file = get_library_settings_file()
-        if os.path.exists(lib_settings_file):
-            try:
-                with open(lib_settings_file, "r", encoding='utf-8') as f:
-                    lib_settings = json.load(f)
-            except: pass
+        lib_settings = load_encrypted_json(lib_settings_file)
 
         if not hasattr(self.mw, 'pending_anchor_folder') or not getattr(self.mw, 'pending_anchor_folder', None):
             saved_anchor = lib_settings.get("anchor_folder")

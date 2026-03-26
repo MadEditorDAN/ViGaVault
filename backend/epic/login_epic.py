@@ -1,13 +1,12 @@
 # WHY: Single Responsibility Principle - Strictly manages Epic Games authentication states, 
 # token exchanges, and secure local cookie storage without bleeding into the UI layer.
 import os
-import json
 import requests
 import logging
-from ViGaVault_utils import BASE_DIR
+from ViGaVault_utils import BASE_DIR, save_encrypted_json, load_encrypted_json
 
 EPIC_DIR = os.path.join(BASE_DIR, "backend", "epic")
-SESSION_FILE = os.path.join(EPIC_DIR, "epic_session.json")
+SESSION_FILE = os.path.join(EPIC_DIR, "epic_session.dat")
 
 def is_epic_connected():
     """Checks if a valid session file exists for the Epic Games platform."""
@@ -22,16 +21,11 @@ def disconnect_epic():
 def save_epic_session(data_dict):
     """Securely dumps the OAuth tokens into a local JSON file."""
     os.makedirs(EPIC_DIR, exist_ok=True)
-    with open(SESSION_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data_dict, f, indent=4)
+    save_encrypted_json(SESSION_FILE, data_dict)
         
 def get_epic_session():
     """Returns the stored session data as a Python dictionary for the scanner to use."""
-    if not is_epic_connected(): return {}
-    try:
-        with open(SESSION_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except: return {}
+    return load_encrypted_json(SESSION_FILE)
 
 def exchange_code_for_token(exchange_code):
     """WHY: Exchanges the browser authorization code for a persistent OAuth Bearer Token."""
