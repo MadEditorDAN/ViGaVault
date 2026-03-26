@@ -81,7 +81,7 @@ class MainWindow(QMainWindow):
         self.master_df['temp_sort_date'] = pd.to_datetime([])
         self.master_df['temp_sort_title'] = []
         
-        global_settings = load_encrypted_json(os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.dat"))
+        global_settings = load_encrypted_json(os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.bin"))
             
         self.date_format_str = global_settings.get("date_format", "DD/MM/YYYY")
         # WHY: Instantiate Controllers
@@ -109,7 +109,7 @@ class MainWindow(QMainWindow):
         if saved_anchor:
             self.pending_anchor_folder = saved_anchor
             
-        if not os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.dat")):
+        if not os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.bin")):
             self.sidebar.combo_sort.setCurrentIndex(0)
 
     # =================================================================================
@@ -151,7 +151,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
 
     # Load and apply theme/language at startup
-    global_settings = load_encrypted_json(os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.dat"))
+    global_settings = load_encrypted_json(os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.bin"))
     
     apply_theme(app, global_settings.get("theme", "System"))
     translator.load_language(global_settings.get("language", "English"))

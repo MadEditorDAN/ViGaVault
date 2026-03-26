@@ -9,7 +9,8 @@ from PySide6.QtCore import QObject, Slot, Qt, QPoint, QTimer
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from backend.library import LibraryManager
-from ViGaVault_utils import get_db_path, get_library_settings_file, build_scanner_config, translator, save_encrypted_json, load_encrypted_json
+from backend.game import Game
+from ViGaVault_utils import get_db_path, get_library_settings_file, build_scanner_config, translator, save_encrypted_json, load_encrypted_json, encrypt_string_to_file, BASE_DIR
 from ViGaVault_workers import DbLoaderWorker, StartupSyncWorker
 
 class LibraryController(QObject):
@@ -86,9 +87,9 @@ class LibraryController(QObject):
 
     def select_library(self):
         # WHY: Use DontConfirmOverwrite to suppress the OS-level "File exists, replace?" warning, replacing it with our custom contextual load prompt.
-        filePath, _ = QFileDialog.getSaveFileName(self.mw, "Switch or Create Library", "", "ViGaVault Library (*.csv)", options=QFileDialog.DontConfirmOverwrite)
+        filePath, _ = QFileDialog.getSaveFileName(self.mw, "Switch or Create Library", "", "ViGaVault Library (*.dat)", options=QFileDialog.DontConfirmOverwrite)
         if filePath:
-            if not filePath.lower().endswith('.csv'): filePath += '.csv'
+            if not filePath.lower().endswith('.dat'): filePath += '.dat'
             is_new_file = not os.path.exists(filePath)
 
             if not is_new_file:
@@ -100,21 +101,19 @@ class LibraryController(QObject):
             self.mw.settings_controller.save_settings()
             
             try:
-                settings = load_encrypted_json(os.path.join(os.path.abspath("."), "settings.dat"))
+                settings = load_encrypted_json(os.path.join(BASE_DIR, "settings.bin"))
                 settings['db_path'] = filePath
-                save_encrypted_json(os.path.join(os.path.abspath("."), "settings.dat"), settings)
+                save_encrypted_json(os.path.join(BASE_DIR, "settings.bin"), settings)
                 
                 if is_new_file:
                     self.mw.force_settings_open = True
-                    expected_columns = [
-                        'Folder_Name', 'Clean_Title', 'Search_Title', 'Path_Root', 'Path_Video', 
-                        'Status_Flag', 'Image_Link', 'Year_Folder', 'Platforms', 'Developer', 
-                        'Publisher', 'Original_Release_Date', 'Summary', 'Genre', 'Collection', 'Trailer_Link',
-                        'game_ID', 'Is_Local', 'Has_Image', 'Has_Video'
-                    ] + [f'platform_ID_{i:02d}' for i in range(1, 51)]
-                    pd.DataFrame(columns=expected_columns).to_csv(filePath, sep=';', index=False, encoding='utf-8')
+                    # WHY: DRY Principle - Always derive the schema from the central LibraryManager to ensure consistency.
+                    expected_columns = LibraryManager(build_scanner_config())._get_db_schema()
+                    df_empty = pd.DataFrame(columns=expected_columns)
+                    encrypt_string_to_file(filePath, df_empty.to_csv(sep=';', index=False))
                     
-                    lib_settings_path = os.path.splitext(filePath)[0] + ".dat"
+                    # WHY: Ensure clean .bin extension prevents collisions with the encrypted .dat database.
+                    lib_settings_path = os.path.splitext(filePath)[0] + ".bin"
                     default_lib_settings = {
                         "root_path": "",
                         "local_scan_config": {"enable_local_scan": False, "ignore_hidden": True, "scan_mode": "simple", "global_type": "Genre", "global_filter": True, "folder_rules": {}},
@@ -127,6 +126,47 @@ class LibraryController(QObject):
                 self.reload_ui_for_new_library()
             except Exception as e:
                 QMessageBox.critical(self.mw, "Error", f"Could not switch library: {e}")
+
+    def import_from_csv(self):
+        """WHY: Restores user ownership. Ingests a plaintext CSV securely into the active encrypted database."""
+        filePath, _ = QFileDialog.getOpenFileName(self.mw, translator.tr("menu_file_import"), "", "CSV Files (*.csv)")
+        if filePath:
+            try:
+                df = pd.read_csv(filePath, sep=';', encoding='utf-8', dtype=str).fillna('')
+                manager = LibraryManager(build_scanner_config())
+                manager.load_db()
+                
+                for _, row in df.iterrows():
+                    game_data = {k: str(v) for k, v in row.to_dict().items()}
+                    folder = game_data.get('Folder_Name')
+                    if folder: manager.games[folder] = Game(config=manager.config, **game_data)
+                
+                manager.save_db()
+                logging.info(f"{'DB IMPORT':<15} : Successfully imported data from {filePath}")
+                QMessageBox.information(self.mw, "Success", translator.tr("msg_import_success"))
+                
+                # WHY: Smart Refresh - Instantly inject the new data without forcing an application restart.
+                self.reload_ui_for_new_library()
+            except Exception as e:
+                logging.error(f"Failed to import CSV: {e}")
+                QMessageBox.critical(self.mw, "Error", f"Could not import CSV: {e}")
+
+    def export_to_csv(self):
+        """WHY: Instantly drops the encrypted RAM buffers into a plaintext spreadsheet on the user's hard drive."""
+        filePath, _ = QFileDialog.getSaveFileName(self.mw, translator.tr("menu_file_export"), "VGVDB_Export.csv", "CSV Files (*.csv)")
+        if filePath:
+            try:
+                expected_columns = LibraryManager(build_scanner_config())._get_db_schema()
+                df = self.mw.master_df.copy()
+                for col in expected_columns:
+                    if col not in df.columns: df[col] = ''
+                df = df[expected_columns]
+                df.fillna('').to_csv(filePath, sep=';', index=False, encoding='utf-8')
+                logging.info(f"{'DB EXPORT':<15} : Successfully exported plaintext CSV to {filePath}")
+                QMessageBox.information(self.mw, "Success", translator.tr("msg_export_success"))
+            except Exception as e:
+                logging.error(f"Failed to export CSV: {e}")
+                QMessageBox.critical(self.mw, "Error", f"Could not export CSV: {e}")
 
     def reload_ui_for_new_library(self):
         self.mw.background_loader.stop()
@@ -250,12 +290,12 @@ class LibraryController(QObject):
         if os.path.exists(db_path):
             backup_dir = "./backups"
             os.makedirs(backup_dir, exist_ok=True)
-            backups = [os.path.join(backup_dir, f) for f in os.listdir(backup_dir) if f.endswith(".csv")]
+            backups = [os.path.join(backup_dir, f) for f in os.listdir(backup_dir) if f.endswith(".dat")]
             backups.sort(key=os.path.getctime)
             while len(backups) >= 10: os.remove(backups.pop(0))
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             db_filename = os.path.basename(db_path)
-            backup_file = os.path.join(backup_dir, f"{os.path.splitext(db_filename)[0]}_{timestamp}.csv")
+            backup_file = os.path.join(backup_dir, f"{os.path.splitext(db_filename)[0]}_{timestamp}.dat")
             shutil.copy2(db_path, backup_file)
             logging.info(f"{'DB BACKUP':<15} : Backup created at {backup_file}")
         

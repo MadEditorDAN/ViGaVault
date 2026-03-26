@@ -36,22 +36,25 @@ def scan_epic_account(config, games_dict, worker_thread=None):
     
     while True:
         if worker_thread and worker_thread.isInterruptionRequested(): return False
-        # WHY: includeMetadata=true is strictly required for the Epic Library API to return the responseMetaData block containing the pagination cursor!
+        # WHY: includeMetadata=true is strictly required for the Epic Library API to return the responseMetadata block containing the pagination cursor!
         url = "https://library-service.live.use1a.on.epicgames.com/library/api/public/items?includeMetadata=true"
         if cursor: url += f"&cursor={cursor}"
-        
+
         resp = requests.get(url, headers=headers, timeout=10)
         if resp.status_code != 200:
             logging.error(f"[EPIC GAMES] Failed to fetch library page: HTTP {resp.status_code}")
             break
             
         data = resp.json()
-        records.extend(data.get("records", []))
+        page_records = data.get("records", [])
+        records.extend(page_records)
         
-        # WHY: With includeMetadata=true, Epic safely nests the pagination token inside responseMetaData in the JSON body.
-        meta = data.get("responseMetaData", {})
-        cursor = meta.get("nextCursor") or data.get("nextCursor") or data.get("cursor")
-        if not cursor: break
+        # WHY: The pagination token is nested inside the 'responseMetadata' key (with a lowercase 'm').
+        meta = data.get("responseMetadata", {})
+        new_cursor = meta.get("nextCursor")
+        if not new_cursor: break
+        
+        cursor = new_cursor
 
     # WHY: Pre-calculate existing Epic games to rapidly skip known entries, avoiding heavy per-game API requests.
     existing_epic_set = set()

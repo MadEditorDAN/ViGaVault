@@ -3,7 +3,7 @@ from PySide6.QtCore import QObject, Qt, Slot, QTimer
 from PySide6.QtWidgets import QPushButton, QCheckBox, QApplication, QSizePolicy, QAbstractItemView
 from widgets import CollapsibleFilterGroup
 from ViGaVault_workers import FilterWorker
-from ViGaVault_utils import get_library_settings_file, load_encrypted_json
+from ViGaVault_utils import get_library_settings_file, load_encrypted_json, BASE_DIR
 
 class FilterController(QObject):
     def __init__(self, main_window):
@@ -29,7 +29,7 @@ class FilterController(QObject):
         lib_settings_file = get_library_settings_file()
         local_config = load_encrypted_json(lib_settings_file).get("local_scan_config", {})
         if not local_config:
-            local_config = load_encrypted_json(os.path.join(os.path.abspath("."), "settings.dat")).get("local_scan_config", {})
+            local_config = load_encrypted_json(os.path.join(BASE_DIR, "settings.bin")).get("local_scan_config", {})
             
         scan_mode = local_config.get("scan_mode", "advanced")
         rules = local_config.get("folder_rules", {})

@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QApplication, QCheckBox
 
 from backend.library import LibraryManager
 from ViGaVault_utils import (get_library_settings_file, build_scanner_config, get_platform_config, 
-                             apply_theme, translator, DEFAULT_DISPLAY_SETTINGS, save_encrypted_json, load_encrypted_json)
+                             apply_theme, translator, DEFAULT_DISPLAY_SETTINGS, save_encrypted_json, load_encrypted_json, BASE_DIR)
 
 class SettingsController(QObject):
     def __init__(self, main_window):
@@ -17,11 +17,8 @@ class SettingsController(QObject):
         self.mw = main_window
 
     def get_user_settings(self):
-        global_settings = load_encrypted_json(os.path.join(os.path.dirname(self.mw.sender().parent().parent().parent().objectName()) if False else os.path.abspath("."), "settings.dat")) if not hasattr(self, '_base_path') else load_encrypted_json(os.path.join(self._base_path, "settings.dat"))
-        
-        # WHY: Hard fallback directory generation to guarantee load path since PySide parent hierarchies can fluctuate during teardown.
-        base_path = os.path.abspath(".")
-        global_settings = load_encrypted_json(os.path.join(base_path, "settings.dat"))
+        # WHY: Use the absolute BASE_DIR to perfectly anchor the settings file regardless of Current Working Directory shifts.
+        global_settings = load_encrypted_json(os.path.join(BASE_DIR, "settings.bin"))
         lib_settings = load_encrypted_json(get_library_settings_file())
         return global_settings, lib_settings
 
@@ -32,7 +29,7 @@ class SettingsController(QObject):
         local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "view_new", "view_dlc", "view_review", "filter_states", "filter_expansion", "sidebar_chk_galaxy", "sidebar_chk_gog_web", "sidebar_chk_epic", "sidebar_chk_steam", "sidebar_chk_local", "sidebar_chk_folders", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_galaxy_db", "galaxy_db_path", "download_images", "download_videos", "image_path", "video_path"]
         for k in local_keys: global_settings.pop(k, None)
         
-        save_encrypted_json(os.path.join(os.path.abspath("."), "settings.dat"), global_settings)
+        save_encrypted_json(os.path.join(BASE_DIR, "settings.bin"), global_settings)
 
         global_keys = ["geometry", "theme", "language", "card_image_size", "card_button_size", "card_text_size", "db_path", "splitter_sizes"]
         for k in global_keys: lib_settings.pop(k, None)
@@ -63,7 +60,7 @@ class SettingsController(QObject):
             self.mw.display_settings['text'] = display_state['card_text_size']
 
     def save_settings(self):
-        global_settings = load_encrypted_json(os.path.join(os.path.abspath("."), "settings.dat"))
+        global_settings = load_encrypted_json(os.path.join(BASE_DIR, "settings.bin"))
 
         try:
             global_settings.update({"geometry": self.mw.saveGeometry().toBase64().data().decode()})
@@ -75,7 +72,7 @@ class SettingsController(QObject):
         local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "view_new", "view_dlc", "view_review", "filter_states", "filter_expansion", "sidebar_chk_galaxy", "sidebar_chk_gog_web", "sidebar_chk_epic", "sidebar_chk_steam", "sidebar_chk_local", "sidebar_chk_folders", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_galaxy_db", "galaxy_db_path", "download_images", "download_videos", "image_path", "video_path"]
         for k in local_keys: global_settings.pop(k, None)
         
-        save_encrypted_json(os.path.join(os.path.abspath("."), "settings.dat"), global_settings)
+        save_encrypted_json(os.path.join(BASE_DIR, "settings.bin"), global_settings)
 
         lib_settings_file = get_library_settings_file()
         lib_settings = load_encrypted_json(lib_settings_file)
@@ -83,6 +80,7 @@ class SettingsController(QObject):
         global_keys = ["geometry", "theme", "language", "card_image_size", "card_button_size", "card_text_size", "db_path", "splitter_sizes"]
         for k in global_keys: lib_settings.pop(k, None)
 
+        # WHY: Reverted to the unified update block. The previous fix was fundamentally flawed. 
         try:
             filter_states = {}
             if hasattr(self.mw.filter_controller, 'dynamic_filters'):
@@ -119,7 +117,6 @@ class SettingsController(QObject):
                 "download_images": self.mw.sidebar.chk_scan_dl_images.isChecked()
             })
         except RuntimeError:
-            # WHY: Safely ignore UI reads if the function is called while PySide6 is violently destroying the main window.
             pass
 
         if "platform_map" not in lib_settings:
@@ -144,12 +141,19 @@ class SettingsController(QObject):
             self.mw.display_settings['button'] = global_settings.get("card_button_size", DEFAULT_DISPLAY_SETTINGS['button'])
             self.mw.display_settings['text'] = global_settings.get("card_text_size", DEFAULT_DISPLAY_SETTINGS['text'])
             
-            # WHY: Restore UI checkboxes cleanly
+            # WHY: Suppress Signals - Prevent programmatic UI population from instantly triggering save_settings() 
+            # which previously wiped the actual user settings with a blank layout during application boot!
+            self.mw.sidebar.chk_scan_galaxy.blockSignals(True)
             self.mw.sidebar.chk_scan_galaxy.setChecked(lib_settings.get("sidebar_chk_galaxy", False))
-            self.mw.sidebar.chk_scan_local.setChecked(lib_settings.get("sidebar_chk_local", False))
+            self.mw.sidebar.chk_scan_galaxy.blockSignals(False)
             
-            # WHY: Ensure the standalone images checkbox physically restores its memory state on boot.
+            self.mw.sidebar.chk_scan_local.blockSignals(True)
+            self.mw.sidebar.chk_scan_local.setChecked(lib_settings.get("sidebar_chk_local", False))
+            self.mw.sidebar.chk_scan_local.blockSignals(False)
+            
+            self.mw.sidebar.chk_scan_dl_images.blockSignals(True)
             self.mw.sidebar.chk_scan_dl_images.setChecked(lib_settings.get("download_images", True))
+            self.mw.sidebar.chk_scan_dl_images.blockSignals(False)
             
             # WHY: Check live connection status to physically forbid the user from toggling scanners for disconnected platforms.
             try:
@@ -158,8 +162,10 @@ class SettingsController(QObject):
             except ImportError: gog_enabled = False
             self.mw.gog_connected_cache = gog_enabled
             self.mw.sidebar.chk_scan_gog_web.setEnabled(gog_enabled)
+            self.mw.sidebar.chk_scan_gog_web.blockSignals(True)
             if not gog_enabled: self.mw.sidebar.chk_scan_gog_web.setChecked(False)
             else: self.mw.sidebar.chk_scan_gog_web.setChecked(lib_settings.get("sidebar_chk_gog_web", False))
+            self.mw.sidebar.chk_scan_gog_web.blockSignals(False)
 
             try:
                 from backend.epic.login_epic import is_epic_connected
@@ -167,8 +173,10 @@ class SettingsController(QObject):
             except ImportError: epic_enabled = False
             self.mw.epic_connected_cache = epic_enabled
             self.mw.sidebar.chk_scan_epic.setEnabled(epic_enabled)
+            self.mw.sidebar.chk_scan_epic.blockSignals(True)
             if not epic_enabled: self.mw.sidebar.chk_scan_epic.setChecked(False)
             else: self.mw.sidebar.chk_scan_epic.setChecked(lib_settings.get("sidebar_chk_epic", False))
+            self.mw.sidebar.chk_scan_epic.blockSignals(False)
 
             try:
                 from backend.steam.login_steam import is_steam_connected
@@ -185,8 +193,10 @@ class SettingsController(QObject):
         
             if hasattr(self.mw.sidebar, 'chk_scan_steam'):
                 self.mw.sidebar.chk_scan_steam.setEnabled(steam_enabled)
+                self.mw.sidebar.chk_scan_steam.blockSignals(True)
                 if not steam_enabled: self.mw.sidebar.chk_scan_steam.setChecked(False)
                 else: self.mw.sidebar.chk_scan_steam.setChecked(lib_settings.get("sidebar_chk_steam", False))
+                self.mw.sidebar.chk_scan_steam.blockSignals(False)
                 
             self.mw.sidebar.update_scan_button_state()
             

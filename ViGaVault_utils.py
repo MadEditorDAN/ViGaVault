@@ -43,6 +43,22 @@ def load_encrypted_json(filepath):
         logging.warning(f"[SECURITY] Invalid or tampered data rejected at {filepath}.")
         return {}
 
+def encrypt_string_to_file(filepath, data_str):
+    """WHY: Securely encrypts raw text buffers into binary .dat files to prevent disk traces."""
+    try:
+        encrypted_data = _cipher.encrypt(data_str.encode('utf-8'))
+        with open(filepath, 'wb') as f: f.write(encrypted_data)
+    except Exception as e: logging.error(f"Failed to encrypt and save {filepath}: {e}")
+
+def decrypt_file_to_string(filepath):
+    """WHY: Safely loads and decrypts .dat files strictly in RAM."""
+    if not os.path.exists(filepath): return ""
+    try:
+        with open(filepath, 'rb') as f: return _cipher.decrypt(f.read()).decode('utf-8')
+    except Exception as e:
+        logging.warning(f"[SECURITY] Invalid or tampered database rejected at {filepath}.")
+        return ""
+
 # --- UI CONSTANTS ---
 # WHY: DRY Principle - Centralizes standard window sizes for easy global modification.
 MAIN_WINDOW_SIZE = (1600, 900)
@@ -114,15 +130,16 @@ def normalize_genre(text):
     return ", ".join(clean_parts)
 
 def get_db_path():
-    """Reads the db_path from settings.dat, falling back to the default."""
-    default_db = os.path.join(BASE_DIR, "VGVDB.csv")
-    settings = load_encrypted_json(os.path.join(BASE_DIR, "settings.dat"))
+    """WHY: Default to the secured .dat extension for the main library database."""
+    default_db = os.path.join(BASE_DIR, "VGVDB.dat")
+    settings = load_encrypted_json(os.path.join(BASE_DIR, "settings.bin"))
     return settings.get("db_path", default_db)
 
 def get_library_settings_file():
-    """Returns the path to the encrypted .dat configuration file for the current library."""
+    """Returns the path to the encrypted .bin configuration file for the current library."""
     db_path = get_db_path()
-    return os.path.splitext(db_path)[0] + ".dat"
+    # WHY: Prevent file collision elegantly by strictly using the .bin extension for config state.
+    return os.path.splitext(db_path)[0] + ".bin"
 
 def get_video_path():
     """Returns the configured video path or default 'videos' folder."""
@@ -139,11 +156,11 @@ def get_root_path():
     settings = load_encrypted_json(get_library_settings_file())
     if "root_path" in settings: return settings.get("root_path", "")
     
-    global_settings = load_encrypted_json(os.path.join(BASE_DIR, "settings.dat"))
+    global_settings = load_encrypted_json(os.path.join(BASE_DIR, "settings.bin"))
     return global_settings.get("root_path", "")
 
 def get_platform_config():
-    """Loads platform mapping and ignore list from settings.dat or returns defaults."""
+    """Loads platform mapping and ignore list from settings.bin or returns defaults."""
     default_map = {
         'gog': 'GOG', 'steam': 'Steam', 'epic': 'Epic Games Store', 'epic games store': 'Epic Games Store',
         'uplay': 'Uplay', 'ubisoft': 'Uplay', 'ubisoft connect': 'Uplay', 'origin': 'Origin', 
@@ -161,13 +178,13 @@ def get_platform_config():
         'gamesessions', 'gameuk', 'playfire', 'weplay'
     ]
     settings_path = get_library_settings_file()
-    if not os.path.exists(settings_path): settings_path = os.path.join(BASE_DIR, "settings.dat")
+    if not os.path.exists(settings_path): settings_path = os.path.join(BASE_DIR, "settings.bin")
         
     settings = load_encrypted_json(settings_path)
     return settings.get("platform_map", default_map), settings.get("ignored_prefixes", default_ignore)
 
 def get_local_scan_config():
-    """Loads local scan configuration from settings.dat."""
+    """Loads local scan configuration from settings.bin."""
     default_config = {
         "enable_local_scan": False,
         "ignore_hidden": True,
@@ -177,7 +194,7 @@ def get_local_scan_config():
         "folder_rules": {}
     }
     settings_path = get_library_settings_file()
-    if not os.path.exists(settings_path): settings_path = os.path.join(BASE_DIR, "settings.dat")
+    if not os.path.exists(settings_path): settings_path = os.path.join(BASE_DIR, "settings.bin")
         
     settings = load_encrypted_json(settings_path)
     return settings.get("local_scan_config", default_config)
@@ -195,7 +212,7 @@ def build_scanner_config():
     p_map, p_ignore = get_platform_config()
     
     settings_path = get_library_settings_file()
-    if not os.path.exists(settings_path): settings_path = os.path.join(BASE_DIR, "settings.dat")
+    if not os.path.exists(settings_path): settings_path = os.path.join(BASE_DIR, "settings.bin")
         
     galaxy_path = os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db')
     settings = load_encrypted_json(settings_path)

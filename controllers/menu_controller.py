@@ -26,6 +26,15 @@ class MenuController(QObject):
         file_menu.addAction(action_save)
         
         file_menu.addSeparator()
+        action_import = QAction(translator.tr("menu_file_import"), self.mw)
+        action_import.triggered.connect(self.mw.library_controller.import_from_csv)
+        file_menu.addAction(action_import)
+        
+        action_export = QAction(translator.tr("menu_file_export"), self.mw)
+        action_export.triggered.connect(self.mw.library_controller.export_to_csv)
+        file_menu.addAction(action_export)
+        
+        file_menu.addSeparator()
         action_settings = QAction(translator.tr("menu_file_settings"), self.mw)
         action_settings.triggered.connect(self.open_settings)
         file_menu.addAction(action_settings)

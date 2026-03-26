@@ -197,7 +197,8 @@ def scan_local_system(config, games_dict, worker_thread=None):
         report += f"{'New Added':<28}: {stats['new']}\n"
         # WHY: Removed the mathematical subtraction because 'stats['updated']' natively only increments on updates/merges.
         report += f"{'Smart Merged':<28}: {stats['updated']}\n"
-        for t in stats['merged_titles']: report += f"                             {t}\n"
+        # WHY: Suppressed the exhaustive list of merged titles as it creates excessive noise in the logs for large, stable libraries.
+        # for t in stats['merged_titles']: report += f"                             {t}\n"
         report += f"{'Missing Purged':<28}: {stats['deleted']}\n"
         for t in stats['deleted_titles']: report += f"                             {t}\n"
         report += f"{'='*80}"

@@ -1,5 +1,6 @@
 # WHY: Strategy Pattern Orchestrator - Coordinates loading/saving DataFrames, and dispatches scanning tasks to specialized modules.
 import os
+import io
 import pandas as pd
 import logging
 import shutil
@@ -8,7 +9,7 @@ import requests
 from urllib.parse import urlparse
 from datetime import datetime
 
-from ViGaVault_utils import BASE_DIR, get_safe_filename
+from ViGaVault_utils import BASE_DIR, get_safe_filename, encrypt_string_to_file, decrypt_file_to_string
 from .game import Game
 from .api_igdb import get_igdb_access_token, query_igdb_api
 from .api_galaxy import sync_galaxy_database
@@ -28,11 +29,23 @@ class LibraryManager:
         self.games = {}
 
     def load_db(self):
-        if os.path.exists(self.db_file):
-            df = pd.read_csv(self.db_file, sep=';', encoding='utf-8').fillna('')
-            for _, row in df.iterrows():
-                game_data = {k: str(v) for k, v in row.to_dict().items()}
-                self.games[game_data['Folder_Name']] = Game(config=self.config, **game_data)
+        # WHY: Read the encrypted blob from the disk and pipe the plaintext string natively into Pandas via StringIO.
+        csv_str = decrypt_file_to_string(self.db_file)
+        if csv_str:
+            try:
+                df = pd.read_csv(io.StringIO(csv_str), sep=';', encoding='utf-8', dtype=str).fillna('')
+                
+                # WHY: Guarantee schema integrity so dict unpacking never throws KeyErrors.
+                for col in self._get_db_schema():
+                    if col not in df.columns: df[col] = ''
+                    
+                for _, row in df.iterrows():
+                    game_data = {k: str(v) for k, v in row.to_dict().items()}
+                    folder = game_data.get('Folder_Name', '').strip()
+                    if folder:
+                        self.games[folder] = Game(config=self.config, **game_data)
+            except Exception as e:
+                logging.error(f"Error loading LibraryManager DB: {e}")
 
     def scan_full(self, worker_thread=None):
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -128,10 +141,10 @@ class LibraryManager:
     def save_db(self):
         if os.path.exists(self.db_file):
             os.makedirs(BACKUP_DIR, exist_ok=True)
-            backups = [os.path.join(BACKUP_DIR, f) for f in os.listdir(BACKUP_DIR) if f.startswith("VGVDB_") and f.endswith(".csv")]
+            backups = [os.path.join(BACKUP_DIR, f) for f in os.listdir(BACKUP_DIR) if f.startswith("VGVDB_") and f.endswith(".dat")]
             backups.sort(key=os.path.getctime)
             while len(backups) >= MAX_FILES: os.remove(backups.pop(0))
-            shutil.copy2(self.db_file, os.path.join(BACKUP_DIR, f"VGVDB_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"))
+            shutil.copy2(self.db_file, os.path.join(BACKUP_DIR, f"VGVDB_{datetime.now().strftime('%Y%m%d_%H%M%S')}.dat"))
         
         df = pd.DataFrame([g.to_dict() for g in self.games.values()])
         expected_columns = self._get_db_schema()
@@ -140,7 +153,9 @@ class LibraryManager:
         df = df[expected_columns]
         for col in ['Year_Folder', 'Original_Release_Date']:
             if col in df.columns: df[col] = df[col].astype(str).str.replace(r'\.0$', '', regex=True).replace('nan', '')
-        df.fillna('').to_csv(self.db_file, sep=';', index=False, encoding='utf-8')
+        
+        csv_str = df.fillna('').to_csv(sep=';', index=False)
+        encrypt_string_to_file(self.db_file, csv_str)
 
     def sync_media_flags_batch(self):
         changes_made = False

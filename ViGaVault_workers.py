@@ -2,13 +2,14 @@
 # from the main UI thread. This prevents GUI freezes and improves maintainability.
 import os
 import re
+import io
 import logging
 import pandas as pd
 from PySide6.QtCore import QThread, Signal, QRunnable, QObject
 from PySide6.QtGui import QImage
 
 from backend.library import LibraryManager
-from ViGaVault_utils import get_db_path, build_scanner_config, get_library_settings_file, load_encrypted_json
+from ViGaVault_utils import get_db_path, build_scanner_config, get_library_settings_file, load_encrypted_json, decrypt_file_to_string, encrypt_string_to_file
 
 # --- WORKER THREADS ---
 # Operations like scanning or filtering can take time. We run them in separate threads
@@ -134,12 +135,21 @@ class DbLoaderWorker(QThread):
         config = build_scanner_config()
         date_fmt = config.get('date_format', '%d/%m/%Y')
         
-        if os.path.exists(db_path):
+        # WHY: Always enforce the master schema to prevent KeyErrors if the user imports a broken/legacy CSV.
+        schema_cols = LibraryManager(config)._get_db_schema()
+
+        csv_str = decrypt_file_to_string(db_path)
+        if csv_str:
             try:
-                df = pd.read_csv(db_path, sep=';', encoding='utf-8').fillna('')
+                df = pd.read_csv(io.StringIO(csv_str), sep=';', encoding='utf-8', dtype=str).fillna('')
+
+                # WHY: Defensive Programming. Automatically repair missing columns to prevent downstream crashes.
+                for col in schema_cols:
+                    if col not in df.columns: df[col] = ''
+                    
                 if 'Status_Flag' not in df.columns:
                     df['Status_Flag'] = 'NEW'
-                    
+                  
                 # WHY: Guarantee Is_DLC resolves as a strict boolean for Pandas processing.
                 if 'Is_DLC' not in df.columns: df['Is_DLC'] = False
                 else: df['Is_DLC'] = df['Is_DLC'].astype(str).str.lower().isin(['true', '1'])
@@ -169,16 +179,23 @@ class DbLoaderWorker(QThread):
                 df['temp_sort_index'] = df.index
             except Exception as e:
                 logging.error(f"Error loading DB: {e}")
-                df = pd.DataFrame()
+                df = pd.DataFrame(columns=schema_cols)
+                df['temp_sort_date'] = pd.to_datetime([])
+                df['temp_sort_title'] = []
+                df['temp_sort_index'] = []
+                df['Is_Excluded'] = pd.Series(dtype=bool)
+                df['Is_DLC'] = pd.Series(dtype=bool)
         else:
             # WHY: Automatically instantiate a physical blank database on the hard drive if it's missing on boot.
-            expected_columns = ['Folder_Name', 'Clean_Title', 'Search_Title', 'Path_Root', 'Path_Video', 'Status_Flag', 'Image_Link', 'Cover_URL', 'Year_Folder', 'Platforms', 'Developer', 'Publisher', 'Original_Release_Date', 'Summary', 'Genre', 'Collection', 'Trailer_Link', 'game_ID', 'Is_Local', 'Has_Image', 'Has_Video'] + [f'platform_ID_{i:02d}' for i in range(1, 51)]
-            pd.DataFrame(columns=expected_columns).to_csv(db_path, sep=';', index=False, encoding='utf-8')
+            df_empty = pd.DataFrame(columns=schema_cols)
+            encrypt_string_to_file(db_path, df_empty.to_csv(sep=';', index=False))
             logging.info(f"Created new empty database at {db_path}")
-            df = pd.DataFrame(columns=['Clean_Title', 'Platforms', 'Original_Release_Date', 'Status_Flag', 'Path_Root', 'Folder_Name'])
+            df = pd.DataFrame(columns=schema_cols)
             df['temp_sort_date'] = pd.to_datetime([])
             df['temp_sort_title'] = []
             df['temp_sort_index'] = []
+            df['Is_Excluded'] = pd.Series(dtype=bool)
+            df['Is_DLC'] = pd.Series(dtype=bool)
         self.finished.emit(df)
 
 class ImageSignals(QObject):
