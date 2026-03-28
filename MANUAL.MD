@@ -198,7 +198,6 @@ allowing you to play rich media directly from the game's detail page. If the
 automatic scraper misses a trailer, you can paste a YouTube link directly into
 the Media Manager to link it.
 -------------------------------------------------------------------------------
-By
             __  __             _  ______     _  _  _                 
            |  \/  |           | ||  ____|   | |(_)| |                
            | \  / |  __ _   __| || |__    __| | _ | |_   ___   _ __  
@@ -206,5 +205,4 @@ By
            | |  | || (_| || (_| || |____| (_| || || |_ | (_) || |    
            |_|  |_| \__,_| \__,_||______|\__,_||_| \__| \___/ |_|
 
-                                                                        (C)2026
 -------------------------------------------------------------------------------
