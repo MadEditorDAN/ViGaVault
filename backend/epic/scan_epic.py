@@ -7,6 +7,7 @@ import re
 from datetime import datetime
 
 from .login_epic import get_epic_session, refresh_epic_token
+from .epic_platform_mapper import map_epic_platforms
 from backend.api_igdb import get_igdb_access_token
 from backend.game import Game
 from ViGaVault_utils import get_safe_filename, normalize_genre
@@ -86,6 +87,8 @@ def scan_epic_account(config, games_dict, worker_thread=None):
         namespace = item.get("namespace")
         catalog_item_id = item.get("catalogItemId")
         app_name = item.get("appName")
+        # WHY: Extract the raw platform array from the base entitlement record
+        raw_platforms = item.get("platform", [])
         
         if not namespace or not catalog_item_id:
             stats['skipped'] += 1
@@ -179,7 +182,10 @@ def scan_epic_account(config, games_dict, worker_thread=None):
                 
                 p_set = set(x.strip() for x in best_game.data.get('Platforms', '').split(',') if x.strip())
                 if 'Local Copy' in p_set: p_set.remove('Local Copy')
-                p_set.add('Epic Games Store')
+                
+                mapped_platforms = map_epic_platforms(raw_platforms, app_name)
+                for mp in mapped_platforms.split(','):
+                    if mp.strip(): p_set.add(mp.strip())
                 best_game.data['Platforms'] = ", ".join(sorted(list(p_set)))
                 
                 img_str = "Yes" if best_game.data.get('Image_Link') else "No "
@@ -199,7 +205,8 @@ def scan_epic_account(config, games_dict, worker_thread=None):
             game_obj = Game(config=config, Folder_Name=folder_name, Status_Flag='NEW', Path_Root='')
             game_obj.data['Clean_Title'] = title_clean
             game_obj.data['game_ID'] = f"epic_{catalog_item_id}"
-            game_obj.data['Platforms'] = "Epic Games Store"
+            mapped_platforms = map_epic_platforms(raw_platforms, app_name)
+            game_obj.data['Platforms'] = mapped_platforms
             
             desc = game_meta.get('description', '')
             game_obj.data['Summary'] = desc

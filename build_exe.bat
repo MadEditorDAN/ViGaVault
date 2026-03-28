@@ -28,6 +28,7 @@ xcopy /E /I /Y "lang" "dist\ViGaVault\lang" >nul
 echo [5/5] Zipping the distribution package...
 REM WHY: Uses native PowerShell to compress the final distribution folder into a clean release archive.
 IF NOT EXIST "build" mkdir "build"
+pause Ready to compress the archive - press any key to contine...
 powershell Compress-Archive -Path "dist\ViGaVault" -DestinationPath "dist\ViGaVault_Beta_0.9.zip" -Force
 
 REM Cleanup after use
