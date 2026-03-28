@@ -197,6 +197,7 @@ Trailers: ViGaVault stores links to YouTube trailers or online mp4 files,
 allowing you to play rich media directly from the game's detail page. If the 
 automatic scraper misses a trailer, you can paste a YouTube link directly into
 the Media Manager to link it.
+
 -------------------------------------------------------------------------------
             __  __             _  ______     _  _  _                 
            |  \/  |           | ||  ____|   | |(_)| |                
