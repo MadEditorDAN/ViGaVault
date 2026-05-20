@@ -209,7 +209,7 @@ class ActionDialog(QDialog):
             self.btn_view_image.setEnabled(False)
 
     def select_new_image(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select Image", "", "Image Files (*.png *.jpg *.jpeg *.webp)")
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select Image", "", "Image Files (*.png *.jpg *.jpeg *.webp)", options=QFileDialog.DontUseNativeDialog)
         if not file_path: return
         safe_filename_base = get_safe_filename(self.original_data.get('Folder_Name', ''))
         _, ext = os.path.splitext(file_path)
