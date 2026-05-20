@@ -46,9 +46,17 @@ class ActionDialog(QDialog):
         is_dlc = str(self.original_data.get('Is_DLC', False)).lower() in ['true', '1']
         self.chk_dlc.setChecked(is_dlc)
         
+        self.chk_ok = QCheckBox("Status: OK")
+        self.chk_ok.setChecked(self.original_data.get('Status_Flag') == 'OK')
+        
+        # WHY: Prevent the user from checking both status boxes at the same time.
+        self.chk_locked.stateChanged.connect(lambda: self.chk_ok.setChecked(False) if self.chk_locked.isChecked() else None)
+        self.chk_ok.stateChanged.connect(lambda: self.chk_locked.setChecked(False) if self.chk_ok.isChecked() else None)
+        
         checkbox_layout.addWidget(self.chk_locked)
+        checkbox_layout.addWidget(self.chk_ok)
         checkbox_layout.addWidget(self.chk_dlc)
-        # WHY: Wrap both checkboxes inside a horizontal layout so they render flawlessly side-by-side.
+        # WHY: Wrap all checkboxes inside a horizontal layout so they render flawlessly side-by-side.
         self.form_layout.addRow(checkbox_layout)
         
         fields_to_disable = ['Folder_Name', 'Status_Flag', 'Image_Link', 'Platforms']
@@ -287,7 +295,15 @@ class ActionDialog(QDialog):
                     new_data[field] = inp.text()
         new_data.update(self.updated_data)
         
-        new_data['Status_Flag'] = 'LOCKED' if self.chk_locked.isChecked() else 'OK'
+        if self.chk_locked.isChecked():
+            new_data['Status_Flag'] = 'LOCKED'
+        elif self.chk_ok.isChecked():
+            new_data['Status_Flag'] = 'OK'
+        else:
+            # WHY: If neither are checked, retain the original status (or default to NEEDS_ATTENTION if it wasn't OK/LOCKED)
+            orig = self.original_data.get('Status_Flag', '')
+            new_data['Status_Flag'] = orig if orig not in ['OK', 'LOCKED'] else 'NEEDS_ATTENTION'
+            
         new_data['Is_DLC'] = self.chk_dlc.isChecked()
         new_data['Trailer_Link'] = self.url_line_edit.text().strip()
         return new_data
