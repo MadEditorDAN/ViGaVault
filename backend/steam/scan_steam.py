@@ -19,17 +19,17 @@ def scan_steam_account(config, games_dict, worker_thread=None):
 
     logging.info(f"\n{' STEAM SCAN ':=^80}")
     
-    # WHY: With the API Key gone, we use the user's secure browser cookies to scrape their library directly from their profile page.
     url = f"https://steamcommunity.com/profiles/{steam_id}/games/?tab=all"
     
     import urllib.parse
-    clean_secure = urllib.parse.unquote(secure_cookie)
-    clean_secure = urllib.parse.quote(clean_secure)
-    
-    cookies = {
-        'steamLoginSecure': clean_secure,
-        'sessionid': session_id
-    }
+    cookies = {}
+    for k, v in session.items():
+        if k == 'steam_id': continue
+        if k == 'steamLoginSecure':
+            clean_secure = urllib.parse.unquote(v)
+            cookies[k] = urllib.parse.quote(clean_secure)
+        else:
+            cookies[k] = v
     
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',

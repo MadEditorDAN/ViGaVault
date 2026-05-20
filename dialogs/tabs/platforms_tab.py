@@ -190,11 +190,8 @@ class PlatformsTabWidget(QWidget):
                         # Extract the 17-digit SteamID64 from the start of the secure cookie
                         steam_id = secure_cookie.split('%7C')[0] if '%7C' in secure_cookie else ""
                         
-                        session_data = {
-                            "steamLoginSecure": secure_cookie,
-                            "sessionid": session_id,
-                            "steam_id": steam_id
-                        }
+                        session_data = dlg.cookies.copy()
+                        session_data["steam_id"] = steam_id
                         save_steam_session(session_data)
                         self.update_platform_btn_ui(btn, True)
                         self.connection_changed.emit("steam", True)
