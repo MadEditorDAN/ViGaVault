@@ -177,6 +177,23 @@ class PlatformsTabWidget(QWidget):
                 self.connection_changed.emit("steam", False)
             else:
                 from dialogs.login_browser_dialog import LoginBrowserDialog
+                from PySide6.QtWidgets import QInputDialog
+                
+                # WHY: Ask the user if they want to use the bulletproof legacy API Key instead of the flaky web scraper.
+                api_key, ok = QInputDialog.getText(self.window(), "Steam Authentication", "Enter your Steam Web API Key (or leave blank to use the new Browser Login):")
+                if not ok: return
+                
+                if api_key.strip():
+                    steam_id, id_ok = QInputDialog.getText(self.window(), "Steam ID", "Enter your 17-digit SteamID64:")
+                    if id_ok and steam_id.strip():
+                        save_steam_session({
+                            "api_key": api_key.strip(),
+                            "steam_id": steam_id.strip()
+                        })
+                        self.update_platform_btn_ui(btn, True)
+                        self.connection_changed.emit("steam", True)
+                    return
+                
                 oauth_url = "https://store.steampowered.com/login/"
                 dlg = LoginBrowserDialog(oauth_url, target_cookies=["steamLoginSecure"], parent=None)
                 dlg.setWindowModality(Qt.ApplicationModal)

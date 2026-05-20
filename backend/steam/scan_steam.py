@@ -17,42 +17,53 @@ def scan_steam_account(config, games_dict, worker_thread=None):
         logging.error("[STEAM] No valid Steam Session found. Please connect Steam in the Platform Manager.")
         return False
 
-    logging.info(f"\n{' STEAM SCAN ':=^80}")
-    
-    url = f"https://steamcommunity.com/profiles/{steam_id}/games/?tab=all"
-    
-    import urllib.parse
-    cookies = {}
-    for k, v in session.items():
-        if k == 'steam_id': continue
-        if k == 'steamLoginSecure':
-            clean_secure = urllib.parse.unquote(v)
-            cookies[k] = urllib.parse.quote(clean_secure)
-        else:
-            cookies[k] = v
-    
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': f'https://steamcommunity.com/profiles/{steam_id}/'
-    }
+    api_key = session.get('api_key')
     
     try:
-        response = requests.get(url, cookies=cookies, headers=headers, timeout=15)
-        if response.status_code != 200:
-            logging.error(f"[STEAM] Failed to fetch library: HTTP {response.status_code}")
-            return False
-            
-        html = response.text
-        # WHY: Steam beautifully embeds the user's entire library as a raw JSON array inside the `rgGames` JavaScript variable.
-        match = re.search(r'var\s+rgGames\s*=\s*(\[.*?\]);', html, re.DOTALL)
-        if match:
-            import json
-            games_list = json.loads(match.group(1))
+        games_list = []
+        if api_key:
+            logging.info("[STEAM] Using Legacy API Key for scan...")
+            url = f"https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key={api_key}&steamid={steam_id}&include_appinfo=1"
+            response = requests.get(url, timeout=15)
+            if response.status_code == 200:
+                data = response.json()
+                games_list = data.get('response', {}).get('games', [])
+            else:
+                logging.error(f"[STEAM] API Key scan failed: HTTP {response.status_code}")
+                return False
         else:
-            logging.warning("[STEAM] Could not find 'rgGames' data in the page HTML. The session may be invalid or the profile private.")
-            return False
+            logging.info("[STEAM] Using Web Scraper for scan...")
+            url = f"https://steamcommunity.com/profiles/{steam_id}/games/?tab=all"
             
+            import urllib.parse
+            cookies = {}
+            for k, v in session.items():
+                if k == 'steam_id': continue
+                if k == 'steamLoginSecure':
+                    clean_secure = urllib.parse.unquote(v)
+                    cookies[k] = urllib.parse.quote(clean_secure)
+                else:
+                    cookies[k] = v
+            
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Referer': f'https://steamcommunity.com/profiles/{steam_id}/'
+            }
+            response = requests.get(url, cookies=cookies, headers=headers, timeout=15)
+            if response.status_code != 200:
+                logging.error(f"[STEAM] Failed to fetch library: HTTP {response.status_code}")
+                return False
+                
+            html = response.text
+            match = re.search(r'var\s+rgGames\s*=\s*(\[.*?\]);', html, re.DOTALL)
+            if match:
+                import json
+                games_list = json.loads(match.group(1))
+            else:
+                logging.warning("[STEAM] Could not find 'rgGames' data in the page HTML. The session may be invalid or the profile private.")
+                return False
+                
     except Exception as e:
         logging.error(f"[STEAM] Error fetching library: {e}")
         return False
