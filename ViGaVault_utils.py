@@ -133,7 +133,7 @@ def get_db_path():
     """WHY: Default to the secured .dat extension for the main library database."""
     default_db = os.path.join(BASE_DIR, "VGVDB.dat")
     settings = load_encrypted_json(os.path.join(BASE_DIR, "settings.bin"))
-    return settings.get("db_path", default_db)
+    return settings.get("libraryName", default_db)
 
 def get_library_settings_file():
     """Returns the path to the encrypted .bin configuration file for the current library."""
@@ -144,20 +144,20 @@ def get_library_settings_file():
 def get_video_path():
     """Returns the configured video path or default 'videos' folder."""
     settings = load_encrypted_json(get_library_settings_file())
-    return settings.get("video_path", os.path.join(BASE_DIR, "videos"))
+    return settings.get("videoPath", os.path.join(BASE_DIR, "videos"))
 
 def get_image_path():
     """Returns the configured image path or default 'images' folder."""
     settings = load_encrypted_json(get_library_settings_file())
-    return settings.get("image_path", os.path.join(BASE_DIR, "images"))
+    return settings.get("imagePath", os.path.join(BASE_DIR, "images"))
 
 def get_root_path():
     """Returns the configured root path from the library's settings."""
     settings = load_encrypted_json(get_library_settings_file())
-    if "root_path" in settings: return settings.get("root_path", "")
+    if "rootPath" in settings: return settings.get("rootPath", "")
     
     global_settings = load_encrypted_json(os.path.join(BASE_DIR, "settings.bin"))
-    return global_settings.get("root_path", "")
+    return global_settings.get("rootPath", "")
 
 def get_platform_config():
     """Loads platform mapping and ignore list from settings.bin or returns defaults."""
@@ -181,7 +181,7 @@ def get_platform_config():
     if not os.path.exists(settings_path): settings_path = os.path.join(BASE_DIR, "settings.bin")
         
     settings = load_encrypted_json(settings_path)
-    return settings.get("platform_map", default_map), settings.get("ignored_prefixes", default_ignore)
+    return settings.get("platformMap", default_map), settings.get("ignoredPrefixes", default_ignore)
 
 def get_local_scan_config():
     """Loads local scan configuration from settings.bin."""
@@ -197,7 +197,7 @@ def get_local_scan_config():
     if not os.path.exists(settings_path): settings_path = os.path.join(BASE_DIR, "settings.bin")
         
     settings = load_encrypted_json(settings_path)
-    return settings.get("local_scan_config", default_config)
+    return settings.get("localScanConfig", default_config)
 
 def get_date_format_mapping():
     """WHY: Maps human-readable UI formats to strict Python datetime strftime formats."""
@@ -217,11 +217,11 @@ def build_scanner_config():
     galaxy_path = os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db')
     settings = load_encrypted_json(settings_path)
     
-    enable_galaxy = settings.get("enable_galaxy_db", False)
-    galaxy_path = settings.get("galaxy_db_path", galaxy_path)
-    download_images = settings.get("download_images", False)
-    download_videos = settings.get("download_videos", False)
-    date_format_str = settings.get("date_format", "DD/MM/YYYY")
+    enable_galaxy = settings.get("enableGalaxyDb", False)
+    galaxy_path = settings.get("galaxyDbPath", galaxy_path)
+    download_images = settings.get("downloadImages", False)
+    download_videos = settings.get("downloadVideos", False)
+    date_format_str = settings.get("dateFormat", "DD/MM/YYYY")
 
     date_format = get_date_format_mapping().get(date_format_str, "%d/%m/%Y")
 

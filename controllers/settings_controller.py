@@ -26,20 +26,20 @@ class SettingsController(QObject):
         global_settings, lib_settings = self.get_user_settings()
         
         global_settings.update(display_state)
-        local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "view_new", "view_dlc", "view_review", "filter_states", "filter_expansion", "sidebar_chk_galaxy", "sidebar_chk_gog_web", "sidebar_chk_epic", "sidebar_chk_steam", "sidebar_chk_local", "sidebar_chk_folders", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_galaxy_db", "galaxy_db_path", "download_images", "download_videos", "image_path", "video_path"]
+        local_keys = ["sortDesc", "sortIndex", "searchText", "anchorFolder", "viewNew", "viewDlc", "viewReview", "filterStates", "filterExpansion", "scanGalaxy", "scanGog", "scanEpic", "scanSteam", "scanLocal", "scanFolders", "platformMap", "ignoredPrefixes", "rootPath", "localScanConfig", "enableGalaxyDb", "galaxyDbPath", "downloadImages", "downloadVideos", "imagePath", "videoPath"]
         for k in local_keys: global_settings.pop(k, None)
         
         save_encrypted_json(os.path.join(BASE_DIR, "settings.bin"), global_settings)
 
-        global_keys = ["geometry", "theme", "language", "card_image_size", "card_button_size", "card_text_size", "db_path", "splitter_sizes"]
+        global_keys = ["geometry", "theme", "language", "cardImageSize", "cardButtonSize", "cardTextSize", "libraryName", "splitterSizes", "dateFormat"]
         for k in global_keys: lib_settings.pop(k, None)
 
-        lib_settings["root_path"] = data_state["root_path"]
-        lib_settings["local_scan_config"] = data_state["local_scan_config"]
-        lib_settings["enable_galaxy_db"] = data_state["enable_galaxy_db"]
-        lib_settings["galaxy_db_path"] = data_state["galaxy_db_path"]
-        lib_settings["download_images"] = data_state["download_images"]
-        lib_settings["image_path"] = data_state["image_path"]
+        lib_settings["rootPath"] = data_state["root_path"]
+        lib_settings["localScanConfig"] = data_state["local_scan_config"]
+        lib_settings["enableGalaxyDb"] = data_state["enable_galaxy_db"]
+        lib_settings["galaxyDbPath"] = data_state["galaxy_db_path"]
+        lib_settings["downloadImages"] = data_state["download_images"]
+        lib_settings["imagePath"] = data_state["image_path"]
         
         new_image_path = data_state["image_path"]
         if move_images and old_image_path and os.path.exists(old_image_path):
@@ -55,21 +55,21 @@ class SettingsController(QObject):
         save_encrypted_json(get_library_settings_file(), lib_settings)
 
         if hasattr(self.mw, 'display_settings'):
-            self.mw.display_settings['image'] = display_state['card_image_size']
-            self.mw.display_settings['button'] = display_state['card_button_size']
-            self.mw.display_settings['text'] = display_state['card_text_size']
+            self.mw.display_settings['image'] = display_state['cardImageSize']
+            self.mw.display_settings['button'] = display_state['cardButtonSize']
+            self.mw.display_settings['text'] = display_state['cardTextSize']
 
     def save_settings(self):
         global_settings = load_encrypted_json(os.path.join(BASE_DIR, "settings.bin"))
 
         try:
             global_settings.update({"geometry": self.mw.saveGeometry().toBase64().data().decode()})
-            global_settings.update({"splitter_sizes": self.mw.splitter.sizes()})
+            global_settings.update({"splitterSizes": self.mw.splitter.sizes()})
         except RuntimeError:
             # WHY: Safely ignore C++ teardown errors if save_settings is fired during application closure.
             pass
         
-        local_keys = ["sort_desc", "sort_index", "search_text", "anchor_folder", "view_new", "view_dlc", "view_review", "filter_states", "filter_expansion", "sidebar_chk_galaxy", "sidebar_chk_gog_web", "sidebar_chk_epic", "sidebar_chk_steam", "sidebar_chk_local", "sidebar_chk_folders", "platform_map", "ignored_prefixes", "root_path", "local_scan_config", "enable_galaxy_db", "galaxy_db_path", "download_images", "download_videos", "image_path", "video_path"]
+        local_keys = ["sortDesc", "sortIndex", "searchText", "anchorFolder", "viewNew", "viewDlc", "viewReview", "filterStates", "filterExpansion", "scanGalaxy", "scanGog", "scanEpic", "scanSteam", "scanLocal", "scanFolders", "platformMap", "ignoredPrefixes", "rootPath", "localScanConfig", "enableGalaxyDb", "galaxyDbPath", "downloadImages", "downloadVideos", "imagePath", "videoPath"]
         for k in local_keys: global_settings.pop(k, None)
         
         save_encrypted_json(os.path.join(BASE_DIR, "settings.bin"), global_settings)
@@ -77,7 +77,7 @@ class SettingsController(QObject):
         lib_settings_file = get_library_settings_file()
         lib_settings = load_encrypted_json(lib_settings_file)
 
-        global_keys = ["geometry", "theme", "language", "card_image_size", "card_button_size", "card_text_size", "db_path", "splitter_sizes"]
+        global_keys = ["geometry", "theme", "language", "cardImageSize", "cardButtonSize", "cardTextSize", "libraryName", "splitterSizes", "dateFormat"]
         for k in global_keys: lib_settings.pop(k, None)
 
         # WHY: Reverted to the unified update block. The previous fix was fundamentally flawed. 
@@ -99,30 +99,30 @@ class SettingsController(QObject):
             checked_folders = [f for f, chk in self.mw.sidebar.chk_scan_folders.items() if chk.isChecked()]
 
             lib_settings.update({
-                "sort_desc": self.mw.sort_desc,
-                "sort_index": self.mw.sidebar.combo_sort.currentIndex(),
-                "search_text": self.mw.sidebar.search_bar.text(),
-                "anchor_folder": self.mw.library_controller.get_second_visible_folder(),
-                "view_new": self.mw.sidebar.btn_toggle_new.isChecked(),
-                "view_dlc": self.mw.sidebar.btn_toggle_dlc.isChecked(),
-                "view_review": self.mw.sidebar.btn_toggle_review.isChecked(),
-                "filter_states": filter_states,
-                "filter_expansion": saved_expansion,
-                "sidebar_chk_galaxy": self.mw.sidebar.chk_scan_galaxy.isChecked(),
-                "sidebar_chk_gog_web": self.mw.sidebar.chk_scan_gog_web.isChecked(),
-                "sidebar_chk_epic": self.mw.sidebar.chk_scan_epic.isChecked(),
-                "sidebar_chk_steam": self.mw.sidebar.chk_scan_steam.isChecked(),
-                "sidebar_chk_local": self.mw.sidebar.chk_scan_local.isChecked(),
-                "sidebar_chk_folders": checked_folders,
-                "download_images": self.mw.sidebar.chk_scan_dl_images.isChecked()
+                "sortDesc": self.mw.sort_desc,
+                "sortIndex": self.mw.sidebar.combo_sort.currentIndex(),
+                "searchText": self.mw.sidebar.search_bar.text(),
+                "anchorFolder": self.mw.library_controller.get_second_visible_folder(),
+                "viewNew": self.mw.sidebar.btn_toggle_new.isChecked(),
+                "viewDlc": self.mw.sidebar.btn_toggle_dlc.isChecked(),
+                "viewReview": self.mw.sidebar.btn_toggle_review.isChecked(),
+                "filterStates": filter_states,
+                "filterExpansion": saved_expansion,
+                "scanGalaxy": self.mw.sidebar.chk_scan_galaxy.isChecked(),
+                "scanGog": self.mw.sidebar.chk_scan_gog_web.isChecked(),
+                "scanEpic": self.mw.sidebar.chk_scan_epic.isChecked(),
+                "scanSteam": self.mw.sidebar.chk_scan_steam.isChecked(),
+                "scanLocal": self.mw.sidebar.chk_scan_local.isChecked(),
+                "scanFolders": checked_folders,
+                "downloadImages": self.mw.sidebar.chk_scan_dl_images.isChecked()
             })
         except RuntimeError:
             pass
 
-        if "platform_map" not in lib_settings:
+        if "platformMap" not in lib_settings:
              pm, ip = get_platform_config()
-             lib_settings["platform_map"] = pm
-             lib_settings["ignored_prefixes"] = ip
+             lib_settings["platformMap"] = pm
+             lib_settings["ignoredPrefixes"] = ip
 
         save_encrypted_json(lib_settings_file, lib_settings)
 
@@ -132,27 +132,27 @@ class SettingsController(QObject):
         try:
             if "geometry" in global_settings:
                 self.mw.restoreGeometry(QByteArray.fromBase64(global_settings["geometry"].encode('utf-8')))
-            if "splitter_sizes" in global_settings:
-                self.mw.splitter.setSizes(global_settings["splitter_sizes"])
-            self.mw.sort_desc = lib_settings.get("sort_desc", True)
+            if "splitterSizes" in global_settings:
+                self.mw.splitter.setSizes(global_settings["splitterSizes"])
+            self.mw.sort_desc = lib_settings.get("sortDesc", True)
             self.mw.sidebar.update_sort_button(self.mw.sort_desc)
             
-            self.mw.display_settings['image'] = global_settings.get("card_image_size", DEFAULT_DISPLAY_SETTINGS['image'])
-            self.mw.display_settings['button'] = global_settings.get("card_button_size", DEFAULT_DISPLAY_SETTINGS['button'])
-            self.mw.display_settings['text'] = global_settings.get("card_text_size", DEFAULT_DISPLAY_SETTINGS['text'])
+            self.mw.display_settings['image'] = global_settings.get("cardImageSize", DEFAULT_DISPLAY_SETTINGS['image'])
+            self.mw.display_settings['button'] = global_settings.get("cardButtonSize", DEFAULT_DISPLAY_SETTINGS['button'])
+            self.mw.display_settings['text'] = global_settings.get("cardTextSize", DEFAULT_DISPLAY_SETTINGS['text'])
             
             # WHY: Suppress Signals - Prevent programmatic UI population from instantly triggering save_settings() 
             # which previously wiped the actual user settings with a blank layout during application boot!
             self.mw.sidebar.chk_scan_galaxy.blockSignals(True)
-            self.mw.sidebar.chk_scan_galaxy.setChecked(lib_settings.get("sidebar_chk_galaxy", False))
+            self.mw.sidebar.chk_scan_galaxy.setChecked(lib_settings.get("scanGalaxy", False))
             self.mw.sidebar.chk_scan_galaxy.blockSignals(False)
             
             self.mw.sidebar.chk_scan_local.blockSignals(True)
-            self.mw.sidebar.chk_scan_local.setChecked(lib_settings.get("sidebar_chk_local", False))
+            self.mw.sidebar.chk_scan_local.setChecked(lib_settings.get("scanLocal", False))
             self.mw.sidebar.chk_scan_local.blockSignals(False)
             
             self.mw.sidebar.chk_scan_dl_images.blockSignals(True)
-            self.mw.sidebar.chk_scan_dl_images.setChecked(lib_settings.get("download_images", True))
+            self.mw.sidebar.chk_scan_dl_images.setChecked(lib_settings.get("downloadImages", True))
             self.mw.sidebar.chk_scan_dl_images.blockSignals(False)
             
             # WHY: Check live connection status to physically forbid the user from toggling scanners for disconnected platforms.
@@ -164,7 +164,7 @@ class SettingsController(QObject):
             self.mw.sidebar.chk_scan_gog_web.setEnabled(gog_enabled)
             self.mw.sidebar.chk_scan_gog_web.blockSignals(True)
             if not gog_enabled: self.mw.sidebar.chk_scan_gog_web.setChecked(False)
-            else: self.mw.sidebar.chk_scan_gog_web.setChecked(lib_settings.get("sidebar_chk_gog_web", False))
+            else: self.mw.sidebar.chk_scan_gog_web.setChecked(lib_settings.get("scanGog", False))
             self.mw.sidebar.chk_scan_gog_web.blockSignals(False)
 
             try:
@@ -175,7 +175,7 @@ class SettingsController(QObject):
             self.mw.sidebar.chk_scan_epic.setEnabled(epic_enabled)
             self.mw.sidebar.chk_scan_epic.blockSignals(True)
             if not epic_enabled: self.mw.sidebar.chk_scan_epic.setChecked(False)
-            else: self.mw.sidebar.chk_scan_epic.setChecked(lib_settings.get("sidebar_chk_epic", False))
+            else: self.mw.sidebar.chk_scan_epic.setChecked(lib_settings.get("scanEpic", False))
             self.mw.sidebar.chk_scan_epic.blockSignals(False)
 
             try:
@@ -195,12 +195,12 @@ class SettingsController(QObject):
                 self.mw.sidebar.chk_scan_steam.setEnabled(steam_enabled)
                 self.mw.sidebar.chk_scan_steam.blockSignals(True)
                 if not steam_enabled: self.mw.sidebar.chk_scan_steam.setChecked(False)
-                else: self.mw.sidebar.chk_scan_steam.setChecked(lib_settings.get("sidebar_chk_steam", False))
+                else: self.mw.sidebar.chk_scan_steam.setChecked(lib_settings.get("scanSteam", False))
                 self.mw.sidebar.chk_scan_steam.blockSignals(False)
                 
             self.mw.sidebar.update_scan_button_state()
             
-            return lib_settings.get("anchor_folder")
+            return lib_settings.get("anchorFolder")
         except Exception as e:
             logging.error(f"Error loading settings: {e}")
             return None
@@ -212,8 +212,8 @@ class SettingsController(QObject):
         lib_settings_file = get_library_settings_file()
         lib_settings = load_encrypted_json(lib_settings_file)
             
-        was_saved = "sidebar_chk_folders" in lib_settings
-        saved_checked = lib_settings.get("sidebar_chk_folders", [])
+        was_saved = "scanFolders" in lib_settings
+        saved_checked = lib_settings.get("scanFolders", [])
         
         for chk in self.mw.sidebar.chk_scan_folders.values():
             self.mw.sidebar.layout_scan_local.removeWidget(chk)
@@ -247,7 +247,7 @@ class SettingsController(QObject):
             translator.load_language(global_settings.get("language", "English"))
             self.retranslate_ui()
             
-        new_format_str = global_settings.get("date_format", "DD/MM/YYYY")
+        new_format_str = global_settings.get("dateFormat", "DD/MM/YYYY")
         if new_format_str != getattr(self.mw, 'date_format_str', "DD/MM/YYYY"):
             self.mw.date_format_str = new_format_str
             self.mw.library_controller.refresh_data()

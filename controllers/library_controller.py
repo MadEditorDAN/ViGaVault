@@ -137,8 +137,15 @@ class LibraryController(QObject):
         )
         if dlg.exec():
             # Apply restored settings if they were checked and successfully decoded
-            if dlg.restored_settings:
-                save_encrypted_json(get_library_settings_file(), dlg.restored_settings)
+            if dlg.restored_global is not None or dlg.restored_lib is not None:
+                # Merge the incoming split dicts with the current local dicts
+                global_curr, lib_curr = self.mw.settings_controller.get_user_settings()
+                
+                if dlg.restored_global: global_curr.update(dlg.restored_global)
+                if dlg.restored_lib: lib_curr.update(dlg.restored_lib)
+                
+                save_encrypted_json(os.path.join(BASE_DIR, "settings.bin"), global_curr)
+                save_encrypted_json(get_library_settings_file(), lib_curr)
                 
             logging.info(f"{'RESTORE':<15} : Successfully restored data from .vgv archive.")
             # Smart Refresh - Instantly inject the new data without forcing an application restart.
@@ -146,12 +153,13 @@ class LibraryController(QObject):
 
     def create_backup(self):
         """WHY: Launches the modular UI allowing users to export their database, cached media, and settings into an encrypted .vgv archive."""
-        settings_dict = load_encrypted_json(get_library_settings_file())
+        global_settings, lib_settings = self.mw.settings_controller.get_user_settings()
         
         dlg = BackupDialog(
             db_path=get_db_path(),
             image_path=get_image_path(),
-            settings_dict=settings_dict,
+            global_settings=global_settings,
+            lib_settings=lib_settings,
             parent=self.mw
         )
         dlg.exec()

@@ -10,7 +10,7 @@ from ViGaVault_utils import translator, center_window
 from backend.backup_manager import create_vgv_backup, analyze_vgv_backup, restore_vgv_backup
 
 class BackupDialog(QDialog):
-    def __init__(self, db_path, image_path, settings_dict, parent=None):
+    def __init__(self, db_path, image_path, global_settings, lib_settings, parent=None):
         super().__init__(parent)
         self.setWindowTitle(translator.tr("menu_file_export") + " (.vgv)")
         self.setMinimumWidth(400)
@@ -18,7 +18,8 @@ class BackupDialog(QDialog):
         
         self.db_path = db_path
         self.image_path = image_path
-        self.settings_dict = settings_dict
+        self.global_settings = global_settings
+        self.lib_settings = lib_settings
         
         layout = QVBoxLayout(self)
         
@@ -68,9 +69,10 @@ class BackupDialog(QDialog):
             # WHY: Only pass paths if the user checked them, else pass a dummy empty path
             db_p = self.db_path if self.chk_db.isChecked() else ""
             img_p = self.image_path if self.chk_images.isChecked() else ""
-            set_dict = self.settings_dict if self.chk_settings.isChecked() else {}
+            glob_set = self.global_settings if self.chk_settings.isChecked() else {}
+            lib_set = self.lib_settings if self.chk_settings.isChecked() else {}
             
-            create_vgv_backup(db_p, img_p, set_dict, file_path)
+            create_vgv_backup(db_p, img_p, glob_set, lib_set, file_path)
             
             QMessageBox.information(self, "Success", "Backup generated successfully!")
             self.accept()
@@ -92,7 +94,8 @@ class RestoreDialog(QDialog):
         self.target_db_dir = target_db_dir
         self.target_img_dir = target_img_dir
         self.backup_path = None
-        self.restored_settings = None
+        self.restored_global = None
+        self.restored_lib = None
         self.restored_db_path = None
         
         self.layout = QVBoxLayout(self)
@@ -177,7 +180,8 @@ class RestoreDialog(QDialog):
                 target_img_dir=self.target_img_dir
             )
             
-            self.restored_settings = result['settings']
+            self.restored_global = result['global_settings']
+            self.restored_lib = result['lib_settings']
             self.restored_db_path = result['db_path']
             
             QMessageBox.information(self, "Success", "Backup restored successfully! The application UI will now refresh.")

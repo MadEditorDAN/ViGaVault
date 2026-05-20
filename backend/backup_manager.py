@@ -17,9 +17,9 @@ def _get_cipher():
     # We use the cryptography package's CTR mode which corresponds to SIC.
     return Cipher(algorithms.AES(APP_KEY), modes.CTR(APP_IV), backend=default_backend())
 
-def create_vgv_backup(db_path, images_path, settings_dict, output_path):
+def create_vgv_backup(db_path, images_path, global_settings, lib_settings, output_path):
     """
-    Creates an AES-256 encrypted .vgv archive containing the database, images, and settings.
+    Creates an AES-256 encrypted .vgv archive containing the database, images, and unified settings.
     """
     archive_buffer = io.BytesIO()
     
@@ -40,7 +40,8 @@ def create_vgv_backup(db_path, images_path, settings_dict, output_path):
                         zf.write(full_path, arcname)
         
         # 3. Snapshot Settings
-        settings_json = json.dumps(settings_dict, indent=4)
+        unified_settings = {**global_settings, **lib_settings}
+        settings_json = json.dumps(unified_settings, indent=4)
         zf.writestr("settings.json", settings_json)
         
     zip_bytes = archive_buffer.getvalue()
@@ -100,8 +101,12 @@ def restore_vgv_backup(backup_path, restore_db=True, restore_images=True, restor
     decrypted_bytes = decryptor.update(encrypted_bytes) + decryptor.finalize()
     
     archive_buffer = io.BytesIO(decrypted_bytes)
-    restored_settings = None
+    restored_global = {}
+    restored_lib = {}
     restored_db_path = None
+    
+    # The global keys expected to be routed to the global settings.bin file
+    GLOBAL_KEYS = ["geometry", "theme", "language", "cardImageSize", "cardButtonSize", "cardTextSize", "libraryName", "splitterSizes", "dateFormat"]
     
     try:
         with zipfile.ZipFile(archive_buffer, 'r') as zf:
@@ -126,6 +131,11 @@ def restore_vgv_backup(backup_path, restore_db=True, restore_images=True, restor
                     settings_data = zf.read(name).decode('utf-8')
                     try:
                         restored_settings = json.loads(settings_data)
+                        for k, v in restored_settings.items():
+                            if k in GLOBAL_KEYS:
+                                restored_global[k] = v
+                            else:
+                                restored_lib[k] = v
                     except json.JSONDecodeError:
                         logging.error("Failed to parse settings.json in backup.")
                         
@@ -134,6 +144,7 @@ def restore_vgv_backup(backup_path, restore_db=True, restore_images=True, restor
         raise Exception("INVALID_BACKUP_FORMAT")
         
     return {
-        'settings': restored_settings,
+        'global_settings': restored_global if restore_settings else None,
+        'lib_settings': restored_lib if restore_settings else None,
         'db_path': restored_db_path
     }
