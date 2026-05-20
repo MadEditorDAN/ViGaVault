@@ -10,8 +10,9 @@ from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from backend.library import LibraryManager
 from backend.game import Game
-from ViGaVault_utils import get_db_path, get_library_settings_file, build_scanner_config, translator, save_encrypted_json, load_encrypted_json, encrypt_string_to_file, BASE_DIR
+from ViGaVault_utils import get_db_path, get_image_path, get_library_settings_file, build_scanner_config, translator, save_encrypted_json, load_encrypted_json, encrypt_string_to_file, BASE_DIR
 from ViGaVault_workers import DbLoaderWorker, StartupSyncWorker
+from dialogs import BackupDialog, RestoreDialog
 
 class LibraryController(QObject):
     def __init__(self, main_window):
@@ -127,46 +128,33 @@ class LibraryController(QObject):
             except Exception as e:
                 QMessageBox.critical(self.mw, "Error", f"Could not switch library: {e}")
 
-    def import_from_csv(self):
-        """WHY: Restores user ownership. Ingests a plaintext CSV securely into the active encrypted database."""
-        filePath, _ = QFileDialog.getOpenFileName(self.mw, translator.tr("menu_file_import"), "", "CSV Files (*.csv)")
-        if filePath:
-            try:
-                df = pd.read_csv(filePath, sep=';', encoding='utf-8', dtype=str).fillna('')
-                manager = LibraryManager(build_scanner_config())
-                manager.load_db()
+    def restore_backup(self):
+        """WHY: Launches the modular UI allowing users to granularly restore elements from an AES-encrypted .vgv backup archive."""
+        dlg = RestoreDialog(
+            target_db_dir=os.path.dirname(get_db_path()),
+            target_img_dir=get_image_path(),
+            parent=self.mw
+        )
+        if dlg.exec():
+            # Apply restored settings if they were checked and successfully decoded
+            if dlg.restored_settings:
+                save_encrypted_json(get_library_settings_file(), dlg.restored_settings)
                 
-                for _, row in df.iterrows():
-                    game_data = {k: str(v) for k, v in row.to_dict().items()}
-                    folder = game_data.get('Folder_Name')
-                    if folder: manager.games[folder] = Game(config=manager.config, **game_data)
-                
-                manager.save_db()
-                logging.info(f"{'DB IMPORT':<15} : Successfully imported data from {filePath}")
-                QMessageBox.information(self.mw, "Success", translator.tr("msg_import_success"))
-                
-                # WHY: Smart Refresh - Instantly inject the new data without forcing an application restart.
-                self.reload_ui_for_new_library()
-            except Exception as e:
-                logging.error(f"Failed to import CSV: {e}")
-                QMessageBox.critical(self.mw, "Error", f"Could not import CSV: {e}")
+            logging.info(f"{'RESTORE':<15} : Successfully restored data from .vgv archive.")
+            # Smart Refresh - Instantly inject the new data without forcing an application restart.
+            self.reload_ui_for_new_library()
 
-    def export_to_csv(self):
-        """WHY: Instantly drops the encrypted RAM buffers into a plaintext spreadsheet on the user's hard drive."""
-        filePath, _ = QFileDialog.getSaveFileName(self.mw, translator.tr("menu_file_export"), "VGVDB_Export.csv", "CSV Files (*.csv)")
-        if filePath:
-            try:
-                expected_columns = LibraryManager(build_scanner_config())._get_db_schema()
-                df = self.mw.master_df.copy()
-                for col in expected_columns:
-                    if col not in df.columns: df[col] = ''
-                df = df[expected_columns]
-                df.fillna('').to_csv(filePath, sep=';', index=False, encoding='utf-8')
-                logging.info(f"{'DB EXPORT':<15} : Successfully exported plaintext CSV to {filePath}")
-                QMessageBox.information(self.mw, "Success", translator.tr("msg_export_success"))
-            except Exception as e:
-                logging.error(f"Failed to export CSV: {e}")
-                QMessageBox.critical(self.mw, "Error", f"Could not export CSV: {e}")
+    def create_backup(self):
+        """WHY: Launches the modular UI allowing users to export their database, cached media, and settings into an encrypted .vgv archive."""
+        settings_dict = load_encrypted_json(get_library_settings_file())
+        
+        dlg = BackupDialog(
+            db_path=get_db_path(),
+            image_path=get_image_path(),
+            settings_dict=settings_dict,
+            parent=self.mw
+        )
+        dlg.exec()
 
     def reload_ui_for_new_library(self):
         self.mw.background_loader.stop()

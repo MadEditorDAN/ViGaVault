@@ -27,11 +27,11 @@ class MenuController(QObject):
         
         file_menu.addSeparator()
         action_import = QAction(translator.tr("menu_file_import"), self.mw)
-        action_import.triggered.connect(self.mw.library_controller.import_from_csv)
+        action_import.triggered.connect(self.mw.library_controller.restore_backup)
         file_menu.addAction(action_import)
         
         action_export = QAction(translator.tr("menu_file_export"), self.mw)
-        action_export.triggered.connect(self.mw.library_controller.export_to_csv)
+        action_export.triggered.connect(self.mw.library_controller.create_backup)
         file_menu.addAction(action_export)
         
         file_menu.addSeparator()
