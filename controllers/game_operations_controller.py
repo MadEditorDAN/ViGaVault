@@ -64,6 +64,7 @@ class GameOperationsController(QObject):
         self.mw.library_controller.patch_memory_df(folder_name, game_obj.to_dict())
         self.mw.library_controller.update_status_checkboxes_state()
         self.mw.list_controller.update_single_card(folder_name, force_media_reload=True)
+        self.mw.filter_controller.request_filter_update()
         self.mw.settings_controller.save_settings()
 
     def execute_merge(self, folder_a, folder_b):
@@ -108,6 +109,7 @@ class GameOperationsController(QObject):
 
         self.mw.list_controller.update_single_card(folder_a, force_media_reload=True)
         self.mw.list_controller.remove_single_card(folder_b)
+        self.mw.filter_controller.request_filter_update()
         self.mw.settings_controller.save_settings()
         return True
 
@@ -119,6 +121,7 @@ class GameOperationsController(QObject):
             for k, v in flags_dict.items(): game.data[k] = v
             manager.save_db()
             self.mw.library_controller.patch_memory_df(folder_name, flags_dict)
+            self.mw.filter_controller.request_filter_update()
 
     def delete_game(self, folder_name):
         manager = LibraryManager(build_scanner_config())
