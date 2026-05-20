@@ -10,9 +10,8 @@
 -------------------------------------------------------------------------------
 User Manual
 -------------------------------------------------------------------------------
-Welcome to ViGaVault (Video Game Vault), your high-performance, offline-first
-unified video game library manager. This guide will walk you through setting 
-up your vault, connecting your accounts, and managing your library with 
+Welcome to ViGaVault (Video Game Vault), your high-performance,unified video 
+game library manager. This guide will walk you through setting up your vault, connecting your accounts, and managing your library with 
 forensic precision.
 
 -------------------------------------------------------------------------------
@@ -40,9 +39,10 @@ will automatically refresh its access in the background in the future.
 GOG.com: Similar to Epic, log in once via the secure portal to grant ViGaVault 
 read-only access to your digital GOG library.
 
-Steam: Steam uses a BYOK architecture. You will need to provide your Steam ID 
-and a free Steam Web API key to securely sync your digital library without 
-risking your account credentials.
+Steam: Steam uses an embedded secure browser architecture. You log into Steam 
+natively via a pop-up window, bypassing CAPTCHAs and Steam Guard 2FA. Once logged 
+in, a background "ghost script" silently extracts your secure session cookies to 
+safely sync your digital library without exposing your credentials.
 
 GOG Galaxy (Local): If you use GOG Galaxy on your PC, ViGaVault can 
 automatically parse its local database to instantly import your existing 
@@ -159,7 +159,8 @@ Using the Game Manager:
 The Game Manager is a spreadsheet-like view of your entire database. 
 It features Excel-style multi-select dropdowns at the top of every column, 
 allowing you to instantly filter down to exactly what you want (e.g., "Show 
-me all Action games developed by Ubisoft").
+me all Action games developed by Ubisoft"). You can also click the inline "Edit" 
+(gear) icon on any row to open the master Edit Dialog without leaving the list.
 
 Batch Delete: Select multiple rows using the checkboxes and delete them from 
 your vault simultaneously.
@@ -170,10 +171,10 @@ where you can type in a new Publisher, Genre, or Collection.
 Safe Blank Logic: If you leave a field blank in the batch editor, ViGaVault 
 will ignore it. It only append the specific fields you type into.
 
-Exclusions word list: you can add specific keywords (like "Soundtrack" or 
-"Bonus") to your Exclusion List. Any game flagged as Excluded is instantly 
-hidden from your main library view, keeping your vault clean. You can view 
-them at any time by toggling the specific "Show Hidden" filters in the sidebar.
+Exclusions & Hidden Filters: You can add specific keywords (like "Soundtrack" 
+or "Bonus") to your Exclusion List. Any game flagged as Excluded is instantly 
+hidden from your main library view. You can view them at any time by toggling 
+the dedicated "Hidden" filter in the Game Manager.
 
 -------------------------------------------------------------------------------
 7. Media Manager
@@ -191,7 +192,12 @@ images. If you accidentally delete a cover from your hard drive, ViGaVault
 detects it.
 
 Manual Overrides: Don't like the official poster? You can manually point 
-ViGaVault to a custom .jpg or .png file on your computer to use as the cover.
+ViGaVault to a custom .jpg, .png, or .webp file on your computer to use as the cover.
+You can also use the inline "Edit" (gear) icon in the Media Manager to instantly
+open the Edit Dialog for any specific game.
+
+Sidebar Media Filters: To quickly find missing assets, use the mutually exclusive
+"No Image" and "No Trailer" toggle buttons located in the main application sidebar.
 
 Trailers: ViGaVault stores links to YouTube trailers or online mp4 files, 
 allowing you to play rich media directly from the game's detail page. If the 
