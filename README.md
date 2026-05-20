@@ -12,7 +12,7 @@ Designed with a focus on speed, data ownership, and a clean, customizable UI, Vi
 
 ## Note for Windows Users (SmartScreen)
 
-As ViGaVault is currently in Beta and not yet digitally signed with a paid certificate, you might see a Windows SmartScreen warning (*"Windows protected your PC"*) when launching the `.exe`.
+As ViGaVault is a very young project and not digitally signed with a paid certificate, you might see a Windows SmartScreen warning (*"Windows protected your PC"*) when launching the `.exe`.
 
 To run the application:
 1. Click on "More info".
