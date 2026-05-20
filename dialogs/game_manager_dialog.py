@@ -300,6 +300,14 @@ class GameManagerDialog(QDialog):
         self.btn_save_exclusions.clicked.connect(self.save_exclusions)
         ex_layout.addWidget(self.exclusion_input)
         ex_layout.addWidget(self.btn_save_exclusions)
+        
+        ex_layout.addStretch()
+        self.btn_batch_ok = QPushButton("Mark Selected OK")
+        self.btn_batch_ok.clicked.connect(self.request_batch_ok)
+        self.btn_batch_ok.setEnabled(False)
+        self.btn_batch_ok.setStyleSheet("background-color: #2E7D32; font-weight: bold;")
+        ex_layout.addWidget(self.btn_batch_ok)
+        
         layout.addWidget(ex_group)
         
         self.load_exclusions()
@@ -341,6 +349,14 @@ class GameManagerDialog(QDialog):
                 self.parent_window.game_operations_controller.batch_update_games(selected_folders, new_data)
                 self.load_data()
 
+    def request_batch_ok(self):
+        selected_folders = self.get_selected_folders()
+        if not selected_folders: return
+        
+        if hasattr(self.parent_window, 'game_operations_controller'):
+            self.parent_window.game_operations_controller.batch_update_games(selected_folders, {'Status_Flag': 'OK'})
+            self.load_data()
+
     def load_exclusions(self):
         lib_settings_file = get_library_settings_file()
         settings = load_encrypted_json(lib_settings_file)
@@ -375,6 +391,7 @@ class GameManagerDialog(QDialog):
             
             self.btn_batch_edit.setEnabled(has_selection)
             self.btn_batch_delete.setEnabled(has_selection)
+            if hasattr(self, 'btn_batch_ok'): self.btn_batch_ok.setEnabled(has_selection)
             
             # WHY: Smart Refresh - Synchronize the master "Select All" checkbox state based on the actual table data. 
             # Signals are blocked to prevent triggering an accidental cascade that overwrites the user's manual selections.
