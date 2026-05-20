@@ -115,11 +115,40 @@ class LoginBrowserDialog(QDialog):
             self.page.toHtml(self.on_apikey_html)
         elif self.api_key_mode == "igdb" and not self.success_triggered and "dev.twitch.tv/console/apps" in self.browser.url().toString():
             # WHY: Twitch Developer Console is a complex React SPA. The URL does not change and loadFinished does not fire when you click "New Secret".
-            # We use a gentle 1.5 second background timer to actively scrape the DOM until the user creates and reveals the keys!
+            # We use a gentle 1.5 second background timer to actively scrape the DOM via JS until the user creates and reveals the keys!
             if not hasattr(self, 'igdb_timer'):
                 self.igdb_timer = QTimer(self)
-                self.igdb_timer.timeout.connect(lambda: self.page.toHtml(self.on_igdb_html))
+                self.igdb_timer.timeout.connect(self.poll_igdb_keys)
                 self.igdb_timer.start(1500)
+
+    def poll_igdb_keys(self):
+        if self.success_triggered: return
+        js = """
+            (function() {
+                var inputs = Array.from(document.querySelectorAll('input')).map(i => i.value);
+                var text = document.body.innerText;
+                var allStrings = inputs.join(' ') + ' ' + text;
+                // Twitch Client IDs and Secrets are universally EXACTLY 30 alphanumeric characters.
+                var matches = allStrings.match(/\\b[a-zA-Z0-9]{30}\\b/g);
+                if (matches && matches.length >= 2) {
+                    var unique = [...new Set(matches)];
+                    if (unique.length >= 2) {
+                        return unique[0] + '|||' + unique[1];
+                    }
+                }
+                return null;
+            })();
+        """
+        self.page.runJavaScript(js, 0, self.on_igdb_js_result)
+
+    def on_igdb_js_result(self, result):
+        if result and not self.success_triggered:
+            parts = result.split('|||')
+            if len(parts) == 2:
+                if hasattr(self, 'igdb_timer'): self.igdb_timer.stop()
+                self.api_key = parts[0]
+                self.auth_code = parts[1]
+                self.trigger_success()
 
     def on_apikey_html(self, html):
         match = re.search(r'Key:\s*([A-F0-9]{32})', html)
@@ -140,20 +169,6 @@ class LoginBrowserDialog(QDialog):
             """
             self.page.runJavaScript(js)
 
-    def on_igdb_html(self, html):
-        if self.success_triggered: return
-        
-        # WHY: Twitch Client IDs and Secrets are universally EXACTLY 30 alphanumeric characters.
-        # We aggressively scan the raw HTML for value="[A-Za-z0-9]{30}". The first distinct one is ID, second is Secret.
-        import re
-        matches = re.findall(r'value="([A-Za-z0-9]{30})"', html)
-        if len(matches) >= 2:
-            distinct_keys = list(dict.fromkeys(matches)) # Preserve order while removing duplicates
-            if len(distinct_keys) >= 2:
-                if hasattr(self, 'igdb_timer'): self.igdb_timer.stop()
-                self.api_key = distinct_keys[0]    # Client ID
-                self.auth_code = distinct_keys[1]  # Client Secret
-                self.trigger_success()
 
     def trigger_success(self):
         self.success_triggered = True
