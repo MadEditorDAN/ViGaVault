@@ -14,7 +14,7 @@ class SilentWebEnginePage(QWebEnginePage):
         pass
 
 class LoginBrowserDialog(QDialog):
-    def __init__(self, start_url, target_cookies=None, success_url=None, parent=None):
+    def __init__(self, start_url, target_cookies=None, success_url=None, api_key_mode=False, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Secure Platform Login")
         self.resize(*DIALOG_STD_SIZE)
@@ -22,6 +22,8 @@ class LoginBrowserDialog(QDialog):
         
         self.cookies = {}
         self.auth_code = None
+        self.api_key_mode = api_key_mode
+        self.api_key = None
         self.target_cookies = target_cookies or []
         self.success_url = success_url
         self.success_triggered = False
@@ -57,6 +59,7 @@ class LoginBrowserDialog(QDialog):
         self.cookie_store.cookieAdded.connect(self.on_cookie_added)
         self.browser.setPage(self.page)
         self.browser.urlChanged.connect(self.on_url_changed)
+        self.browser.loadFinished.connect(self.on_load_finished)
         
         # WHY: No disk to wait for, so we can load the URL immediately.
         self.browser.load(QUrl(start_url))
@@ -106,6 +109,30 @@ class LoginBrowserDialog(QDialog):
                     self.auth_code = qs['code'][0]
                 self.trigger_success()
             
+    def on_load_finished(self, ok):
+        if not ok: return
+        if self.api_key_mode and not self.success_triggered and "dev/apikey" in self.browser.url().toString():
+            self.page.toHtml(self.on_apikey_html)
+
+    def on_apikey_html(self, html):
+        match = re.search(r'Key:\s*([A-F0-9]{32})', html)
+        if match:
+            self.api_key = match.group(1)
+            self.trigger_success()
+        else:
+            # WHY: If the user doesn't have an API key yet, automatically check the box and submit the form to generate one instantly.
+            js = """
+                var domainInputs = document.querySelectorAll('input[type="text"]');
+                var checkboxes = document.querySelectorAll('input[type="checkbox"]');
+                var buttons = document.querySelectorAll('input[type="submit"], button[type="submit"]');
+                if (domainInputs.length > 0 && checkboxes.length > 0 && buttons.length > 0) {
+                    domainInputs[0].value = 'ViGaVault';
+                    checkboxes[0].checked = true;
+                    buttons[0].click();
+                }
+            """
+            self.page.runJavaScript(js)
+
     def trigger_success(self):
         self.success_triggered = True
         # WHY: Wait 1.5 seconds before closing. This ensures all lingering cookies from the final HTTP response 

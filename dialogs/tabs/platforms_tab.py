@@ -177,25 +177,10 @@ class PlatformsTabWidget(QWidget):
                 self.connection_changed.emit("steam", False)
             else:
                 from dialogs.login_browser_dialog import LoginBrowserDialog
-                from PySide6.QtWidgets import QInputDialog
                 
-                # WHY: Ask the user if they want to use the bulletproof legacy API Key instead of the flaky web scraper.
-                api_key, ok = QInputDialog.getText(self.window(), "Steam Authentication", "Enter your Steam Web API Key (or leave blank to use the new Browser Login):")
-                if not ok: return
-                
-                if api_key.strip():
-                    steam_id, id_ok = QInputDialog.getText(self.window(), "Steam ID", "Enter your 17-digit SteamID64:")
-                    if id_ok and steam_id.strip():
-                        save_steam_session({
-                            "api_key": api_key.strip(),
-                            "steam_id": steam_id.strip()
-                        })
-                        self.update_platform_btn_ui(btn, True)
-                        self.connection_changed.emit("steam", True)
-                    return
-                
-                oauth_url = "https://store.steampowered.com/login/"
-                dlg = LoginBrowserDialog(oauth_url, target_cookies=["steamLoginSecure"], parent=None)
+                # WHY: Mirror the seamless mobile experience. The user logs in, and the browser automatically redirects to the dev/apikey page where our script natively extracts or registers the API Key.
+                oauth_url = "https://steamcommunity.com/login/home/?goto=dev%2Fapikey"
+                dlg = LoginBrowserDialog(oauth_url, target_cookies=["steamLoginSecure"], success_url="dev/apikey", api_key_mode=True, parent=None)
                 dlg.setWindowModality(Qt.ApplicationModal)
                 self._active_dlg = dlg
                 
@@ -203,17 +188,19 @@ class PlatformsTabWidget(QWidget):
                     if dlg.success_triggered and "steamLoginSecure" in dlg.cookies:
                         secure_cookie = dlg.cookies["steamLoginSecure"]
                         session_id = dlg.cookies.get("sessionid", "")
-                        
-                        # Extract the 17-digit SteamID64 from the start of the secure cookie
                         steam_id = secure_cookie.split('%7C')[0] if '%7C' in secure_cookie else ""
                         
                         session_data = dlg.cookies.copy()
                         session_data["steam_id"] = steam_id
+                        
+                        if dlg.api_key:
+                            session_data["api_key"] = dlg.api_key
+                            
                         save_steam_session(session_data)
                         self.update_platform_btn_ui(btn, True)
                         self.connection_changed.emit("steam", True)
                     else:
-                        QMessageBox.warning(self.window(), "Login Failed", "Failed to capture Steam authentication cookies.")
+                        QMessageBox.warning(self.window(), "Login Failed", "Failed to capture Steam authentication cookies or API Key.")
                     dlg.deleteLater()
                     self._active_dlg = None
                     
