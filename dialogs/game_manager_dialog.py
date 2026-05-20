@@ -199,7 +199,17 @@ class GameManagerDialog(QDialog):
         self.btn_filter_new = QPushButton(translator.tr("sidebar_btn_toggle_new"))
         self.btn_filter_new.setCheckable(True)
         self.btn_filter_new.clicked.connect(self.filter_table)
+        
+        self.btn_filter_hidden = QPushButton(translator.tr("sidebar_btn_toggle_dlc"))
+        self.btn_filter_hidden.setCheckable(True)
+        self.btn_filter_hidden.clicked.connect(self.filter_table)
+        
+        # WHY: Make quick filters mutually exclusive to prevent impossible compound queries.
+        self.btn_filter_new.clicked.connect(lambda: self.btn_filter_hidden.setChecked(False) if self.btn_filter_new.isChecked() else None)
+        self.btn_filter_hidden.clicked.connect(lambda: self.btn_filter_new.setChecked(False) if self.btn_filter_hidden.isChecked() else None)
+        
         btn_layout.addWidget(self.btn_filter_new)
+        btn_layout.addWidget(self.btn_filter_hidden)
         
         layout.addLayout(btn_layout)
 
@@ -431,8 +441,12 @@ class GameManagerDialog(QDialog):
             df = df[df['Clean_Title'].str.lower().str.contains(text, na=False)]
             
         if self.btn_filter_new.isChecked():
-            # WHY: Filter strictly for games that need metadata scraping or human review.
-            df = df[df['Status_Flag'].isin(['NEW', 'NEEDS_ATTENTION'])]
+            # WHY: Filter strictly for games that need metadata scraping or human review, EXCLUDING hidden ones.
+            df = df[df['Status_Flag'].isin(['NEW', 'NEEDS_ATTENTION']) & (df['Is_DLC'] != True) & (df['Is_Excluded'] != True)]
+            
+        if self.btn_filter_hidden.isChecked():
+            # WHY: Filter strictly for Hidden/DLC games.
+            df = df[(df['Is_DLC'] == True) | (df['Is_Excluded'] == True)]
             
         # WHY: Apply interdependent Excel-style filtering across all active dropdown columns.
         for col, combo in self.filter_combos.items():
