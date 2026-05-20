@@ -104,11 +104,28 @@ class PlatformsTabWidget(QWidget):
                 self.update_platform_btn_ui(btn, False)
                 self.connection_changed.emit("igdb", False)
             else:
-                from dialogs.igdb_auth_dialog import IGDBAuthDialog
-                dlg = IGDBAuthDialog(self.window())
-                if dlg.exec():
-                    self.update_platform_btn_ui(btn, True)
-                    self.connection_changed.emit("igdb", True)
+                from dialogs.login_browser_dialog import LoginBrowserDialog
+                
+                # WHY: Mirror the seamless mobile experience for IGDB. The user logs into Twitch Dev Portal. Once they generate their app and reveal the secret, 
+                # our bot natively scrapes the Client ID and Secret from the screen and closes automatically!
+                oauth_url = "https://dev.twitch.tv/console/apps"
+                dlg = LoginBrowserDialog(oauth_url, target_cookies=[], success_url=None, api_key_mode="igdb", parent=None)
+                dlg.setWindowModality(Qt.ApplicationModal)
+                self._active_dlg = dlg
+                
+                def on_igdb_finished(result):
+                    if dlg.success_triggered and dlg.api_key and dlg.auth_code:
+                        from backend.igdb.login_igdb import save_igdb_keys
+                        save_igdb_keys(dlg.api_key, dlg.auth_code) # api_key = client_id, auth_code = client_secret
+                        self.update_platform_btn_ui(btn, True)
+                        self.connection_changed.emit("igdb", True)
+                    else:
+                        QMessageBox.warning(self.window(), "Login Failed", "Failed to extract IGDB (Twitch) API Keys. Make sure you click 'New Secret' on the Twitch Developer Console.")
+                    dlg.deleteLater()
+                    self._active_dlg = None
+                    
+                dlg.finished.connect(on_igdb_finished)
+                dlg.show()
                     
         elif platform_id == "gog":
             try: from dialogs.login_browser_dialog import LoginBrowserDialog 
