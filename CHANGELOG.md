@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - **Added:** Advanced `.vgv` Backup & Restore system (AES-256 encrypted archive) with modular UI for selective data restoration.
+- **Added:** Global Test Harness infrastructure (`pytest`, `pytest-qt`) with isolated sandboxing to automatically verify future feature stability.
 - **Native Key Standardization:** All configuration dictionary keys natively refactored to `camelCase` (e.g. `dateFormat`, `scanSteam`) to strictly align the Python data schemas with the Mobile app's expectations, enabling seamless `.vgv` settings imports/exports.
 ### Changed
 - **Changed:** Removed legacy CSV Export/Import system in favor of the new `.vgv` modular backup architecture.
