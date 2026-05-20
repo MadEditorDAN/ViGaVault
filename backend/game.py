@@ -359,7 +359,7 @@ class Game:
                         orig_ts = min(valid_dates)
                         self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime(self.config.get('date_format', '%d/%m/%Y'))
                 
-                self.data['Image_Link'] = self._ensure_cover(g)
+                self.data['Image_Link'] = self._ensure_cover(g, force_download=True)
                 self.data['Status_Flag'] = 'OK'
                 return True
         return False
