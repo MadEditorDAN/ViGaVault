@@ -195,6 +195,12 @@ class GameManagerDialog(QDialog):
         self.btn_batch_delete.clicked.connect(self.request_batch_delete)
         
         btn_layout.addStretch()
+        
+        self.btn_filter_new = QPushButton(translator.tr("sidebar_btn_toggle_new"))
+        self.btn_filter_new.setCheckable(True)
+        self.btn_filter_new.clicked.connect(self.filter_table)
+        btn_layout.addWidget(self.btn_filter_new)
+        
         layout.addLayout(btn_layout)
 
         # Column Filters
@@ -406,6 +412,10 @@ class GameManagerDialog(QDialog):
         
         if text:
             df = df[df['Clean_Title'].str.lower().str.contains(text, na=False)]
+            
+        if self.btn_filter_new.isChecked():
+            # WHY: Filter strictly for games that need metadata scraping or human review.
+            df = df[df['Status_Flag'].isin(['NEW', 'NEEDS_ATTENTION'])]
             
         # WHY: Apply interdependent Excel-style filtering across all active dropdown columns.
         for col, combo in self.filter_combos.items():
