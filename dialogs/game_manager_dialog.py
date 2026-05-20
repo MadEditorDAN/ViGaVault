@@ -312,10 +312,10 @@ class GameManagerDialog(QDialog):
         ex_layout.addWidget(self.btn_save_exclusions)
         
         ex_layout.addStretch()
-        self.btn_batch_ok = QPushButton("Mark Selected OK")
+        self.btn_batch_ok = QPushButton(translator.tr("game_manager_btn_batch_ok"))
         self.btn_batch_ok.clicked.connect(self.request_batch_ok)
         self.btn_batch_ok.setEnabled(False)
-        self.btn_batch_ok.setStyleSheet("background-color: #2E7D32; font-weight: bold;")
+
         ex_layout.addWidget(self.btn_batch_ok)
         
         layout.addWidget(ex_group)

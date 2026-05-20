@@ -250,5 +250,7 @@
     "media_manager_verify_title": "Discrepancias Encontradas",
     "media_manager_verify_msg": "El escaneo reveló que faltaban {count} imágenes en la carpeta de imágenes, ¿Desea actualizar la base de datos?",
     "msg_steam_instructions": "1. Vaya a la <a href='https://steamcommunity.com/dev/apikey'><span style='color: #2196F3;'>Página de clave API de Steam</span></a> para obtener su clave.<br>Steam le pedirá un dominio, ingrese : <b>vigavault.app</b><br>Y confirme usando Steam Guard.<br>2. Ingrese su clave API de Steam y la <b>URL de su perfil de Steam</b> a continuación.<br>3. Asegúrese de que la configuración de privacidad de 'Detalles de los juegos' de su perfil de Steam esté configurada en <b>Público</b>.",
-    "msg_steam_invalid_keys": "Clave API web de Steam o URL de perfil no válidas, o los detalles del juego no están configurados en Público."
+    "msg_steam_invalid_keys": "Clave API web de Steam o URL de perfil no válidas, o los detalles del juego no están configurados en Público.",
+    "dialog_edit_status_ok": "Estado: OK",
+    "game_manager_btn_batch_ok": "Marcar selección OK"
 }

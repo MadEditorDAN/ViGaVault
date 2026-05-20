@@ -46,7 +46,7 @@ class ActionDialog(QDialog):
         is_dlc = str(self.original_data.get('Is_DLC', False)).lower() in ['true', '1']
         self.chk_dlc.setChecked(is_dlc)
         
-        self.chk_ok = QCheckBox("Status: OK")
+        self.chk_ok = QCheckBox(translator.tr("dialog_edit_status_ok"))
         self.chk_ok.setChecked(self.original_data.get('Status_Flag') == 'OK')
         
         # WHY: Prevent the user from checking both status boxes at the same time.
