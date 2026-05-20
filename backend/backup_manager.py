@@ -34,10 +34,9 @@ def create_vgv_backup(db_path, images_path, global_settings, lib_settings, outpu
         if os.path.exists(images_path):
             for root, _, files in os.walk(images_path):
                 for file in files:
-                    if file.lower().endswith(('.jpg', '.png')):
-                        full_path = os.path.join(root, file)
-                        arcname = f"images/{file}"
-                        zf.write(full_path, arcname)
+                    full_path = os.path.join(root, file)
+                    arcname = f"images/{file}"
+                    zf.write(full_path, arcname)
         
         # 3. Snapshot Settings
         unified_settings = {**global_settings, **lib_settings}
