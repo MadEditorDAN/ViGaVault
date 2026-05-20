@@ -26,3 +26,6 @@ DAN-todo.txt
 
 # Dossier VS Code
 .vscode/
+
+# Build scripts
+build_exe.bat
