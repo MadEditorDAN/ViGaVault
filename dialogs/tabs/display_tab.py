@@ -113,15 +113,15 @@ class DisplayTabWidget(QWidget):
         self.combo_theme.setCurrentText(theme_map.get(saved_theme, translator.tr("theme_system")))
         
         self.combo_lang.setCurrentText(global_settings.get("language", "English"))
-        self.combo_date.setCurrentText(global_settings.get("date_format", "DD/MM/YYYY"))
+        self.combo_date.setCurrentText(global_settings.get("dateFormat", "DD/MM/YYYY"))
 
-        img_size = global_settings.get("card_image_size", DEFAULT_DISPLAY_SETTINGS['image'])
+        img_size = global_settings.get("cardImageSize", DEFAULT_DISPLAY_SETTINGS['image'])
         self.slider_img_size.setValue(self.IMG_SIZES.index(min(self.IMG_SIZES, key=lambda x:abs(x-img_size))))
         
-        btn_size = global_settings.get("card_button_size", DEFAULT_DISPLAY_SETTINGS['button'])
+        btn_size = global_settings.get("cardButtonSize", DEFAULT_DISPLAY_SETTINGS['button'])
         self.slider_btn_size.setValue(self.BTN_SIZES.index(min(self.BTN_SIZES, key=lambda x:abs(x-btn_size))))
         
-        txt_size = global_settings.get("card_text_size", DEFAULT_DISPLAY_SETTINGS['text'])
+        txt_size = global_settings.get("cardTextSize", DEFAULT_DISPLAY_SETTINGS['text'])
         self.slider_text_size.setValue(self.TXT_SIZES.index(min(self.TXT_SIZES, key=lambda x:abs(x-txt_size))))
         self.update_preview_labels()
         
@@ -130,8 +130,8 @@ class DisplayTabWidget(QWidget):
         return {
             "theme": theme_map_rev.get(self.combo_theme.currentText(), "System"),
             "language": self.combo_lang.currentText(),
-            "date_format": self.combo_date.currentText(),
-            "card_image_size": self.IMG_SIZES[self.slider_img_size.value()],
-            "card_button_size": self.BTN_SIZES[self.slider_btn_size.value()],
-            "card_text_size": self.TXT_SIZES[self.slider_text_size.value()]
+            "dateFormat": self.combo_date.currentText(),
+            "cardImageSize": self.IMG_SIZES[self.slider_img_size.value()],
+            "cardButtonSize": self.BTN_SIZES[self.slider_btn_size.value()],
+            "cardTextSize": self.TXT_SIZES[self.slider_text_size.value()]
         }

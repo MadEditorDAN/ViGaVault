@@ -92,7 +92,7 @@ class SettingsDialog(QDialog):
         # WHY: State Delegation - Pass the loaded JSON directly to the dedicated tab controllers.
         self.tab_display.set_state(global_settings)
         
-        self.initial_date = global_settings.get("date_format", "DD/MM/YYYY")
+        self.initial_date = global_settings.get("dateFormat", "DD/MM/YYYY")
         
         live_dl_images = None
         if self.parent_window and hasattr(self.parent_window, 'sidebar'):
@@ -104,9 +104,9 @@ class SettingsDialog(QDialog):
         # WHY: "Dirty Flags" initialization. We save the starting states of purely cosmetic variables.
         self.initial_theme = global_settings.get("theme", "System")
         self.initial_lang = global_settings.get("language", "English")
-        self.initial_img_size = global_settings.get("card_image_size", DEFAULT_DISPLAY_SETTINGS['image'])
-        self.initial_btn_size = global_settings.get("card_button_size", DEFAULT_DISPLAY_SETTINGS['button'])
-        self.initial_txt_size = global_settings.get("card_text_size", DEFAULT_DISPLAY_SETTINGS['text'])
+        self.initial_img_size = global_settings.get("cardImageSize", DEFAULT_DISPLAY_SETTINGS['image'])
+        self.initial_btn_size = global_settings.get("cardButtonSize", DEFAULT_DISPLAY_SETTINGS['button'])
+        self.initial_txt_size = global_settings.get("cardTextSize", DEFAULT_DISPLAY_SETTINGS['text'])
         self.initial_galaxy = lib_settings.get("enable_galaxy_db", False)
         self.initial_gog_web = lib_settings.get("sidebar_chk_gog_web", False)
         self.initial_epic_web = lib_settings.get("sidebar_chk_epic", False)
@@ -147,10 +147,10 @@ class SettingsDialog(QDialog):
         # WHY: Smart Refresh logic checking Dirty Flags
         new_theme = display_state['theme']
         new_lang = display_state['language']
-        new_date = display_state['date_format']
-        new_img = display_state['card_image_size']
-        new_btn = display_state['card_button_size']
-        new_txt = display_state['card_text_size']
+        new_date = display_state['dateFormat']
+        new_img = display_state['cardImageSize']
+        new_btn = display_state['cardButtonSize']
+        new_txt = display_state['cardTextSize']
         
         if new_theme != self.initial_theme or new_lang != self.initial_lang or new_date != self.initial_date:
             if self.parent_window and hasattr(self.parent_window, 'reload_global_settings'):
