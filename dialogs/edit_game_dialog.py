@@ -222,6 +222,7 @@ class ActionDialog(QDialog):
             os.makedirs(dest_dir, exist_ok=True)
             shutil.copy(file_path, dest_path)
             self.updated_data['Image_Link'] = new_filename
+            self.updated_data['Has_Image'] = True
             self.update_cover_display()
         except Exception as e:
             logging.error(f"Failed to copy new image: {e}")
