@@ -180,12 +180,12 @@ class PlatformsTabWidget(QWidget):
                 
                 # WHY: Mirror the seamless mobile experience. The user logs in, and the browser automatically redirects to the dev/apikey page where our script natively extracts or registers the API Key.
                 oauth_url = "https://steamcommunity.com/login/home/?goto=dev%2Fapikey"
-                dlg = LoginBrowserDialog(oauth_url, target_cookies=["steamLoginSecure"], success_url="dev/apikey", api_key_mode=True, parent=None)
+                dlg = LoginBrowserDialog(oauth_url, target_cookies=[], success_url=None, api_key_mode=True, parent=None)
                 dlg.setWindowModality(Qt.ApplicationModal)
                 self._active_dlg = dlg
                 
                 def on_steam_finished(result):
-                    if dlg.success_triggered and "steamLoginSecure" in dlg.cookies:
+                    if "steamLoginSecure" in dlg.cookies:
                         secure_cookie = dlg.cookies["steamLoginSecure"]
                         session_id = dlg.cookies.get("sessionid", "")
                         steam_id = secure_cookie.split('%7C')[0] if '%7C' in secure_cookie else ""

@@ -122,13 +122,13 @@ class LoginBrowserDialog(QDialog):
         else:
             # WHY: If the user doesn't have an API key yet, automatically check the box and submit the form to generate one instantly.
             js = """
-                var domainInputs = document.querySelectorAll('input[type="text"]');
-                var checkboxes = document.querySelectorAll('input[type="checkbox"]');
-                var buttons = document.querySelectorAll('input[type="submit"], button[type="submit"]');
-                if (domainInputs.length > 0 && checkboxes.length > 0 && buttons.length > 0) {
-                    domainInputs[0].value = 'ViGaVault';
-                    checkboxes[0].checked = true;
-                    buttons[0].click();
+                var d = document.getElementById('domain');
+                var a = document.getElementById('agreeToTerms');
+                var s = document.getElementById('Submit');
+                if (d && a && s) {
+                    d.value = 'ViGaVault';
+                    a.checked = true;
+                    s.click();
                 }
             """
             self.page.runJavaScript(js)
