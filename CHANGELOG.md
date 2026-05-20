@@ -9,9 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Added:** Advanced `.vgv` Backup & Restore system (AES-256 encrypted archive) with modular UI for selective data restoration.
 - **Added:** Global Test Harness infrastructure (`pytest`, `pytest-qt`) with isolated sandboxing to automatically verify future feature stability.
+- **Added:** Steam Browser Authentication via Embedded QWebEngineView. Users can now securely log into Steam natively, solving CAPTCHAs and 2FA, while the app automatically extracts `steamLoginSecure` cookies in the background.
 - **Native Key Standardization:** All configuration dictionary keys natively refactored to `camelCase` (e.g. `dateFormat`, `scanSteam`) to strictly align the Python data schemas with the Mobile app's expectations, enabling seamless `.vgv` settings imports/exports.
 ### Changed
 - **Changed:** Removed legacy CSV Export/Import system in favor of the new `.vgv` modular backup architecture.
+- **Changed:** Completely removed the legacy Steam Web API Key requirement. The application now fetches Steam libraries directly from the Steam Community profile by scraping the `rgGames` JavaScript payload, perfectly mirroring the Mobile app's logic.
 
 ## [0.9.2] - 2026-03-28
 ### Added

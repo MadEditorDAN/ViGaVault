@@ -170,16 +170,40 @@ class PlatformsTabWidget(QWidget):
                         else: QMessageBox.warning(self.window(), "Login Failed", translator.tr("msg_epic_invalid_code"))
                 QTimer.singleShot(200, prompt_token)
         elif platform_id == "steam":
-            from backend.steam.login_steam import is_steam_connected, disconnect_steam
+            from backend.steam.login_steam import is_steam_connected, disconnect_steam, save_steam_session
             if is_steam_connected():
                 disconnect_steam()
                 self.update_platform_btn_ui(btn, False)
                 self.connection_changed.emit("steam", False)
             else:
-                from dialogs.steam_auth_dialog import SteamAuthDialog
-                dlg = SteamAuthDialog(self.window())
-                if dlg.exec():
-                    self.update_platform_btn_ui(btn, True)
-                    self.connection_changed.emit("steam", True)
+                from dialogs.login_browser_dialog import LoginBrowserDialog
+                oauth_url = "https://store.steampowered.com/login/"
+                dlg = LoginBrowserDialog(oauth_url, target_cookies=["steamLoginSecure"], parent=None)
+                dlg.setWindowModality(Qt.ApplicationModal)
+                self._active_dlg = dlg
+                
+                def on_steam_finished(result):
+                    if dlg.success_triggered and "steamLoginSecure" in dlg.cookies:
+                        secure_cookie = dlg.cookies["steamLoginSecure"]
+                        session_id = dlg.cookies.get("sessionid", "")
+                        
+                        # Extract the 17-digit SteamID64 from the start of the secure cookie
+                        steam_id = secure_cookie.split('%7C')[0] if '%7C' in secure_cookie else ""
+                        
+                        session_data = {
+                            "steamLoginSecure": secure_cookie,
+                            "sessionid": session_id,
+                            "steam_id": steam_id
+                        }
+                        save_steam_session(session_data)
+                        self.update_platform_btn_ui(btn, True)
+                        self.connection_changed.emit("steam", True)
+                    else:
+                        QMessageBox.warning(self.window(), "Login Failed", "Failed to capture Steam authentication cookies.")
+                    dlg.deleteLater()
+                    self._active_dlg = None
+                    
+                dlg.finished.connect(on_steam_finished)
+                dlg.show()
         else:
             QMessageBox.information(self.window(), "Info", translator.tr("tools_platform_not_impl"))

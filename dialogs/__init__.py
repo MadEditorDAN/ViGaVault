@@ -10,7 +10,6 @@ from .media_manager_dialog import MediaManagerDialog
 from .metadata_manager_dialog import MetadataManagerDialog
 from .game_manager_dialog import GameManagerDialog
 from .igdb_auth_dialog import IGDBAuthDialog
-from .steam_auth_dialog import SteamAuthDialog
 from .backup_restore_dialogs import BackupDialog, RestoreDialog
 
 # Conditionally import WebEngine to prevent fatal crashes if the module isn't installed yet.

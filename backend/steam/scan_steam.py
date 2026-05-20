@@ -9,25 +9,39 @@ from .login_steam import get_steam_session
 
 def scan_steam_account(config, games_dict, worker_thread=None):
     session = get_steam_session()
-    api_key = session.get('api_key')
+    secure_cookie = session.get('steamLoginSecure')
+    session_id = session.get('sessionid')
     steam_id = session.get('steam_id')
     
-    if not api_key or not steam_id:
-        logging.error("[STEAM] No valid API Key found. Please connect Steam in the Platform Manager.")
+    if not secure_cookie or not steam_id:
+        logging.error("[STEAM] No valid Steam Session found. Please connect Steam in the Platform Manager.")
         return False
 
     logging.info(f"\n{' STEAM SCAN ':=^80}")
     
-    # WHY: include_appinfo=1 forces the API to perfectly bundle the game Names natively inside the JSON response!
-    url = f"http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={api_key}&steamid={steam_id}&format=json&include_appinfo=1"
+    # WHY: With the API Key gone, we use the user's secure browser cookies to scrape their library directly from their profile page.
+    url = f"https://steamcommunity.com/profiles/{steam_id}/games/?tab=all"
+    cookies = {
+        'steamLoginSecure': secure_cookie,
+        'sessionid': session_id
+    }
     
     try:
-        response = requests.get(url, timeout=15)
+        response = requests.get(url, cookies=cookies, timeout=15)
         if response.status_code != 200:
             logging.error(f"[STEAM] Failed to fetch library: HTTP {response.status_code}")
             return False
-        data = response.json()
-        games_list = data.get('response', {}).get('games', [])
+            
+        html = response.text
+        # WHY: Steam beautifully embeds the user's entire library as a raw JSON array inside the `rgGames` JavaScript variable.
+        match = re.search(r'var rgGames = (\[.*?\]);', html, re.DOTALL)
+        if match:
+            import json
+            games_list = json.loads(match.group(1))
+        else:
+            logging.warning("[STEAM] Could not find 'rgGames' data in the page HTML. The session may be invalid or the profile private.")
+            return False
+            
     except Exception as e:
         logging.error(f"[STEAM] Error fetching library: {e}")
         return False
