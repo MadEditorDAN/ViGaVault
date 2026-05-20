@@ -37,6 +37,9 @@ REM WHY: Uses WinRAR for significantly faster and more powerful maximum-level ZI
 pause 
 "c:\Program Files\WinRAR\winrar.exe" a -afzip -m5 -y "d:\ViGaVault\ViGaVault_1.2.0.zip" "dist\ViGaVault"
 
+echo [6/6] Deploying to d:\ViGaVault...
+xcopy /E /I /Y "dist\ViGaVault" "d:\ViGaVault\" >nul
+
 REM Cleanup after use
 FOR /d /r . %%d in (__pycache__) DO @IF EXIST "%%d" rd /s /q "%%d"
 IF EXIST "build" rd /s /q "build"
