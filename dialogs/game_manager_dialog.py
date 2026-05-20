@@ -113,7 +113,11 @@ class GameManagerModel(QAbstractTableModel):
         if role == Qt.DisplayRole:
             # WHY: Hide the string value "True/False" from displaying next to the checkbox.
             if col_name == '_selected': return ""
+            if col_name == '_edit': return "⚙️"
             return str(self._df.iloc[index.row()][col_name])
+            
+        if role == Qt.TextAlignmentRole and col_name == '_edit':
+            return int(Qt.AlignCenter)
         return None
 
     def setData(self, index, value, role=Qt.EditRole):
@@ -131,6 +135,7 @@ class GameManagerModel(QAbstractTableModel):
             if orientation == Qt.Horizontal:
                 col_name = self.display_cols[section]
                 if col_name == '_selected': return ""
+                if col_name == '_edit': return ""
                 # WHY: DRY Principle - Centralized mapping to apply dynamic JSON translations to the raw Pandas column headers.
                 headers_map = {
                     'Original_Release_Date': translator.tr("game_manager_col_rel_date"),
@@ -219,6 +224,9 @@ class GameManagerDialog(QDialog):
         filter_row_layout.setSpacing(0)
         filter_row_layout.setContentsMargins(0, 0, 0, 0)
         
+        self.lbl_edit_spacer = QLabel()
+        self.lbl_edit_spacer.setMinimumWidth(0)
+        
         self.chk_select_all = QCheckBox()
         # WHY: Add a tiny margin to roughly center the master checkbox horizontally over the table's checkbox column.
         self.chk_select_all.setStyleSheet("margin-left: 8px;")
@@ -238,7 +246,7 @@ class GameManagerDialog(QDialog):
         self.search_timer.timeout.connect(self.filter_table)
         self.search_name.textChanged.connect(self.search_timer.start)
         
-        self.filter_widgets = [self.chk_select_all, self.combo_date, self.search_name]
+        self.filter_widgets = [self.lbl_edit_spacer, self.chk_select_all, self.combo_date, self.search_name]
         self.filter_combos = {'Original_Release_Date': self.combo_date}
         
         # WHY: DRY Principle - Construct columns by merging requested permanent columns with active dynamic filters uniquely.
@@ -281,6 +289,7 @@ class GameManagerDialog(QDialog):
 
         # Table
         self.table = QTableView()
+        self.table.clicked.connect(self.on_table_clicked)
         # WHY: Disabled standard row selection highlighting to remove the blue selection bar, 
         # as batch logic is strictly driven by the checkboxes now.
         self.table.setSelectionMode(QAbstractItemView.NoSelection)
@@ -324,6 +333,21 @@ class GameManagerDialog(QDialog):
         self.load_data()
         # WHY: User request to open the dialog fully maximized by default.
         self.showMaximized()
+
+    def on_table_clicked(self, index):
+        if not index.isValid(): return
+        col_name = self.model.display_cols[index.column()]
+        if col_name == '_edit':
+            folder_name = self.model._df.iloc[index.row()]['Folder_Name']
+            if hasattr(self.parent_window, 'master_df'):
+                game_data = self.parent_window.master_df[self.parent_window.master_df['Folder_Name'] == folder_name].iloc[0].to_dict()
+                from dialogs import ActionDialog
+                dlg = ActionDialog("dialog_edit_title", game_data, self.parent_window)
+                if dlg.exec():
+                    new_data = dlg.get_data()
+                    if new_data:
+                        self.parent_window.update_game_data(folder_name, new_data)
+                        self.load_data()
 
     def get_selected_folders(self):
         """WHY: Securely maps the visually selected rows to their absolute target Folder_Names for backend execution."""
@@ -412,8 +436,9 @@ class GameManagerDialog(QDialog):
     def load_data(self):
         if hasattr(self.parent_window, 'master_df'):
             self.base_df = self.parent_window.master_df.copy()
-            # WHY: Inject the _selected virtual column for checkboxes.
+            # WHY: Inject the _edit and _selected virtual columns for checkboxes.
             self.base_df.insert(0, '_selected', False)
+            self.base_df.insert(0, '_edit', 'Edit')
             
             # WHY: Populate each multi-select dropdown with the unique comma-separated elements from the target column.
             for col, combo in self.filter_combos.items():
@@ -465,7 +490,7 @@ class GameManagerDialog(QDialog):
             df = df[df[col].astype(str).str.contains(pattern, case=False, na=False)]
 
         # WHY: Construct the Pandas display columns perfectly ordered to match the assembled UI widgets.
-        cols = ['_selected', 'Original_Release_Date', 'Clean_Title'] + self.logical_columns
+        cols = ['_edit', '_selected', 'Original_Release_Date', 'Clean_Title'] + self.logical_columns
         existing_cols = [c for c in cols if c in df.columns]
         
         # WHY: Preserve user sorting preferences dynamically when filters drastically alter the visible rows.
@@ -492,12 +517,14 @@ class GameManagerDialog(QDialog):
         self.table.setColumnWidth(0, 30)
         
         header.setSectionResizeMode(1, QHeaderView.Fixed)
-        # WHY: Increased fixed width from 90 to 110 to ensure the full date format (DD/MM/YYYY) and combobox UI elements are completely visible.
-        self.table.setColumnWidth(1, 110)
+        self.table.setColumnWidth(1, 30)
         
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.Fixed)
+        self.table.setColumnWidth(2, 110)
         
-        for i in range(3, header.count()):
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        
+        for i in range(4, header.count()):
             header.setSectionResizeMode(i, QHeaderView.Stretch)
 
         self.update_batch_buttons()
