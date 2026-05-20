@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.2] - 2026-03-28
+### Added
+- Virtual platform "Epic Games Mobile" to track iOS and Android game entitlements natively.
+- Multi-platform mapping utility for the Epic Games backend to elegantly merge PC and Mobile ownership into single, unified library items.
 ## [0.9.1] - 2026-03-27
+### Changed
+- Updated `README.md` to reflect the new AES encryption (`.dat`/`.bin`) architecture, strict 80% IGDB confidence thresholds, and CSV Import/Export capabilities.
 ### Added
 - New project logo with metallic shield and neon blue accents.
 - "Video Game Vault" subtitle added to the brand identity.
@@ -22,11 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cleaned up the repository by removing cached configuration files.
 - **Security:** Fixed a Regex injection vulnerability in the search bar by enforcing literal string matching.
 - Fixed an infinite loop bug in Galaxy ghost deletion concerning digital Steam games.
-- Fixed the "Start-Up Overwrite Loop" that wiped user filters and sorting preferences on application boot.
+- Fixed the "Start-Up Overwrite Loop" that wiped user filters and sorting preferences on application boot by blocking signals during UI population.
 - Fixed the IGDB scrapper "Empty Shell" bug to aggressively prioritize candidates with complete metadata.
+- Fixed Epic Games API pagination by correctly identifying the case-sensitive `responseMetadata` key.
+- Fixed a file collision between the encrypted database (`.dat`) and its settings file by migrating settings to `.bin`.
 
 ### Changed
-- Migrated VGVDB from plaintext CSV to an AES-encrypted `.dat` format for absolute security while preserving Pandas memory performance.
+- Migrated VGVDB from plaintext CSV to an AES-encrypted `.dat` format for absolute security while preserving in-memory Pandas performance.
 - Refined `README.md` to detail technical architecture and feature sets for a broader audience.
 - Updated project license to MIT.
 - Overhauled real-time UI logging to use single-line dynamic updates instead of spamming multiple rows.
