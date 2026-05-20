@@ -51,7 +51,7 @@ def query_igdb_api(token, search_term=None, limit=5, by_id=False, custom_query=N
             results = response.json()
             if not results and not by_id and not custom_query:
                 import re
-                fallback_regex = re.compile(r'\s*\(?(\d{4}|classic|original)\)?$', flags=re.IGNORECASE)
+                fallback_regex = re.compile(r'\s*\(?(\d{4}|classic|original|remake)\)?$', flags=re.IGNORECASE)
                 if fallback_regex.search(search_term):
                     fallback_term = fallback_regex.sub('', search_term).strip()
                     fallback_term = re.sub(r'[:-]\s*$', '', fallback_term).strip()

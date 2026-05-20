@@ -174,7 +174,7 @@ class Game:
         
         # 2. Category Multipliers (Max 15)
         folder_lower = self.data.get('Folder_Name', '').lower()
-        edition_keywords = ['goty', 'remaster', 'definitive', 'complete', 'edition', 'director', 'redux', 'anniversary']
+        edition_keywords = ['goty', 'remaster', 'remake', 'definitive', 'complete', 'edition', 'director', 'redux', 'anniversary']
         has_edition_keyword = any(kw in folder_lower for kw in edition_keywords)
         
         cat = g.get('category', 0)
