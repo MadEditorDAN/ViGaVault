@@ -84,10 +84,12 @@ class FilterWorker(QThread):
         is_scan_new = self.params.get('scan_new', False)
         is_scan_dlc = self.params.get('scan_dlc', False)
         is_scan_review = self.params.get('scan_review', False)
+        is_scan_no_img = self.params.get('scan_no_img', False)
+        is_scan_no_trl = self.params.get('scan_no_trl', False)
 
         # 2. Dynamic Filters (Sidebar Checkboxes)
         # Only apply if NOT scanning new games, as new games often lack metadata
-        if not is_scan_new and not is_scan_review:
+        if not is_scan_new and not is_scan_review and not is_scan_no_img and not is_scan_no_trl:
             active_filters = self.params.get('active_filters', {})
             for col, selected_values in active_filters.items():
                 if not selected_values:
@@ -111,6 +113,10 @@ class FilterWorker(QThread):
         elif allowed_flags:
             # Show target statuses, but protect against DLC/Exclusion pollution
             df = df[df['Status_Flag'].isin(allowed_flags) & ~df['Is_DLC'] & ~df['Is_Excluded']]
+        elif is_scan_no_img:
+            df = df[(~df['Has_Image'].astype(str).str.lower().isin(['true', '1'])) & (~df['Is_DLC']) & (~df['Is_Excluded'])]
+        elif is_scan_no_trl:
+            df = df[(~df['Trailer_Link'].astype(str).str.startswith('http', na=False)) & (~df['Is_DLC']) & (~df['Is_Excluded'])]
         else:
             # Default safe view
             df = df[df['Status_Flag'].isin(['OK', 'LOCKED']) & ~df['Is_DLC'] & ~df['Is_Excluded']]

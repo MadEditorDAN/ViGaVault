@@ -252,5 +252,7 @@
     "msg_steam_instructions": "1. Gehen Sie zur <a href='https://steamcommunity.com/dev/apikey'><span style='color: #2196F3;'>Steam API Key-Seite</span></a>, um Ihren Schlüssel zu erhalten.<br>Steam wird nach einer Domain fragen, geben Sie ein: <b>vigavault.app</b><br>Und bestätigen Sie mit Steam Guard.<br>2. Geben Sie unten Ihren API-Schlüssel und Ihre <b>Steam-Profil-URL</b> ein.<br>3. Stellen Sie sicher, dass die Datenschutzeinstellung für 'Spieldetails' in Ihrem Steam-Profil auf <b>Öffentlich</b> gesetzt ist.",
     "msg_steam_invalid_keys": "Ungültiger Steam-Web-API-Schlüssel oder Profil-URL, oder Ihre Spieldetails sind nicht auf Öffentlich gesetzt.",
     "dialog_edit_status_ok": "Status: OK",
-    "game_manager_btn_batch_ok": "Auswahl als OK markieren"
+    "game_manager_btn_batch_ok": "Auswahl als OK markieren",
+    "sidebar_btn_toggle_no_img": "Ohne Bild",
+    "sidebar_btn_toggle_no_trl": "Ohne Trailer"
 }

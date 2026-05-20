@@ -90,7 +90,7 @@ class MediaManagerDialog(QDialog):
         check_trl = self.chk_trailer.isChecked()
         check_hidden = self.chk_hidden.isChecked()
         
-        headers = [translator.tr("media_manager_col_game"), translator.tr("media_manager_col_copy")]
+        headers = [translator.tr("media_manager_col_game"), "Edit"]
         if check_img: headers.append(translator.tr("media_manager_col_image"))
         if check_trl: headers.append(translator.tr("media_manager_col_trailer"))
         headers.extend([translator.tr("media_manager_col_import"), "URL", ""])
@@ -201,10 +201,10 @@ class MediaManagerDialog(QDialog):
         self.table.setItem(row, col_idx, item_name)
         col_idx += 1
         
-        btn_copy = QPushButton("📋")
-        btn_copy.setFixedWidth(30)
-        btn_copy.clicked.connect(lambda _, t=game_info['title']: QApplication.clipboard().setText(t))
-        self.table.setCellWidget(row, col_idx, btn_copy)
+        btn_edit = QPushButton("⚙️")
+        btn_edit.setFixedWidth(30)
+        btn_edit.clicked.connect(lambda _, f=game_info['folder']: self.on_edit_clicked(f))
+        self.table.setCellWidget(row, col_idx, btn_edit)
         col_idx += 1
         
         if check_img:
@@ -244,6 +244,17 @@ class MediaManagerDialog(QDialog):
         btn_import.clicked.connect(lambda _, r=row, b=btn_import, ab=btn_apply: self.import_local_file(r, b, ab))
         btn_apply.clicked.connect(lambda _, r=row, f=game_info['folder'], i_c=import_col_idx, u_c=url_col_idx, ab=btn_apply: self.apply_media(r, f, i_c, u_c, check_img, check_trl, ab))
         self.table.setCellWidget(row, col_idx, btn_apply)
+
+    def on_edit_clicked(self, folder_name):
+        if hasattr(self.parent_window, 'master_df'):
+            game_data = self.parent_window.master_df[self.parent_window.master_df['Folder_Name'] == folder_name].iloc[0].to_dict()
+            from dialogs import ActionDialog
+            dlg = ActionDialog("dialog_edit_title", game_data, self.parent_window)
+            if dlg.exec():
+                new_data = dlg.get_data()
+                if new_data:
+                    self.parent_window.update_game_data(folder_name, new_data)
+                    self.scan_media()
 
     def import_local_file(self, row, btn, apply_btn):
         file_path, _ = QFileDialog.getOpenFileName(

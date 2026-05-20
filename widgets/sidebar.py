@@ -147,6 +147,8 @@ class Sidebar(QWidget):
         filters_header_layout.addWidget(self.lbl_show)
 
         # --- MUTUAL EXCLUSIVE VIEW TOGGLES ---
+        self.btn_toggle_no_img = QPushButton(translator.tr("sidebar_btn_toggle_no_img"))
+        self.btn_toggle_no_trl = QPushButton(translator.tr("sidebar_btn_toggle_no_trl"))
         self.btn_toggle_new = QPushButton(translator.tr("sidebar_btn_toggle_new"))
         self.btn_toggle_dlc = QPushButton(translator.tr("sidebar_btn_toggle_dlc"))
         self.btn_toggle_review = QPushButton(translator.tr("sidebar_btn_toggle_review"))
@@ -156,13 +158,15 @@ class Sidebar(QWidget):
             QPushButton:checked { background-color: palette(highlight); color: palette(highlighted-text); font-weight: bold; }
         """
         
-        for btn in [self.btn_toggle_new, self.btn_toggle_dlc, self.btn_toggle_review]:
+        for btn in [self.btn_toggle_no_img, self.btn_toggle_no_trl, self.btn_toggle_new, self.btn_toggle_dlc, self.btn_toggle_review]:
             btn.setCheckable(True)
             btn.setStyleSheet(toggle_style)
             btn.setCursor(Qt.PointingHandCursor)
             filters_header_layout.addWidget(btn)
             
         # WHY: Handled manually instead of QButtonGroup so the user can easily un-toggle everything to revert to the default safe view.
+        self.btn_toggle_no_img.toggled.connect(lambda checked: self.handle_view_toggle(self.btn_toggle_no_img, checked))
+        self.btn_toggle_no_trl.toggled.connect(lambda checked: self.handle_view_toggle(self.btn_toggle_no_trl, checked))
         self.btn_toggle_new.toggled.connect(lambda checked: self.handle_view_toggle(self.btn_toggle_new, checked))
         self.btn_toggle_dlc.toggled.connect(lambda checked: self.handle_view_toggle(self.btn_toggle_dlc, checked))
         self.btn_toggle_review.toggled.connect(lambda checked: self.handle_view_toggle(self.btn_toggle_review, checked))
@@ -370,7 +374,7 @@ class Sidebar(QWidget):
 
     def handle_view_toggle(self, toggled_btn, checked):
         if checked:
-            for btn in [self.btn_toggle_new, self.btn_toggle_dlc, self.btn_toggle_review]:
+            for btn in [self.btn_toggle_no_img, self.btn_toggle_no_trl, self.btn_toggle_new, self.btn_toggle_dlc, self.btn_toggle_review]:
                 if btn != toggled_btn:
                     btn.blockSignals(True)
                     btn.setChecked(False)
@@ -442,6 +446,8 @@ class Sidebar(QWidget):
         self.findChild(QLabel, "sidebar_filters_label").setText(translator.tr("sidebar_filters_label"))
         # WHY: Retranslate the newly added 'Show :' label dynamically.
         self.lbl_show.setText(translator.tr("sidebar_lbl_show"))
+        self.btn_toggle_no_img.setText(translator.tr("sidebar_btn_toggle_no_img"))
+        self.btn_toggle_no_trl.setText(translator.tr("sidebar_btn_toggle_no_trl"))
         self.btn_toggle_new.setText(translator.tr("sidebar_btn_toggle_new"))
         self.btn_toggle_dlc.setText(translator.tr("sidebar_btn_toggle_dlc"))
         self.btn_toggle_review.setText(translator.tr("sidebar_btn_toggle_review"))

@@ -189,9 +189,11 @@ class FilterController(QObject):
             'active_filters': active_filters,
             'sort_col': sort_col_map[self.mw.sidebar.combo_sort.currentIndex()],
             'sort_desc': self.mw.sort_desc,
-            'scan_new': self.mw.sidebar.btn_toggle_new.isChecked(),
-            'scan_dlc': self.mw.sidebar.btn_toggle_dlc.isChecked(),
-            'scan_review': self.mw.sidebar.btn_toggle_review.isChecked(),
+            'scan_new': getattr(self.mw.sidebar, 'btn_toggle_new', None) and self.mw.sidebar.btn_toggle_new.isChecked(),
+            'scan_dlc': getattr(self.mw.sidebar, 'btn_toggle_dlc', None) and self.mw.sidebar.btn_toggle_dlc.isChecked(),
+            'scan_review': getattr(self.mw.sidebar, 'btn_toggle_review', None) and self.mw.sidebar.btn_toggle_review.isChecked(),
+            'scan_no_img': getattr(self.mw.sidebar, 'btn_toggle_no_img', None) and self.mw.sidebar.btn_toggle_no_img.isChecked(),
+            'scan_no_trl': getattr(self.mw.sidebar, 'btn_toggle_no_trl', None) and self.mw.sidebar.btn_toggle_no_trl.isChecked(),
         }
 
         self.filter_worker = FilterWorker(self.mw.master_df, params)
