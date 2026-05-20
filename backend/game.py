@@ -360,6 +360,8 @@ class Game:
                         self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime(self.config.get('date_format', '%d/%m/%Y'))
                 
                 self.data['Image_Link'] = self._ensure_cover(g, force_download=True)
+                if self.data['Image_Link']:
+                    self.data['Has_Image'] = True
                 self.data['Status_Flag'] = 'OK'
                 return True
         return False
@@ -389,6 +391,8 @@ class Game:
             self.data['game_ID'] = ", ".join(sorted(list(current_ids)))
 
         self.data['Image_Link'] = self._ensure_cover(g, force_download=True)
+        if self.data['Image_Link']:
+            self.data['Has_Image'] = True
         self.data['Status_Flag'] = 'LOCKED'
         return True
 
