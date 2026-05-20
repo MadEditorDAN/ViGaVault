@@ -40,10 +40,10 @@ class BackupDialog(QDialog):
         layout.addWidget(group)
         
         btn_layout = QHBoxLayout()
-        btn_cancel = QPushButton(translator.tr("btn_cancel"))
+        btn_cancel = QPushButton(translator.tr("settings_btn_cancel"))
         btn_cancel.clicked.connect(self.reject)
         
-        self.btn_backup = QPushButton(translator.tr("btn_save"))
+        self.btn_backup = QPushButton(translator.tr("settings_btn_save"))
         self.btn_backup.clicked.connect(self.execute_backup)
         
         btn_layout.addStretch()
@@ -79,7 +79,7 @@ class BackupDialog(QDialog):
             QMessageBox.critical(self, "Error", f"Failed to generate backup:\n{e}")
         finally:
             self.btn_backup.setEnabled(True)
-            self.btn_backup.setText(translator.tr("btn_save"))
+            self.btn_backup.setText(translator.tr("settings_btn_save"))
 
 
 class RestoreDialog(QDialog):
@@ -119,7 +119,7 @@ class RestoreDialog(QDialog):
         
         # Step 3: Actions
         btn_layout = QHBoxLayout()
-        btn_cancel = QPushButton(translator.tr("btn_cancel"))
+        btn_cancel = QPushButton(translator.tr("settings_btn_cancel"))
         btn_cancel.clicked.connect(self.reject)
         
         self.btn_restore = QPushButton("Restore Selected")
