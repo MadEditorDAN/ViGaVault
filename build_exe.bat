@@ -25,7 +25,7 @@ REM --windowed: Hides the black CMD console window when running the GUI.
 REM --clean: Flushes PyInstaller's cache to prevent corrupted bytecode Analysis errors.
 REM -n "ViGaVault" forces the executable and the output folder to be named ViGaVault.
 REM --icon: Injects the custom ViGaVault logo into the compiled .exe file metadata.
-pyinstaller --noconfirm --onedir --windowed --clean -n "ViGaVault" --icon="assets\images\ViGaVault.ico" ViGaVault_UI.py
+.\.venv\Scripts\pyinstaller.exe --noconfirm --onedir --windowed --clean -n "ViGaVault" --icon="assets\images\ViGaVault.ico" ViGaVault_UI.py
 
 echo [4/5] Assembling External User Assets...
 REM WHY: Natively copies the editable folders directly next to the executable in the final dist folder.
@@ -35,7 +35,7 @@ xcopy /E /I /Y "lang" "dist\ViGaVault\lang" >nul
 echo [5/5] Ready to Zip the distribution package...
 REM WHY: Uses WinRAR for significantly faster and more powerful maximum-level ZIP compression.
 pause 
-"c:\Program Files\WinRAR\winrar.exe" a -afzip -m5 -y "d:\ViGaVault\ViGaVault_Beta_0.9.2.zip" "d:\ViGaVault\ViGaVault"
+"c:\Program Files\WinRAR\winrar.exe" a -afzip -m5 -y "d:\ViGaVault\ViGaVault_1.2.0.zip" "dist\ViGaVault"
 
 REM Cleanup after use
 FOR /d /r . %%d in (__pycache__) DO @IF EXIST "%%d" rd /s /q "%%d"
