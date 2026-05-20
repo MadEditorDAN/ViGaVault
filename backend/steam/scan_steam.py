@@ -21,20 +21,31 @@ def scan_steam_account(config, games_dict, worker_thread=None):
     
     # WHY: With the API Key gone, we use the user's secure browser cookies to scrape their library directly from their profile page.
     url = f"https://steamcommunity.com/profiles/{steam_id}/games/?tab=all"
+    
+    import urllib.parse
+    clean_secure = urllib.parse.unquote(secure_cookie)
+    clean_secure = urllib.parse.quote(clean_secure)
+    
     cookies = {
-        'steamLoginSecure': secure_cookie,
+        'steamLoginSecure': clean_secure,
         'sessionid': session_id
     }
     
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': f'https://steamcommunity.com/profiles/{steam_id}/'
+    }
+    
     try:
-        response = requests.get(url, cookies=cookies, timeout=15)
+        response = requests.get(url, cookies=cookies, headers=headers, timeout=15)
         if response.status_code != 200:
             logging.error(f"[STEAM] Failed to fetch library: HTTP {response.status_code}")
             return False
             
         html = response.text
         # WHY: Steam beautifully embeds the user's entire library as a raw JSON array inside the `rgGames` JavaScript variable.
-        match = re.search(r'var rgGames = (\[.*?\]);', html, re.DOTALL)
+        match = re.search(r'var\s+rgGames\s*=\s*(\[.*?\]);', html, re.DOTALL)
         if match:
             import json
             games_list = json.loads(match.group(1))
