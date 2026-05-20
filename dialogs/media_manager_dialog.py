@@ -227,7 +227,6 @@ class MediaManagerDialog(QDialog):
         else: btn_import.setText("📁")
             
         btn_import.setProperty("selected_file", "")
-        btn_import.clicked.connect(lambda _, r=row, b=btn_import: self.import_local_file(r, b))
         self.table.setCellWidget(row, col_idx, btn_import)
         import_col_idx = col_idx
         col_idx += 1
