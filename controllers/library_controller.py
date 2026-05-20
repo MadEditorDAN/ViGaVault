@@ -116,11 +116,10 @@ class LibraryController(QObject):
                     # WHY: Ensure clean .bin extension prevents collisions with the encrypted .dat database.
                     lib_settings_path = os.path.splitext(filePath)[0] + ".bin"
                     default_lib_settings = {
-                        "root_path": "",
-                        "local_scan_config": {"enable_local_scan": False, "ignore_hidden": True, "scan_mode": "simple", "global_type": "Genre", "global_filter": True, "folder_rules": {}},
-                        "galaxy_db_path": os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db'),
-                    # WHY: Set default download_images to True so fresh libraries automatically backfill covers from API scans.
-                    "enable_galaxy_db": False, "download_images": True, "download_videos": False, "sort_desc": True, "sort_index": 0, "view_new": False, "view_dlc": False, "view_review": False, "filter_states": {}, "filter_expansion": {}
+                        "rootPath": "",
+                        "localScanConfig": {"enable_local_scan": False, "ignore_hidden": True, "scan_mode": "simple", "global_type": "Genre", "global_filter": True, "folder_rules": {}},
+                        "galaxyDbPath": os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db'),
+                        "enableGalaxyDb": False, "downloadImages": True, "downloadVideos": False, "sortDesc": True, "sortIndex": 0, "viewNew": False, "viewDlc": False, "viewReview": False, "filterStates": {}, "filterExpansion": {}
                     }
                     save_encrypted_json(lib_settings_path, default_lib_settings)
 
@@ -193,12 +192,12 @@ class LibraryController(QObject):
         lib_settings = load_encrypted_json(lib_settings_file)
 
         if not hasattr(self.mw, 'pending_anchor_folder') or not getattr(self.mw, 'pending_anchor_folder', None):
-            saved_anchor = lib_settings.get("anchor_folder")
+            saved_anchor = lib_settings.get("anchorFolder")
             if saved_anchor:
                 self.mw.pending_anchor_folder = saved_anchor
 
-        saved_filters = lib_settings.get("filter_states")
-        saved_expansion = lib_settings.get("filter_expansion")
+        saved_filters = lib_settings.get("filterStates")
+        saved_expansion = lib_settings.get("filterExpansion")
 
         self.mw.filter_controller.populate_dynamic_filters(saved_filters, saved_expansion)
 
@@ -207,12 +206,12 @@ class LibraryController(QObject):
         self.mw.sidebar.btn_toggle_dlc.blockSignals(True)
         self.mw.sidebar.btn_toggle_review.blockSignals(True)
 
-        self.mw.sort_desc = lib_settings.get("sort_desc", True)
-        self.mw.sidebar.combo_sort.setCurrentIndex(lib_settings.get("sort_index", 0))
-        self.mw.sidebar.search_bar.setText(lib_settings.get("search_text", ""))
-        self.mw.sidebar.btn_toggle_new.setChecked(lib_settings.get("view_new", False))
-        self.mw.sidebar.btn_toggle_dlc.setChecked(lib_settings.get("view_dlc", False))
-        self.mw.sidebar.btn_toggle_review.setChecked(lib_settings.get("view_review", False))
+        self.mw.sort_desc = lib_settings.get("sortDesc", True)
+        self.mw.sidebar.combo_sort.setCurrentIndex(lib_settings.get("sortIndex", 0))
+        self.mw.sidebar.search_bar.setText(lib_settings.get("searchText", ""))
+        self.mw.sidebar.btn_toggle_new.setChecked(lib_settings.get("viewNew", False))
+        self.mw.sidebar.btn_toggle_dlc.setChecked(lib_settings.get("viewDlc", False))
+        self.mw.sidebar.btn_toggle_review.setChecked(lib_settings.get("viewReview", False))
         self.mw.sidebar.update_sort_button(self.mw.sort_desc)
 
         self.mw.sidebar.combo_sort.blockSignals(False)

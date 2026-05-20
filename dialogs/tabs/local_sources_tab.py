@@ -313,8 +313,8 @@ class LocalSourcesTabWidget(QWidget):
                 widgets["inject_value"].setEnabled(inj_checked)
                 
     def set_state(self, lib_settings, live_dl_images=None):
-        self.root_path_input.setText(lib_settings.get("root_path", ""))
-        local_config = lib_settings.get("local_scan_config", {})
+        self.root_path_input.setText(lib_settings.get("rootPath", ""))
+        local_config = lib_settings.get("localScanConfig", {})
         
         self.chk_scan_local.setChecked(local_config.get("enable_local_scan", False))
         self.toggle_local_scan_options(self.chk_scan_local.isChecked())
@@ -330,15 +330,15 @@ class LocalSourcesTabWidget(QWidget):
         self.current_folder_rules = local_config.get("folder_rules", {})
         self.populate_folders_list()
         
-        self.chk_enable_galaxy.setChecked(lib_settings.get("enable_galaxy_db", False))
-        self.galaxy_db_input.setText(lib_settings.get("galaxy_db_path", os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db')))
+        self.chk_enable_galaxy.setChecked(lib_settings.get("enableGalaxyDb", False))
+        self.galaxy_db_input.setText(lib_settings.get("galaxyDbPath", os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db')))
         self.galaxy_db_input.setEnabled(self.chk_enable_galaxy.isChecked())
         self.btn_browse_galaxy.setEnabled(self.chk_enable_galaxy.isChecked())
         
         if live_dl_images is not None: self.chk_download_images.setChecked(live_dl_images)
-        else: self.chk_download_images.setChecked(lib_settings.get("download_images", True))
+        else: self.chk_download_images.setChecked(lib_settings.get("downloadImages", True))
             
-        self.image_path_input.setText(lib_settings.get("image_path", os.path.join(BASE_DIR, "images")))
+        self.image_path_input.setText(lib_settings.get("imagePath", os.path.join(BASE_DIR, "images")))
         
     def get_state(self):
         self.save_current_folder_rules_state()

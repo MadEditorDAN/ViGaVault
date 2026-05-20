@@ -107,11 +107,11 @@ class SettingsDialog(QDialog):
         self.initial_img_size = global_settings.get("cardImageSize", DEFAULT_DISPLAY_SETTINGS['image'])
         self.initial_btn_size = global_settings.get("cardButtonSize", DEFAULT_DISPLAY_SETTINGS['button'])
         self.initial_txt_size = global_settings.get("cardTextSize", DEFAULT_DISPLAY_SETTINGS['text'])
-        self.initial_galaxy = lib_settings.get("enable_galaxy_db", False)
-        self.initial_gog_web = lib_settings.get("sidebar_chk_gog_web", False)
-        self.initial_epic_web = lib_settings.get("sidebar_chk_epic", False)
-        self.initial_steam_web = lib_settings.get("sidebar_chk_steam", False)
-        self.initial_local = lib_settings.get("local_scan_config", {}).get("enable_local_scan", False)
+        self.initial_galaxy = lib_settings.get("enableGalaxyDb", False)
+        self.initial_gog_web = lib_settings.get("scanGog", False)
+        self.initial_epic_web = lib_settings.get("scanEpic", False)
+        self.initial_steam_web = lib_settings.get("scanSteam", False)
+        self.initial_local = lib_settings.get("localScanConfig", {}).get("enable_local_scan", False)
         
         if self.btn_apply:
             self.btn_apply.setEnabled(False)
