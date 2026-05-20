@@ -238,7 +238,7 @@ class LibraryManager:
             if images_only:
                 should_scrape = needs_cover_rescue
             else:
-                should_scrape = (status == 'NEW' or needs_cover_rescue)
+                should_scrape = ((status == 'NEW' and not str(game.data.get('Is_DLC')).lower() in ['true', '1']) or needs_cover_rescue)
                 
             if should_scrape:
                 action_taken = True
@@ -262,7 +262,7 @@ class LibraryManager:
                 
                 if not images_only:
                     # Evaluate final completion status
-                    missing_meta = not all([game.data.get(f) for f in ['Developer', 'Publisher', 'Genre', 'Summary', 'Original_Release_Date']])
+                    missing_meta = not all([game.data.get(f) for f in ['Genre', 'Summary']])
                     has_cover = bool(game.data.get('Cover_URL')) or bool(game.data.get('Image_Link'))
                     
                     if missing_meta or not has_cover:

@@ -39,7 +39,7 @@ def query_igdb_api(token, search_term=None, limit=5, by_id=False, custom_query=N
                   'involved_companies.developer, involved_companies.publisher, '
                   'videos.video_id, release_dates.date, cover.url, category')
         if by_id: query = f'fields {fields}; where id = {search_term};'
-        else: query = f'search "{search_term}"; fields {fields}; where platforms = (3, 6, 13, 14, 161, 162, 163); limit {limit};'
+        else: query = f'search "{search_term}"; fields {fields}; where platforms = (3, 6, 13, 14, 34, 39, 48, 49, 130, 161, 162, 163, 164, 165, 167, 169); limit {limit};'
             
     # WHY: Twitch/IGDB strictly limits API requests to 4 per second. 
     # We enforce a mandatory 300ms delay to prevent HTTP 429 (Too Many Requests) connection hangs.
@@ -47,7 +47,17 @@ def query_igdb_api(token, search_term=None, limit=5, by_id=False, custom_query=N
     
     try:
         response = requests.post(api_url, headers=headers, data=query, timeout=10)
-        if response.status_code == 200: return response.json()
+        if response.status_code == 200:
+            results = response.json()
+            if not results and not by_id and not custom_query:
+                import re
+                fallback_regex = re.compile(r'\s*\(?(\d{4}|classic|original)\)?$', flags=re.IGNORECASE)
+                if fallback_regex.search(search_term):
+                    fallback_term = fallback_regex.sub('', search_term).strip()
+                    fallback_term = re.sub(r'[:-]\s*$', '', fallback_term).strip()
+                    if fallback_term and fallback_term != search_term:
+                        return query_igdb_api(token, search_term=fallback_term, limit=limit, by_id=by_id, custom_query=custom_query)
+            return results
         else:
             logging.error(f"{'IGDB API ERROR':<15} : {response.status_code} for query: {query}")
             return None
