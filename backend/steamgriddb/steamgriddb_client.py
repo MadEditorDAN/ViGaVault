@@ -66,11 +66,25 @@ def fetch_steamgriddb_covers_list(search_term):
     except Exception as e:
         raise RuntimeError(f"Invalid response format: Failed to parse covers JSON.\n\nDetails: {e}")
         
+    was_fallback = False
     if not grids_data.get("success") or not grids_data.get("data"):
-        raise ValueError(f"Found game page, but no 600x900 vertical covers were found for '{search_term}'.")
+        # Fallback: query all dimensions since 600x900 was not found
+        params_any = {"nsfw": "false", "humor": "false"}
+        try:
+            grids_resp_any = requests.get(grids_url, headers=headers, params=params_any, timeout=10)
+            if grids_resp_any.status_code == 200:
+                grids_data_any = grids_resp_any.json()
+                if grids_data_any.get("success") and grids_data_any.get("data"):
+                    grids_data = grids_data_any
+                    was_fallback = True
+        except Exception:
+            pass
+
+    if not grids_data.get("success") or not grids_data.get("data"):
+        raise ValueError(f"Found game page, but no vertical covers or other media were found for '{search_term}'.")
         
-    covers = [{"url": g.get("url"), "thumb": g.get("thumb", g.get("url"))} for g in grids_data["data"] if g.get("url")]
+    covers = [{"url": g.get("url"), "thumb": g.get("thumb", g.get("url")), "is_fallback": was_fallback} for g in grids_data["data"] if g.get("url")]
     if not covers:
-        raise ValueError(f"No vertical cover URLs available for '{search_term}'.")
+        raise ValueError(f"No vertical cover or alternative media URLs available for '{search_term}'.")
         
     return covers

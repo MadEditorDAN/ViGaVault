@@ -283,5 +283,6 @@
     "dialog_amazon_region_title": "Amazon Luna Region",
     "dialog_amazon_region_msg": "Please choose your Amazon regional store:",
     "msg_amazon_login_failed": "Failed to authenticate with Amazon Luna.",
-    "msg_steamgriddb_login_failed": "Failed to capture SteamGridDB API Key automatically."
+    "msg_steamgriddb_login_failed": "Failed to capture SteamGridDB API Key automatically.",
+    "dialog_sgdb_warn_no_vertical_covers": "Found game page, but no 600x900 vertical covers were found for '{game_title}'. Showing other available media formats instead."
 }

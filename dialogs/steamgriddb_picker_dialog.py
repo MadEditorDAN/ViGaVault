@@ -142,6 +142,14 @@ class SteamGridDBPickerDialog(QDialog):
             list_item.setIcon(QIcon(pixmap))
             self.list_widget.addItem(list_item)
 
+        # If fallback, show a warning messagebox but still display other format covers
+        if covers and covers[0].get("is_fallback"):
+            QMessageBox.warning(
+                self,
+                translator.tr("dialog_sgdb_warning_title"),
+                translator.tr("dialog_sgdb_warn_no_vertical_covers", game_title=self.search_input.text().strip())
+            )
+
     def on_image_loaded(self, idx, data):
         if idx < self.list_widget.count():
             pixmap = QPixmap()
