@@ -89,23 +89,7 @@ def fetch_steamgriddb_covers_list(search_term):
         except Exception:
             pass
             
-    # Fallback 2: if still no grids found, try heroes, logos, and icons for this game
     if not all_covers:
-        for m_type in ["heroes", "logos", "icons"]:
-            try:
-                m_url = f"https://www.steamgriddb.com/api/v2/{m_type}/game/{game_id}"
-                grids_resp_m = requests.get(m_url, headers=headers, params={"nsfw": "false", "humor": "false"}, timeout=10)
-                if grids_resp_m.status_code == 200:
-                    grids_data_m = grids_resp_m.json()
-                    if grids_data_m.get("success") and grids_data_m.get("data"):
-                        for g in grids_data_m["data"]:
-                            if g.get("url"):
-                                all_covers.append({"url": g.get("url"), "thumb": g.get("thumb", g.get("url")), "is_fallback": True})
-                                was_fallback = True
-            except Exception:
-                pass
-                
-    if not all_covers:
-        raise ValueError(f"No vertical covers or other media formats were found for '{game_name}' on SteamGridDB.")
+        raise ValueError(f"No vertical covers or alternative dimension covers were found for '{game_name}' on SteamGridDB.")
         
     return all_covers
