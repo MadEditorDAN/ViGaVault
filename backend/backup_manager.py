@@ -43,6 +43,18 @@ def create_vgv_backup(db_path, images_path, global_settings, lib_settings, outpu
         settings_json = json.dumps(unified_settings, indent=4)
         zf.writestr("settings.json", settings_json)
         
+        # 4. Snapshot Session Files (Credentials)
+        if global_settings or lib_settings:
+            import ViGaVault_utils
+            backend_dir = os.path.join(ViGaVault_utils.BASE_DIR, "backend")
+            if os.path.exists(backend_dir):
+                for root, _, files in os.walk(backend_dir):
+                    for file in files:
+                        if file.endswith("_session.dat"):
+                            full_path = os.path.join(root, file)
+                            arcname = f"sessions/{file}"
+                            zf.write(full_path, arcname)
+        
     zip_bytes = archive_buffer.getvalue()
     
     # Encrypt the ZIP buffer
@@ -112,7 +124,7 @@ def restore_vgv_backup(backup_path, restore_db=True, restore_images=True, restor
         with zipfile.ZipFile(archive_buffer, 'r') as zf:
             for name in zf.namelist():
                 name_lower = name.lower()
-                if restore_db and (name_lower.endswith('.dat') or name_lower == 'vigavault.db'):
+                if restore_db and not name_lower.startswith('sessions/') and (name_lower.endswith('.dat') or name_lower == 'vigavault.db'):
                     if target_db_path:
                         # Ensure the target database directory exists
                         os.makedirs(os.path.dirname(target_db_path), exist_ok=True)
@@ -132,6 +144,19 @@ def restore_vgv_backup(backup_path, restore_db=True, restore_images=True, restor
                         if filename:
                             with open(os.path.join(target_img_dir, filename), 'wb') as img_f:
                                 img_f.write(file_data)
+                                
+                elif restore_settings and name_lower.startswith('sessions/'):
+                    import ViGaVault_utils
+                    filename = os.path.basename(name)
+                    if filename:
+                        platform_name = filename.split('_')[0]
+                        dest_dir = os.path.join(ViGaVault_utils.BASE_DIR, "backend", platform_name)
+                        os.makedirs(dest_dir, exist_ok=True)
+                        
+                        file_data = zf.read(name)
+                        dest_path = os.path.join(dest_dir, filename)
+                        with open(dest_path, 'wb') as session_f:
+                            session_f.write(file_data)
                                 
                 elif restore_settings and name_lower == 'settings.json':
                     settings_data = zf.read(name).decode('utf-8')
