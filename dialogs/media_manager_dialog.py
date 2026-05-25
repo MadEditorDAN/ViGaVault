@@ -221,18 +221,35 @@ class MediaManagerDialog(QDialog):
             self.table.setItem(row, col_idx, item_trl)
             col_idx += 1
         
+        url_input = QLineEdit()
+        url_input.setPlaceholderText(translator.tr("media_manager_url_placeholder"))
+
         btn_import = QPushButton()
         # WHY: DRY Principle - Uses the pre-cached icon instead of querying the hard drive for every single row.
         if folder_icon: btn_import.setIcon(folder_icon)
         else: btn_import.setText("📁")
             
         btn_import.setProperty("selected_file", "")
-        self.table.setCellWidget(row, col_idx, btn_import)
+        
+        from backend.steamgriddb.login_steamgriddb import is_steamgriddb_connected
+        if is_steamgriddb_connected() and check_img:
+            btn_container = QWidget()
+            btn_layout = QHBoxLayout(btn_container)
+            btn_layout.setContentsMargins(0, 0, 0, 0)
+            btn_layout.setSpacing(4)
+            btn_layout.addWidget(btn_import)
+            
+            btn_sgdb = QPushButton("SGDB")
+            btn_sgdb.setToolTip("Search SteamGridDB")
+            btn_sgdb.clicked.connect(lambda _, r=row, f=game_info['folder'], u_in=url_input: self.search_sgdb_for_row(r, f, u_in))
+            btn_layout.addWidget(btn_sgdb)
+            self.table.setCellWidget(row, col_idx, btn_container)
+        else:
+            self.table.setCellWidget(row, col_idx, btn_import)
+
         import_col_idx = col_idx
         col_idx += 1
         
-        url_input = QLineEdit()
-        url_input.setPlaceholderText(translator.tr("media_manager_url_placeholder"))
         self.table.setCellWidget(row, col_idx, url_input)
         url_col_idx = col_idx
         col_idx += 1
@@ -395,3 +412,16 @@ class MediaManagerDialog(QDialog):
             btn_import.setProperty("selected_file", "")
             btn_import.setStyleSheet("")
             url_input.clear()
+
+    def search_sgdb_for_row(self, row, folder_name, url_input):
+        game = self.manager.games.get(folder_name)
+        if not game: return
+        
+        title_to_search = game.data.get('Clean_Title') or game.data.get('Folder_Name', '')
+        
+        from dialogs.steamgriddb_picker_dialog import SteamGridDBPickerDialog
+        dlg = SteamGridDBPickerDialog(title_to_search, self)
+        if dlg.exec():
+            selected_url = dlg.selected_url
+            if selected_url:
+                url_input.setText(selected_url)

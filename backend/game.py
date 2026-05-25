@@ -39,7 +39,11 @@ class Game:
                 found_platforms_raw = re.findall(platform_pattern, tag_content, re.IGNORECASE)
                 if found_platforms_raw:
                     canonical_platforms = {platform_map[p.lower()] for p in found_platforms_raw}
-                    self.data['Platforms'] = ", ".join(sorted(list(canonical_platforms)))
+                    existing_platforms = set(x.strip() for x in self.data.get('Platforms', '').split(',') if x.strip())
+                    if 'Local Copy' in existing_platforms:
+                        existing_platforms.remove('Local Copy')
+                    existing_platforms.update(canonical_platforms)
+                    self.data['Platforms'] = ", ".join(sorted(list(existing_platforms)))
 
         if not self.data.get('Platforms') and self.data.get('Path_Root'):
             self.data['Platforms'] = 'Local Copy'
@@ -251,7 +255,7 @@ class Game:
                     valid_dates = [d['date'] for d in dates if 'date' in d]
                     if valid_dates:
                         orig_ts = min(valid_dates)
-                        self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime(self.config.get('date_format', '%d/%m/%Y'))
+                        self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%Y-%m-%d')
                         api_year_str = datetime.utcfromtimestamp(orig_ts).strftime('%Y')
                 
                 if self.data.get('Platforms') == 'Local Copy' and 'id' in g:
@@ -319,7 +323,7 @@ class Game:
                         valid_dates = [d['date'] for d in dates if 'date' in d]
                         if valid_dates:
                             orig_ts = min(valid_dates)
-                            self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime(self.config.get('date_format', '%d/%m/%Y'))
+                            self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%Y-%m-%d')
                 
                 # WHY: Let _ensure_cover handle the physical disk check natively.
                 if not self.data.get('Cover_URL'):
@@ -357,7 +361,7 @@ class Game:
                     valid_dates = [d['date'] for d in dates if 'date' in d]
                     if valid_dates:
                         orig_ts = min(valid_dates)
-                        self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime(self.config.get('date_format', '%d/%m/%Y'))
+                        self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%Y-%m-%d')
                 
                 self.data['Image_Link'] = self._ensure_cover(g, force_download=True)
                 if self.data['Image_Link']:
@@ -383,7 +387,7 @@ class Game:
             valid_dates = [d['date'] for d in dates if 'date' in d]
             if valid_dates:
                 orig_ts = min(valid_dates)
-                self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime(self.config.get('date_format', '%d/%m/%Y'))
+                self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%Y-%m-%d')
         
         if self.data.get('Platforms') == 'Local Copy' and 'id' in g:
             current_ids = set(x.strip() for x in self.data.get('game_ID', '').split(',') if x.strip())

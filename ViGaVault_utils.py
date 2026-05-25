@@ -207,6 +207,59 @@ def get_date_format_mapping():
         "YYYY-MM-DD": "%Y-%m-%d"
     }
 
+def format_date_for_ui(date_str, format_str="DD/MM/YYYY"):
+    """
+    Converts a universal date string (YYYY-MM-DD) from the DB 
+    to the user-selected UI format.
+    """
+    if not date_str:
+        return ""
+    date_str = str(date_str).strip()
+    if not date_str or date_str.lower() == 'nan':
+        return ""
+
+    mapping = get_date_format_mapping()
+    py_fmt = mapping.get(format_str, "%d/%m/%Y")
+
+    # Try parsing universal YYYY-MM-DD first
+    for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%Y"]:
+        try:
+            dt = datetime.strptime(date_str, fmt)
+            return dt.strftime(py_fmt)
+        except ValueError:
+            continue
+    return date_str
+
+def parse_date_from_ui(date_str, format_str="DD/MM/YYYY"):
+    """
+    Parses a user-entered UI date string into the universal DB format (YYYY-MM-DD).
+    """
+    if not date_str:
+        return ""
+    date_str = str(date_str).strip()
+    if not date_str or date_str.lower() == 'nan':
+        return ""
+
+    mapping = get_date_format_mapping()
+    py_fmt = mapping.get(format_str, "%d/%m/%Y")
+
+    # Try parsing the user selected format
+    try:
+        dt = datetime.strptime(date_str, py_fmt)
+        return dt.strftime("%Y-%m-%d")
+    except ValueError:
+        pass
+
+    # Try other formats as fallback
+    for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%Y"]:
+        try:
+            dt = datetime.strptime(date_str, fmt)
+            return dt.strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return date_str
+
+
 def build_scanner_config():
     """Builds the comprehensive configuration dict required by LibraryManager."""
     p_map, p_ignore = get_platform_config()

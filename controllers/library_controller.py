@@ -99,11 +99,16 @@ class LibraryController(QObject):
                                             QMessageBox.Yes | QMessageBox.No)
                 if reply == QMessageBox.No: return
 
+            if hasattr(self, 'startup_worker') and self.startup_worker and self.startup_worker.isRunning():
+                logging.info("[SWITCH] Cancelling and waiting for running startup worker thread before switching library...")
+                self.startup_worker.requestInterruption()
+                self.startup_worker.wait()
+
             self.mw.settings_controller.save_settings()
             
             try:
                 settings = load_encrypted_json(os.path.join(BASE_DIR, "settings.bin"))
-                settings['db_path'] = filePath
+                settings['libraryName'] = filePath
                 save_encrypted_json(os.path.join(BASE_DIR, "settings.bin"), settings)
                 
                 if is_new_file:
@@ -129,8 +134,13 @@ class LibraryController(QObject):
 
     def restore_backup(self):
         """WHY: Launches the modular UI allowing users to granularly restore elements from an AES-encrypted .vgv backup archive."""
+        if hasattr(self, 'startup_worker') and self.startup_worker and self.startup_worker.isRunning():
+            logging.info("[RESTORE] Cancelling and waiting for running startup worker thread before restoring backup...")
+            self.startup_worker.requestInterruption()
+            self.startup_worker.wait()
+
         dlg = RestoreDialog(
-            target_db_dir=os.path.dirname(get_db_path()),
+            target_db_path=get_db_path(),
             target_img_dir=get_image_path(),
             parent=self.mw
         )
@@ -142,6 +152,12 @@ class LibraryController(QObject):
                 
                 if dlg.restored_global: global_curr.update(dlg.restored_global)
                 if dlg.restored_lib: lib_curr.update(dlg.restored_lib)
+                
+                # WHY: Force libraryName to point strictly to the physical file location where
+                # the database was actually extracted during this restore session.
+                # This ensures perfect path synchronization even if the backup has a different historical path.
+                if dlg.restored_db_path:
+                    global_curr["libraryName"] = dlg.restored_db_path
                 
                 save_encrypted_json(os.path.join(BASE_DIR, "settings.bin"), global_curr)
                 save_encrypted_json(get_library_settings_file(), lib_curr)
@@ -278,6 +294,13 @@ class LibraryController(QObject):
                             if df[k].dtype not in [bool, object]:
                                 df[k] = df[k].astype(object)
                             df.at[idx[0], k] = bool(v) if df[k].dtype == bool else (str(v) if isinstance(v, bool) else v)
+                            
+                            # Keep temp sort columns in sync!
+                            if k == 'Original_Release_Date' and 'temp_sort_date' in df.columns:
+                                new_date_parsed = pd.to_datetime(v, format='%Y-%m-%d', errors='coerce')
+                                df.at[idx[0], 'temp_sort_date'] = new_date_parsed
+                            elif k == 'Clean_Title' and 'temp_sort_title' in df.columns:
+                                df.at[idx[0], 'temp_sort_title'] = str(v).lower()
 
     def save_database(self):
         logging.info("Manual save requested.")

@@ -94,6 +94,48 @@ def scan_steam_account(config, games_dict, worker_thread=None):
             continue
             
         title_clean = re.sub(r'[^\w\s\-\.\:\,\;\!\?\(\)\[\]\&\'\"]', '', name).strip()
+        
+        # --- ZERO-COST SMART MATCH ---
+        norm_title = re.sub(r'[^a-z0-9]', '', title_clean.lower())
+        best_score = 0
+        best_game = None
+        
+        import difflib
+        for g in games_dict.values():
+            local_title = g.data.get('Clean_Title', '')
+            local_norm_title = re.sub(r'[^a-z0-9]', '', local_title.lower())
+            
+            score = 0
+            if local_norm_title == norm_title: score += 60
+            else:
+                ratio = difflib.SequenceMatcher(None, title_clean.lower(), local_title.lower()).ratio()
+                if ratio > 0.6: score += int(ratio * 60)
+                else: continue
+                
+            local_platforms = g.data.get('Platforms', '').lower()
+            if 'steam' in local_platforms: score += 20
+            if local_norm_title == norm_title: score += 20
+            
+            if score > best_score:
+                best_score, best_game = score, g
+                
+        threshold = 60 if best_game and re.sub(r'[^a-z0-9]', '', best_game.data.get('Clean_Title', '').lower()) == norm_title else 70
+        
+        if best_game and best_score >= threshold:
+            current_ids = set(x.strip() for x in best_game.data.get('game_ID', '').split(',') if x.strip())
+            current_ids.add(f"steam_{appid}")
+            best_game.data['game_ID'] = ", ".join(sorted(list(current_ids)))
+            
+            p_set = set(x.strip() for x in best_game.data.get('Platforms', '').split(',') if x.strip())
+            if 'Local Copy' in p_set: p_set.remove('Local Copy')
+            p_set.add('Steam')
+            best_game.data['Platforms'] = ", ".join(sorted(list(p_set)))
+            
+            changes_made = True
+            stats['already_in_db'] += 1
+            logging.info(f"|{'Merged : ' + title_clean[:48]:<56}| Img: Yes | Trl: Yes |")
+            continue
+            
         folder_name = get_safe_filename(title_clean) or f"Unknown Game [{appid}]"
         if folder_name in games_dict: folder_name = f"{title_clean} [{appid}]"
         

@@ -295,7 +295,12 @@ class GameCard(QWidget):
             elif field == 'Developer': display_name = translator.tr("gamecard_info_developer")
             elif field == 'Publisher': display_name = translator.tr("gamecard_info_publisher")
             elif field == 'Collection': display_name = translator.tr("gamecard_info_collection")
-            self.info_labels[i].setText(f"<b>{display_name}:</b> {self.data.get(field, '')}")
+            val = self.data.get(field, '')
+            if field == 'Original_Release_Date':
+                from ViGaVault_utils import format_date_for_ui
+                fmt_str = getattr(self.parent_window, 'date_format_str', 'DD/MM/YYYY')
+                val = format_date_for_ui(val, fmt_str)
+            self.info_labels[i].setText(f"<b>{display_name}:</b> {val}")
             
         self.summary_content.setText(self.data.get('Summary', ''))
 

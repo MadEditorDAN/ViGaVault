@@ -229,7 +229,7 @@ def scan_gog_account(config, games_dict, worker_thread=None):
                     try:
                         dt_str = release_date_raw.split('T')[0]
                         dt = datetime.strptime(dt_str, "%Y-%m-%d")
-                        game_obj.data['Original_Release_Date'] = dt.strftime(config.get('date_format', '%d/%m/%Y'))
+                        game_obj.data['Original_Release_Date'] = dt.strftime('%Y-%m-%d')
                     except Exception: pass
 
         if game_obj.data.get('Cover_URL') or game_obj.data.get('Image_Link'):

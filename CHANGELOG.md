@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+- SteamGridDB integration with automated API key extraction and an interactive manual cover picker dialog displaying alternative visual propositions.
+- Amazon Luna integration supporting multiple region selections and automated login token capture.
+- Standardized database date schema to YYYY-MM-DD with dynamic localization conversion for UI rendering.
+- Immediate list sorting reflow triggered in-memory upon editing game dates or titles.
+
+### Changed
+- Upgraded platform tagging system to cumulatively append local copy parenthesized platform tags rather than replacing existing storefront platforms.
+
 ## [1.2.0] - 2026-05-20
 ### Added
 - **Added:** Advanced `.vgv` Backup & Restore system (AES-256 encrypted archive) with modular UI for selective data restoration.

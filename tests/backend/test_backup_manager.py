@@ -31,15 +31,14 @@ def test_backup_manager_merge_split(safe_sandbox, mock_settings):
     assert analysis["hasSettings"] is True
     
     # 3. Test Restore (Split)
-    target_db_dir = os.path.join(safe_sandbox, "restored_db")
-    os.makedirs(target_db_dir, exist_ok=True)
+    target_db_path = os.path.join(safe_sandbox, "restored_db", "VGVDB.dat")
     
     result = restore_vgv_backup(
         backup_path,
         restore_db=True,
         restore_images=False,
         restore_settings=True,
-        target_db_dir=target_db_dir,
+        target_db_path=target_db_path,
         target_img_dir=None
     )
     

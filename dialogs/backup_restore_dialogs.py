@@ -85,13 +85,13 @@ class BackupDialog(QDialog):
 
 
 class RestoreDialog(QDialog):
-    def __init__(self, target_db_dir, target_img_dir, parent=None):
+    def __init__(self, target_db_path, target_img_dir, parent=None):
         super().__init__(parent)
         self.setWindowTitle(translator.tr("menu_file_import") + " (.vgv)")
         self.setMinimumWidth(400)
         center_window(self, parent)
         
-        self.target_db_dir = target_db_dir
+        self.target_db_path = target_db_path
         self.target_img_dir = target_img_dir
         self.backup_path = None
         self.restored_global = None
@@ -176,7 +176,7 @@ class RestoreDialog(QDialog):
                 restore_db=self.chk_db.isChecked(),
                 restore_images=self.chk_images.isChecked(),
                 restore_settings=self.chk_settings.isChecked(),
-                target_db_dir=self.target_db_dir,
+                target_db_path=self.target_db_path,
                 target_img_dir=self.target_img_dir
             )
             

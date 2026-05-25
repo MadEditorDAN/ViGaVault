@@ -13,6 +13,11 @@ class SilentWebEnginePage(QWebEnginePage):
     def javaScriptConsoleMessage(self, level, message, lineNumber, sourceID):
         pass
 
+    def createWindow(self, type):
+        # WHY: Intercept and route target="_blank" popup windows to load natively 
+        # inside the same single-page modal frame instead of failing silently.
+        return self
+
 class LoginBrowserDialog(QDialog):
     def __init__(self, start_url, target_cookies=None, success_url=None, api_key_mode=False, parent=None):
         super().__init__(parent)
@@ -45,9 +50,12 @@ class LoginBrowserDialog(QDialog):
         # WHY: hCaptcha's advanced bot detection compares the claimed Chrome version in the User-Agent 
         # against the actual JavaScript engine's physical capabilities. Hardcoding a fake version causes a mismatch 
         # resulting in "Incorrect response". We fetch the true engine UA and strictly strip the "QtWebEngine" tag.
-        default_ua = self.profile.httpUserAgent()
-        stealth_ua = re.sub(r'QtWebEngine/[\d\.]+\s', '', default_ua)
-        self.profile.setHttpUserAgent(stealth_ua)
+        if api_key_mode == "amazon":
+            self.profile.setHttpUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+        else:
+            default_ua = self.profile.httpUserAgent()
+            stealth_ua = re.sub(r'QtWebEngine/[\d\.]+\s', '', default_ua)
+            self.profile.setHttpUserAgent(stealth_ua)
         
         self.cookie_store = self.profile.cookieStore()
         self.page = SilentWebEnginePage(self.profile, self.browser)
@@ -93,8 +101,28 @@ class LoginBrowserDialog(QDialog):
                 self.trigger_success()
             
     def on_url_changed(self, url):
-        # WHY: Fallback success detection. If the user lands on their account page, we know they logged in successfully.
         url_str = url.toString()
+        if not self.success_triggered:
+            if self.api_key_mode == "amazon" and "my-collection" in url_str:
+                self.api_key = "authenticated"
+                self.trigger_success()
+                return
+            elif self.api_key_mode == "steamgriddb" and "preferences/api" in url_str:
+                def handle_html(html):
+                    if not self.success_triggered:
+                        import re
+                        matches = re.findall(r'\b([a-fA-F0-9]{32})\b', html)
+                        if matches:
+                            self.api_key = matches[0]
+                            if hasattr(self, '_sgdb_html_timer'): self._sgdb_html_timer.stop()
+                            self.trigger_success()
+                
+                if not hasattr(self, '_sgdb_html_timer'):
+                    self._sgdb_html_timer = QTimer(self)
+                    self._sgdb_html_timer.timeout.connect(lambda: self.page.toHtml(handle_html) if "preferences/api" in self.browser.url().toString() else None)
+                    self._sgdb_html_timer.start(500)
+
+        # WHY: Fallback success detection. If the user lands on their account page, we know they logged in successfully.
         if not self.success_triggered and self.success_url and self.success_url in url_str:
             from urllib.parse import urlparse, parse_qs
             parsed_url = urlparse(url_str)
@@ -113,13 +141,16 @@ class LoginBrowserDialog(QDialog):
         if not ok: return
         if self.api_key_mode == True and not self.success_triggered and "dev/apikey" in self.browser.url().toString():
             self.page.toHtml(self.on_apikey_html)
-        elif self.api_key_mode == "igdb" and not self.success_triggered and "dev.twitch.tv/console/apps" in self.browser.url().toString():
-            # WHY: Twitch Developer Console is a complex React SPA. The URL does not change and loadFinished does not fire when you click "New Secret".
-            # We use a gentle 1.5 second background timer to actively scrape the DOM via JS until the user creates and reveals the keys!
-            if not hasattr(self, 'igdb_timer'):
-                self.igdb_timer = QTimer(self)
-                self.igdb_timer.timeout.connect(self.poll_igdb_keys)
-                self.igdb_timer.start(1500)
+        elif self.api_key_mode == "steamgriddb" and not self.success_triggered:
+            if not hasattr(self, 'sgdb_timer'):
+                self.sgdb_timer = QTimer(self)
+                self.sgdb_timer.timeout.connect(self.poll_sgdb)
+                self.sgdb_timer.start(1000)
+        elif self.api_key_mode == "amazon" and not self.success_triggered:
+            if not hasattr(self, 'amazon_timer'):
+                self.amazon_timer = QTimer(self)
+                self.amazon_timer.timeout.connect(self.poll_amazon)
+                self.amazon_timer.start(1000)
 
     def poll_igdb_keys(self):
         if self.success_triggered: return
@@ -170,6 +201,133 @@ class LoginBrowserDialog(QDialog):
             self.page.runJavaScript(js)
 
 
+    def poll_sgdb(self):
+        if self.success_triggered: return
+        js = """
+            (function() {
+                try {
+                    var url = window.location.href;
+
+                    // A. Click the GDPR Consent button automatically
+                    var consentBtn = document.querySelector('.fc-cta-consent') || document.querySelector('.fc-button.fc-cta-consent');
+                    if (consentBtn) {
+                        consentBtn.click();
+                    } else {
+                        var btns = document.querySelectorAll('button');
+                        btns.forEach(function(b) {
+                            var t = b.innerText ? b.innerText.trim().toLowerCase() : '';
+                            if (t === 'consent' || t === 'agree' || b.classList.contains('fc-cta-consent')) {
+                                b.click();
+                            }
+                        });
+                    }
+
+                    // B. Click "Login via Steam" automatically on login page
+                    if (url.includes('/login')) {
+                        var links = document.querySelectorAll('a, button');
+                        links.forEach(function(el) {
+                            var txt = el.innerText ? el.innerText.trim().toLowerCase() : '';
+                            var href = el.href ? el.href.toLowerCase() : '';
+                            if (txt.includes('login via steam') || href.includes('/login/steam')) {
+                                el.click();
+                            }
+                        });
+                    }
+
+                    // C. Auto-click Steam OpenID "Sign In" button
+                    if (url.includes('steamcommunity.com/openid/login')) {
+                        var steamBtn = document.getElementById('imageLogin') || document.querySelector('input[type="submit"][value="Sign In"]') || document.querySelector('input[value="Sign In"]');
+                        if (steamBtn) {
+                            steamBtn.click();
+                        }
+                    }
+
+                    // D. Auto-redirect from home to Preferences page once logged in
+                    if (url === 'https://www.steamgriddb.com/' || url === 'https://www.steamgriddb.com') {
+                        var loggedIn = document.querySelector('.user-menu') || document.querySelector('a[href^="/profile"]');
+                        if (loggedIn && !window.vgvActionTaken) {
+                            window.vgvActionTaken = true;
+                            window.location.href = 'https://www.steamgriddb.com/profile/preferences/api';
+                        }
+                    }
+
+                    // E. Auto-create API Key if we are on the Preferences page but key is not created yet
+                    if (url.includes('/profile/preferences/api')) {
+                        var createBtn = document.querySelector('button.btn');
+                        var btns = document.querySelectorAll('button');
+                        btns.forEach(function(btn) {
+                            if (btn.innerText.trim().toLowerCase() === 'create api key') {
+                                btn.click();
+                            }
+                        });
+                    }
+                } catch(e) {}
+                return null;
+            })();
+        """
+        self.page.runJavaScript(js, 0, self.on_sgdb_js_result)
+
+    def on_sgdb_js_result(self, result):
+        if result and isinstance(result, dict) and result.get("success") and not self.success_triggered:
+            if hasattr(self, 'sgdb_timer'): self.sgdb_timer.stop()
+            self.api_key = result["api_key"]
+            self.trigger_success()
+
+    def poll_amazon(self):
+        if self.success_triggered: return
+        js = """
+            (function() {
+                try {
+                    var url = window.location.href;
+                    var pathname = window.location.pathname;
+
+                    if (pathname.includes('/ap/')) return null;
+                    
+                    var isGamingDomain = url.includes('gaming.amazon.com') || url.includes('luna.amazon.');
+                    if (!isGamingDomain) return null;
+
+                    if (pathname.includes('/claims/claims/')) {
+                        window.location.href = '/claims/my-collection';
+                        return null;
+                    }
+
+                    if (document.readyState !== 'complete') return null;
+
+                    var signInBtn = document.querySelector('[data-a-target="sign-in-button"]') || document.querySelector('a[href*="/ap/signin"]');
+                    if (signInBtn) {
+                        if (!sessionStorage.getItem('vgvClickedSignIn')) {
+                            sessionStorage.setItem('vgvClickedSignIn', 'true');
+                            signInBtn.click();
+                        }
+                        return null;
+                    }
+
+                    if (!pathname.includes('/claims/my-collection')) {
+                        if (!sessionStorage.getItem('vgvRouted')) {
+                            sessionStorage.setItem('vgvRouted', 'true');
+                            setTimeout(function() {
+                                window.location.href = '/claims/my-collection';
+                            }, 3000);
+                        }
+                        return null;
+                    }
+
+                    // Success: Landing on '/claims/my-collection' is absolute proof of authentication.
+                    var csrfInput = document.querySelector('input[name="csrf-key"]');
+                    var csrfVal = (csrfInput && csrfInput.value) ? csrfInput.value : "authenticated";
+                    return { success: true, session_cookie: csrfVal };
+                } catch(e) {}
+                return null;
+            })();
+        """
+        self.page.runJavaScript(js, 0, self.on_amazon_js_result)
+
+    def on_amazon_js_result(self, result):
+        if result and isinstance(result, dict) and result.get("success") and not self.success_triggered:
+            if hasattr(self, 'amazon_timer'): self.amazon_timer.stop()
+            self.api_key = result["session_cookie"]
+            self.trigger_success()
+
     def trigger_success(self):
         self.success_triggered = True
         # WHY: Wait 1.5 seconds before closing. This ensures all lingering cookies from the final HTTP response 
@@ -180,4 +338,7 @@ class LoginBrowserDialog(QDialog):
         # WHY: Simplified cleanup. Qt's parent-child memory management will now handle the destruction
         # of the page and profile in the correct order when the dialog is deleted.
         self.browser.stop()
+        if hasattr(self, 'sgdb_timer'): self.sgdb_timer.stop()
+        if hasattr(self, 'amazon_timer'): self.amazon_timer.stop()
+        if hasattr(self, '_sgdb_html_timer'): self._sgdb_html_timer.stop()
         super().closeEvent(event)

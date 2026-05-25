@@ -38,9 +38,7 @@ class PlatformsTabWidget(QWidget):
         platforms = [
             ("igdb", "IGDB", "© Twitch Interactive"), ("gog", "GOG", "© CD Projekt"), 
             ("epic", "Epic Games Store", "© Epic Games"), ("steam", "Steam", "© Valve Corporation"), 
-            ("amazon", "Amazon", "© Amazon.com, Inc."), ("uplay", "Uplay", "© Ubisoft"), 
-            ("battlenet", "Battle.net", "© Blizzard Entertainment"), ("origin", "Origin", "© Electronic Arts"), 
-            ("itch", "itch.io", "© Itch Corp"), ("xbox", "Xbox", "© Microsoft")
+            ("amazon", "Amazon Luna", "© Amazon.com, Inc."), ("steamgriddb", "SteamGridDB", "© SteamGridDB")
         ]
         
         self.platform_table.setRowCount(len(platforms))
@@ -72,6 +70,16 @@ class PlatformsTabWidget(QWidget):
                 try:
                     from backend.steam.login_steam import is_steam_connected
                     is_connected = is_steam_connected()
+                except ImportError: pass
+            elif p_id == "amazon":
+                try:
+                    from backend.amazon.login_amazon import is_amazon_connected
+                    is_connected = is_amazon_connected()
+                except ImportError: pass
+            elif p_id == "steamgriddb":
+                try:
+                    from backend.steamgriddb.login_steamgriddb import is_steamgriddb_connected
+                    is_connected = is_steamgriddb_connected()
                 except ImportError: pass
             
             btn_connect = QPushButton()
@@ -222,6 +230,71 @@ class PlatformsTabWidget(QWidget):
                     self._active_dlg = None
                     
                 dlg.finished.connect(on_steam_finished)
+                dlg.show()
+        elif platform_id == "amazon":
+            from backend.amazon.login_amazon import is_amazon_connected, disconnect_amazon, get_login_url, save_amazon_session
+            if is_amazon_connected():
+                disconnect_amazon()
+                self.update_platform_btn_ui(btn, False)
+                self.connection_changed.emit("amazon", False)
+            else:
+                regions = ["AE (amazon.ae)", "AU (amazon.com.au)", "BE (amazon.com.be)", "BR (amazon.com.br)",
+                           "CA (amazon.ca)", "DE (amazon.de)", "EG (amazon.eg)", "ES (amazon.es)",
+                           "FR (amazon.fr)", "IN (amazon.in)", "IT (amazon.it)", "JP (amazon.co.jp)",
+                           "MX (amazon.com.mx)", "NL (amazon.nl)", "PL (amazon.pl)", "SA (amazon.sa)",
+                           "SE (amazon.se)", "SG (amazon.sg)", "TR (amazon.com.tr)", "UK (amazon.co.uk)",
+                           "US (amazon.com)"]
+                
+                region_text, ok = QInputDialog.getItem(self.window(), "Amazon Luna Region",
+                                                       "Please choose your Amazon regional store:", regions, 20, False)
+                if ok and region_text:
+                    region_code = region_text.split(" ")[0]
+                    login_url = get_login_url(region_code)
+                    
+                    from dialogs.login_browser_dialog import LoginBrowserDialog
+                    dlg = LoginBrowserDialog(login_url, target_cookies=[], success_url=None, api_key_mode="amazon", parent=None)
+                    dlg.setWindowModality(Qt.ApplicationModal)
+                    self._active_dlg = dlg
+                    
+                    def on_amazon_finished(result):
+                        if dlg.success_triggered and dlg.api_key:
+                            save_amazon_session(dlg.api_key)
+                            self.update_platform_btn_ui(btn, True)
+                            self.connection_changed.emit("amazon", True)
+                        else:
+                            QMessageBox.warning(self.window(), "Login Failed", "Failed to authenticate with Amazon Luna.")
+                        dlg.deleteLater()
+                        self._active_dlg = None
+                        
+                    dlg.finished.connect(on_amazon_finished)
+                    dlg.show()
+        elif platform_id == "steamgriddb":
+            from backend.steamgriddb.login_steamgriddb import is_steamgriddb_connected, disconnect_steamgriddb
+            if is_steamgriddb_connected():
+                disconnect_steamgriddb()
+                self.update_platform_btn_ui(btn, False)
+                self.connection_changed.emit("steamgriddb", False)
+            else:
+                from dialogs.login_browser_dialog import LoginBrowserDialog
+                
+                # WHY: Connect using our automated capture bot on steamgriddb.com/login
+                oauth_url = "https://www.steamgriddb.com/login"
+                dlg = LoginBrowserDialog(oauth_url, target_cookies=[], success_url=None, api_key_mode="steamgriddb", parent=None)
+                dlg.setWindowModality(Qt.ApplicationModal)
+                self._active_dlg = dlg
+                
+                def on_sgdb_finished(result):
+                    if dlg.success_triggered and dlg.api_key:
+                        from backend.steamgriddb.login_steamgriddb import save_steamgriddb_key
+                        save_steamgriddb_key(dlg.api_key)
+                        self.update_platform_btn_ui(btn, True)
+                        self.connection_changed.emit("steamgriddb", True)
+                    else:
+                        QMessageBox.warning(self.window(), "Login Failed", "Failed to capture SteamGridDB API Key automatically.")
+                    dlg.deleteLater()
+                    self._active_dlg = None
+                    
+                dlg.finished.connect(on_sgdb_finished)
                 dlg.show()
         else:
             QMessageBox.information(self.window(), "Info", translator.tr("tools_platform_not_impl"))

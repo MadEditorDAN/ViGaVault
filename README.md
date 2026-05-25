@@ -55,9 +55,8 @@ ViGaVault is built on Python using the PySide6 (Qt) framework for a responsive, 
 
 ViGaVault is actively evolving. Key planned features include:
 
-*   Migration to SQLite: Transitioning the core database backend from CSV to SQLite. This will improve data integrity, handle even larger libraries more efficiently, and allow users to utilize tools like *DB Browser for SQLite* for manual administration.
 *   Expanded Storefront Integrations: Implementing native scanners for additional platforms currently stubbed in the UI, such as Amazon Games, Ubisoft Connect (Uplay), Battle.net, and the EA App.
-*   Mobile Version: The ultimate goal is to create a fully autonomous Android version for library management on the go.
+*   Mobile Version: The Android version is coming soon...
 
 ---
 

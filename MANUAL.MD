@@ -11,8 +11,8 @@
 User Manual
 -------------------------------------------------------------------------------
 Welcome to ViGaVault (Video Game Vault), your high-performance,unified video 
-game library manager. This guide will walk you through setting up your vault, connecting your accounts, and managing your library with 
-forensic precision.
+game library manager. This guide will walk you through setting up your vault, 
+connecting your accounts, and managing your library with forensic precision.
 
 -------------------------------------------------------------------------------
 1. Step-by-Step New User Setup & Platforms

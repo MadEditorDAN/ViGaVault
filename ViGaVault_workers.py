@@ -172,7 +172,7 @@ class DbLoaderWorker(QThread):
                     mask = df['Clean_Title'].str.contains(pattern, case=False, na=False)
                     df.loc[mask, 'Is_Excluded'] = True
 
-                parsed_dates = pd.to_datetime(df['Original_Release_Date'], format=date_fmt, errors='coerce')
+                parsed_dates = pd.to_datetime(df['Original_Release_Date'], format='%Y-%m-%d', errors='coerce')
                 # WHY: Pass 2 - Catch dates that failed (like pure "2020" years) and fallback to generic parsing.
                 mask = parsed_dates.isna() & (df['Original_Release_Date'] != '')
                 if mask.any():
@@ -233,5 +233,6 @@ class StartupSyncWorker(QThread):
     def run(self):
         manager = LibraryManager(self.config)
         manager.load_db()
-        changes_made = manager.sync_media_flags_batch()
-        self.finished.emit(changes_made)
+        changes_made = manager.sync_media_flags_batch(worker_thread=self)
+        if not self.isInterruptionRequested():
+            self.finished.emit(changes_made)

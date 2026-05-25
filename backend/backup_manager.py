@@ -73,11 +73,12 @@ def analyze_vgv_backup(backup_path):
     try:
         with zipfile.ZipFile(archive_buffer, 'r') as zf:
             for name in zf.namelist():
-                if name.endswith('.dat') or name == 'vigavault.db':
+                name_lower = name.lower()
+                if name_lower.endswith('.dat') or name_lower == 'vigavault.db':
                     has_db = True
-                elif name.startswith('images/'):
+                elif name_lower.startswith('images/'):
                     has_images = True
-                elif name == 'settings.json':
+                elif name_lower == 'settings.json':
                     has_settings = True
     except zipfile.BadZipFile:
         logging.error("Failed to parse the decrypted .vgv file. It may be corrupt or encrypted with a different key.")
@@ -89,7 +90,7 @@ def analyze_vgv_backup(backup_path):
         'hasSettings': has_settings
     }
 
-def restore_vgv_backup(backup_path, restore_db=True, restore_images=True, restore_settings=True, target_db_dir=None, target_img_dir=None):
+def restore_vgv_backup(backup_path, restore_db=True, restore_images=True, restore_settings=True, target_db_path=None, target_img_dir=None):
     """
     Extracts the selected modules from the encrypted .vgv archive.
     """
@@ -110,12 +111,18 @@ def restore_vgv_backup(backup_path, restore_db=True, restore_images=True, restor
     try:
         with zipfile.ZipFile(archive_buffer, 'r') as zf:
             for name in zf.namelist():
-                if restore_db and (name.endswith('.dat') or name == 'vigavault.db'):
-                    if target_db_dir:
-                        zf.extract(name, target_db_dir)
-                        restored_db_path = os.path.join(target_db_dir, name)
+                name_lower = name.lower()
+                if restore_db and (name_lower.endswith('.dat') or name_lower == 'vigavault.db'):
+                    if target_db_path:
+                        # Ensure the target database directory exists
+                        os.makedirs(os.path.dirname(target_db_path), exist_ok=True)
+                        # Decrypt and write the database bytes directly to the exact target path
+                        file_data = zf.read(name)
+                        with open(target_db_path, 'wb') as db_f:
+                            db_f.write(file_data)
+                        restored_db_path = target_db_path
                 
-                elif restore_images and name.startswith('images/'):
+                elif restore_images and name_lower.startswith('images/'):
                     if target_img_dir:
                         # Ensure the target base images directory exists
                         os.makedirs(target_img_dir, exist_ok=True)
@@ -126,7 +133,7 @@ def restore_vgv_backup(backup_path, restore_db=True, restore_images=True, restor
                             with open(os.path.join(target_img_dir, filename), 'wb') as img_f:
                                 img_f.write(file_data)
                                 
-                elif restore_settings and name == 'settings.json':
+                elif restore_settings and name_lower == 'settings.json':
                     settings_data = zf.read(name).decode('utf-8')
                     try:
                         restored_settings = json.loads(settings_data)

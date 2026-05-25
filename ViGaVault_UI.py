@@ -147,6 +147,10 @@ class MainWindow(QMainWindow):
         self.sidebar.setMaximumWidth(self.width() // 3)
 
 if __name__ == "__main__":
+    # WHY: Prevent noisy, harmless internal Chromium warning/error logs (like Bluetooth or WinRT adapter discovery failures) 
+    # from spamming the console on Windows by completely disabling Chromium's internal terminal logging.
+    os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-logging --log-level=3"
+
     setup_logging()
     app = QApplication(sys.argv)
 

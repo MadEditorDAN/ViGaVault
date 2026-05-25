@@ -79,10 +79,11 @@ class BatchEditDialog(QDialog):
         return data
 
 class GameManagerModel(QAbstractTableModel):
-    def __init__(self, df, display_cols):
+    def __init__(self, df, display_cols, date_format_str="DD/MM/YYYY"):
         super().__init__()
         self._df = df
         self.display_cols = display_cols
+        self.date_format_str = date_format_str
 
     def rowCount(self, parent=None):
         return len(self._df)
@@ -114,6 +115,9 @@ class GameManagerModel(QAbstractTableModel):
             # WHY: Hide the string value "True/False" from displaying next to the checkbox.
             if col_name == '_selected': return ""
             if col_name == '_edit': return "⚙️"
+            if col_name == 'Original_Release_Date':
+                from ViGaVault_utils import format_date_for_ui
+                return format_date_for_ui(str(self._df.iloc[index.row()][col_name]), self.date_format_str)
             return str(self._df.iloc[index.row()][col_name])
             
         if role == Qt.TextAlignmentRole and col_name == '_edit':
@@ -503,9 +507,8 @@ class GameManagerDialog(QDialog):
             sort_col = existing_cols.index('Clean_Title') if 'Clean_Title' in existing_cols else 0
             sort_order = Qt.AscendingOrder
             
-        # WHY: Pass the full dataframe (as a hard copy) and the display column list separately 
-        # so the model can access hidden sorting metrics without breaking the visual table layout.
-        self.model = GameManagerModel(df.copy(), existing_cols)
+        fmt_str = getattr(self.parent_window, 'date_format_str', 'DD/MM/YYYY')
+        self.model = GameManagerModel(df.copy(), existing_cols, date_format_str=fmt_str)
         self.model.dataChanged.connect(self.update_batch_buttons)
         self.model.sort(sort_col, sort_order)
         self.table.setModel(self.model)

@@ -108,7 +108,7 @@ class LibraryManager:
                 self.save_db()
                 if worker_thread and worker_thread.isInterruptionRequested(): return
         
-        self.sync_media_flags_batch()
+        self.sync_media_flags_batch(worker_thread=worker_thread)
         # WHY: Run the unified IGDB scrapper engine after all platforms have finished their fast data intake.
         self.run_igdb_scrapper(worker_thread=worker_thread, images_only=images_only)
         
@@ -157,7 +157,7 @@ class LibraryManager:
         csv_str = df.fillna('').to_csv(sep=';', index=False)
         encrypt_string_to_file(self.db_file, csv_str)
 
-    def sync_media_flags_batch(self):
+    def sync_media_flags_batch(self, worker_thread=None):
         changes_made = False
         
         # WHY: Convert physical directory listings to lowercase sets. This completely fixes a 
@@ -178,6 +178,10 @@ class LibraryManager:
             except: pass
 
         for folder, game in self.games.items():
+            if worker_thread and worker_thread.isInterruptionRequested():
+                logging.info("[SYNC] Interruption requested during media flags sync. Exiting early.")
+                return False
+                
             old_img = str(game.data.get('Has_Image')).lower() in ['true', '1']
             old_loc = str(game.data.get('Is_Local')).lower() in ['true', '1']
 

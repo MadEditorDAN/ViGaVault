@@ -254,13 +254,13 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
             release_date = None
             release_ts = meta_data.get('releaseDate') or meta_data.get('releaseTimestamp')
             if release_ts:
-                try: release_date = datetime.utcfromtimestamp(release_ts).strftime(config.get('date_format', '%d/%m/%Y'))
+                try: release_date = datetime.utcfromtimestamp(release_ts).strftime('%Y-%m-%d')
                 except: pass
             elif ld_release_date:
                 clean_date_str = ld_release_date.split('T')[0]
                 try:
                     dt = datetime.strptime(clean_date_str, '%Y-%m-%d')
-                    release_date = dt.strftime(config.get('date_format', '%d/%m/%Y'))
+                    release_date = dt.strftime('%Y-%m-%d')
                 except ValueError: release_date = ld_release_date
             if release_date: game_obj.data['Original_Release_Date'] = release_date
 

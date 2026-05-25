@@ -62,7 +62,7 @@ class ActionDialog(QDialog):
         fields_to_disable = ['Folder_Name', 'Status_Flag', 'Image_Link', 'Platforms']
         # WHY: Explicitly exclude internal system flags and media paths so they don't clutter the generic text zone.
         fields_to_exclude = ['Trailer_Link', 'game_ID', 'Image_Link', 'temp_sort_date', 'temp_sort_title', 'temp_sort_index', 'Path_Root', 'Year_Folder', 'Is_Local', 'Has_Image', 'Has_Video', 'Cover_URL', 'Path_Video', 'Is_DLC', 'Is_Excluded']
-        fmt_str = build_scanner_config().get('date_format_str', 'DD/MM/YYYY')
+        fmt_str = getattr(self.parent_window, 'date_format_str', 'DD/MM/YYYY')
 
         for field, value in self.original_data.items():
             if field in fields_to_exclude or field.startswith('platform_ID_'):
@@ -71,7 +71,11 @@ class ActionDialog(QDialog):
             if field == "Summary":
                 inp = QTextEdit(str(value))
             else:
-                inp = QLineEdit(str(value))
+                display_value = str(value)
+                if field == 'Original_Release_Date':
+                    from ViGaVault_utils import format_date_for_ui
+                    display_value = format_date_for_ui(display_value, fmt_str)
+                inp = QLineEdit(display_value)
                 if field == 'Original_Release_Date':
                     # WHY: Provide UI guidance so the user doesn't manually enter a conflicting date format.
                     inp.setPlaceholderText(fmt_str)
@@ -103,6 +107,12 @@ class ActionDialog(QDialog):
         btn_select_image = QPushButton(translator.tr("dialog_edit_select_btn"))
         btn_select_image.clicked.connect(self.select_new_image)
         path_layout_img.addWidget(btn_select_image)
+
+        from backend.steamgriddb.login_steamgriddb import is_steamgriddb_connected
+        if is_steamgriddb_connected():
+            btn_sgdb = QPushButton("SteamGridDB...")
+            btn_sgdb.clicked.connect(self.select_steamgriddb_cover)
+            path_layout_img.addWidget(btn_sgdb)
 
         self.btn_view_image = QPushButton(translator.tr("dialog_edit_view_full_size_btn"))
         self.btn_view_image.clicked.connect(self.view_full_image)
@@ -228,6 +238,78 @@ class ActionDialog(QDialog):
             logging.error(f"Failed to copy new image: {e}")
             QMessageBox.critical(self, "Error", f"Could not copy the image: {e}")
 
+    def select_steamgriddb_cover(self):
+        from dialogs.steamgriddb_picker_dialog import SteamGridDBPickerDialog
+        from PySide6.QtWidgets import QProgressDialog
+        from PySide6.QtCore import Qt
+        
+        # Get clean title
+        title_to_search = ""
+        clean_title_input = self.inputs.get('Clean_Title')
+        if clean_title_input:
+            title_to_search = clean_title_input.text().strip()
+        if not title_to_search:
+            title_to_search = self.original_data.get('Clean_Title', '')
+        if not title_to_search:
+            title_to_search = self.original_data.get('Folder_Name', '')
+
+        dlg = SteamGridDBPickerDialog(title_to_search, self)
+        if dlg.exec():
+            selected_url = dlg.selected_url
+            if not selected_url:
+                return
+            
+            # Overwrite confirmation if image exists
+            img_name = self.updated_data.get('Image_Link') or self.original_data.get('Image_Link', '')
+            if img_name:
+                reply = QMessageBox.question(
+                    self,
+                    "Replace Cover Image",
+                    "A cover image already exists for this game. Would you like to overwrite it?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No
+                )
+                if reply == QMessageBox.No:
+                    return
+
+            safe_filename_base = get_safe_filename(self.original_data.get('Folder_Name', ''))
+            import urllib.parse
+            parsed_url = urllib.parse.urlparse(selected_url)
+            _, ext = os.path.splitext(parsed_url.path)
+            if not ext:
+                ext = ".jpg"
+            
+            new_filename = f"{safe_filename_base}{ext}"
+            
+            manager = LibraryManager(build_scanner_config())
+            dest_dir = manager.config.get('image_path', os.path.join(BASE_DIR, 'images'))
+            dest_path = os.path.join(dest_dir, new_filename)
+            
+            progress = QProgressDialog("Downloading cover image...", "Cancel", 0, 0, self)
+            progress.setWindowTitle("Downloading")
+            progress.setWindowModality(Qt.WindowModal)
+            progress.show()
+            QApplication.processEvents()
+            
+            try:
+                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+                response = requests.get(selected_url, stream=True, timeout=15, headers=headers)
+                if response.status_code == 200:
+                    os.makedirs(dest_dir, exist_ok=True)
+                    with open(dest_path, 'wb') as f:
+                        shutil.copyfileobj(response.raw, f)
+                    
+                    self.updated_data['Image_Link'] = new_filename
+                    self.updated_data['Has_Image'] = True
+                    self.update_cover_display()
+                else:
+                    QMessageBox.warning(self, "Download Failed", f"HTTP error {response.status_code}")
+            except Exception as e:
+                logging.error(f"Failed to download SteamGridDB cover: {e}")
+                QMessageBox.critical(self, "Error", f"Failed to download the cover: {e}")
+            finally:
+                progress.close()
+
     def view_full_image(self):
         img_name = self.updated_data.get('Image_Link') or self.original_data.get('Image_Link', '')
         img_path = os.path.join(get_image_path(), os.path.basename(img_name)) if img_name else ''
@@ -293,7 +375,12 @@ class ActionDialog(QDialog):
                 if isinstance(inp, QTextEdit):
                     new_data[field] = inp.toPlainText()
                 else:
-                    new_data[field] = inp.text()
+                    val = inp.text().strip()
+                    if field == 'Original_Release_Date':
+                        from ViGaVault_utils import parse_date_from_ui
+                        fmt_str = getattr(self.parent_window, 'date_format_str', 'DD/MM/YYYY')
+                        val = parse_date_from_ui(val, fmt_str)
+                    new_data[field] = val
         new_data.update(self.updated_data)
         
         if self.chk_locked.isChecked():
