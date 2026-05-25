@@ -284,5 +284,6 @@
     "dialog_amazon_region_msg": "Scegli il tuo negozio regionale Amazon:",
     "msg_amazon_login_failed": "Impossibile autenticarsi con Amazon Luna.",
     "msg_steamgriddb_login_failed": "Impossibile acquisire automaticamente la chiave API di SteamGridDB.",
-    "dialog_sgdb_warn_no_vertical_covers": "Pagina del gioco trovata, ma non è stata trovata alcuna copertina verticale 600x900 per '{game_title}'. Verranno mostrati gli altri formati multimediali disponibili."
+    "dialog_sgdb_warn_no_vertical_covers": "Pagina del gioco trovata, ma non è stata trovata alcuna copertina verticale 600x900 per '{game_title}'. Verranno mostrati gli altri formati multimediali disponibili.",
+    "msg_epic_login_failed": "Impossibile catturare automaticamente il codice di autorizzazione di Epic Games."
 }

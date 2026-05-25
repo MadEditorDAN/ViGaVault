@@ -176,24 +176,30 @@ class PlatformsTabWidget(QWidget):
                 self.update_platform_btn_ui(btn, False)
                 self.connection_changed.emit("epic", False)
             else:
-                # WHY: Bypassed the instructional popup to instantly launch the external browser.
+                from dialogs.login_browser_dialog import LoginBrowserDialog
+                
+                # WHY: Connect using our automated capture bot on Epic login
                 oauth_url = "https://www.epicgames.com/id/login?redirectUrl=https%3A%2F%2Fwww.epicgames.com%2Fid%2Fapi%2Fredirect%3FclientId%3D34a02cf8f4414e29b15921876da36f9a%26responseType%3Dcode"
-                webbrowser.open(oauth_url)
-                def prompt_token():
-                    # WHY: Bind strictly to self.window() to ensure the input dialog stays firmly on top of Settings.
-                    code_input, ok = QInputDialog.getText(self.window(), translator.tr("msg_epic_input_title"), translator.tr("msg_epic_input_prompt"))
-                    if ok and code_input:
-                        match = re.search(r'([a-fA-F0-9]{32})', code_input)
-                        if match:
-                            auth_code = match.group(1)
-                            token_data = exchange_code_for_token(auth_code)
-                            if token_data and 'access_token' in token_data:
-                                save_epic_session(token_data)
-                                self.update_platform_btn_ui(btn, True)
-                                self.connection_changed.emit("epic", True)
-                            else: QMessageBox.warning(self.window(), "Login Failed", translator.tr("msg_epic_token_failed"))
-                        else: QMessageBox.warning(self.window(), "Login Failed", translator.tr("msg_epic_invalid_code"))
-                QTimer.singleShot(200, prompt_token)
+                dlg = LoginBrowserDialog(oauth_url, target_cookies=[], success_url=None, api_key_mode="epic", parent=None)
+                dlg.setWindowModality(Qt.ApplicationModal)
+                self._active_dlg = dlg
+                
+                def on_epic_finished(result):
+                    if dlg.success_triggered and dlg.auth_code:
+                        token_data = exchange_code_for_token(dlg.auth_code)
+                        if token_data and 'access_token' in token_data:
+                            save_epic_session(token_data)
+                            self.update_platform_btn_ui(btn, True)
+                            self.connection_changed.emit("epic", True)
+                        else:
+                            QMessageBox.warning(self.window(), translator.tr("msg_login_failed_title"), translator.tr("msg_epic_token_failed"))
+                    else:
+                        QMessageBox.warning(self.window(), translator.tr("msg_login_failed_title"), translator.tr("msg_epic_login_failed"))
+                    dlg.deleteLater()
+                    self._active_dlg = None
+                    
+                dlg.finished.connect(on_epic_finished)
+                dlg.show()
         elif platform_id == "steam":
             from backend.steam.login_steam import is_steam_connected, disconnect_steam, save_steam_session
             if is_steam_connected():

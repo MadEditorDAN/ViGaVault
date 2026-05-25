@@ -121,6 +121,20 @@ class LoginBrowserDialog(QDialog):
                     self._sgdb_html_timer = QTimer(self)
                     self._sgdb_html_timer.timeout.connect(lambda: self.page.toHtml(handle_html) if "preferences/api" in self.browser.url().toString() else None)
                     self._sgdb_html_timer.start(500)
+            elif self.api_key_mode == "epic" and "id/api/redirect" in url_str:
+                def handle_html(html):
+                    if not self.success_triggered:
+                        import re
+                        match = re.search(r'"authorizationCode"\s*:\s*"([a-fA-F0-9]{32})"', html)
+                        if match:
+                            self.auth_code = match.group(1)
+                            if hasattr(self, '_epic_html_timer'): self._epic_html_timer.stop()
+                            self.trigger_success()
+                
+                if not hasattr(self, '_epic_html_timer'):
+                    self._epic_html_timer = QTimer(self)
+                    self._epic_html_timer.timeout.connect(lambda: self.page.toHtml(handle_html) if "id/api/redirect" in self.browser.url().toString() else None)
+                    self._epic_html_timer.start(200)
 
         # WHY: Fallback success detection. If the user lands on their account page, we know they logged in successfully.
         if not self.success_triggered and self.success_url and self.success_url in url_str:
@@ -151,6 +165,15 @@ class LoginBrowserDialog(QDialog):
                 self.amazon_timer = QTimer(self)
                 self.amazon_timer.timeout.connect(self.poll_amazon)
                 self.amazon_timer.start(1000)
+        elif self.api_key_mode == "epic" and not self.success_triggered and "id/api/redirect" in self.browser.url().toString():
+            def handle_html(html):
+                if not self.success_triggered:
+                    import re
+                    match = re.search(r'"authorizationCode"\s*:\s*"([a-fA-F0-9]{32})"', html)
+                    if match:
+                        self.auth_code = match.group(1)
+                        self.trigger_success()
+            self.page.toHtml(handle_html)
 
     def poll_igdb_keys(self):
         if self.success_triggered: return
