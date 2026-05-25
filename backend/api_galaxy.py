@@ -366,6 +366,12 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
             from backend.steam.login_steam import is_steam_connected
             steam_active = is_steam_connected()
         except ImportError: steam_active = False
+
+        # WHY: Add Amazon Luna cloud immunity so Galaxy doesn't delete uninstalled Amazon games.
+        try:
+            from backend.amazon.login_amazon import is_amazon_connected
+            amazon_active = is_amazon_connected()
+        except ImportError: amazon_active = False
         
         for folder_name, game in games_dict.items():
             if not game.data.get('Path_Root'):
@@ -378,11 +384,13 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
                 
                 # WHY: If native connectors are authenticated, forbid Galaxy from deleting their DLCs/Goodies
                 # even if the user temporarily unchecked them in the UI for a quick scan.
-                if 'gog' in platforms and gog_active:
+                if any('gog' in p for p in platforms) and gog_active:
                     continue
-                if ('epic games store' in platforms or 'epic' in platforms) and epic_active:
+                if any('epic' in p for p in platforms) and epic_active:
                     continue
-                if 'steam' in platforms and steam_active:
+                if any('steam' in p for p in platforms) and steam_active:
+                    continue
+                if any('amazon' in p for p in platforms) and amazon_active:
                     continue
 
                 game_ids = [x.strip() for x in game.data.get('game_ID', '').split(',') if x.strip()]
