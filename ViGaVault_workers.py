@@ -176,7 +176,7 @@ class DbLoaderWorker(QThread):
                 # WHY: Pass 2 - Catch dates that failed (like pure "2020" years) and fallback to generic parsing.
                 mask = parsed_dates.isna() & (df['Original_Release_Date'] != '')
                 if mask.any():
-                    fallback = pd.to_datetime(df.loc[mask, 'Original_Release_Date'], errors='coerce')
+                    fallback = pd.to_datetime(df.loc[mask, 'Original_Release_Date'], errors='coerce', dayfirst=True)
                     parsed_dates.update(fallback)
                     
                 df['temp_sort_date'] = parsed_dates
