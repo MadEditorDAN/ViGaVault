@@ -49,7 +49,7 @@ class SteamGridDBPickerDialog(QDialog):
     def __init__(self, initial_search, parent=None):
         super().__init__(parent)
         self.setWindowTitle(translator.tr("dialog_sgdb_title"))
-        self.resize(750, 600)
+        self.resize(*DIALOG_STD_SIZE)
         center_window(self, parent)
         
         self.selected_url = None
