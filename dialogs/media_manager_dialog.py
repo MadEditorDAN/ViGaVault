@@ -240,7 +240,7 @@ class MediaManagerDialog(QDialog):
             btn_layout.addWidget(btn_import)
             
             btn_sgdb = QPushButton("SGDB")
-            btn_sgdb.setToolTip("Search SteamGridDB")
+            btn_sgdb.setToolTip(translator.tr("media_manager_sgdb_tooltip"))
             btn_sgdb.clicked.connect(lambda _, r=row, f=game_info['folder'], u_in=url_input: self.search_sgdb_for_row(r, f, u_in))
             btn_layout.addWidget(btn_sgdb)
             self.table.setCellWidget(row, col_idx, btn_container)

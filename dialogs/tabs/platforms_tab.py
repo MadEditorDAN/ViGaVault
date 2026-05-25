@@ -128,7 +128,7 @@ class PlatformsTabWidget(QWidget):
                         self.update_platform_btn_ui(btn, True)
                         self.connection_changed.emit("igdb", True)
                     else:
-                        QMessageBox.warning(self.window(), "Login Failed", "Failed to extract IGDB (Twitch) API Keys. Make sure you click 'New Secret' on the Twitch Developer Console.")
+                        QMessageBox.warning(self.window(), translator.tr("msg_login_failed_title"), translator.tr("msg_igdb_login_failed"))
                     dlg.deleteLater()
                     self._active_dlg = None
                     
@@ -225,7 +225,7 @@ class PlatformsTabWidget(QWidget):
                         self.update_platform_btn_ui(btn, True)
                         self.connection_changed.emit("steam", True)
                     else:
-                        QMessageBox.warning(self.window(), "Login Failed", "Failed to capture Steam authentication cookies or API Key.")
+                        QMessageBox.warning(self.window(), translator.tr("msg_login_failed_title"), translator.tr("msg_steam_login_failed"))
                     dlg.deleteLater()
                     self._active_dlg = None
                     
@@ -245,8 +245,8 @@ class PlatformsTabWidget(QWidget):
                            "SE (amazon.se)", "SG (amazon.sg)", "TR (amazon.com.tr)", "UK (amazon.co.uk)",
                            "US (amazon.com)"]
                 
-                region_text, ok = QInputDialog.getItem(self.window(), "Amazon Luna Region",
-                                                       "Please choose your Amazon regional store:", regions, 20, False)
+                region_text, ok = QInputDialog.getItem(self.window(), translator.tr("dialog_amazon_region_title"),
+                                                       translator.tr("dialog_amazon_region_msg"), regions, 20, False)
                 if ok and region_text:
                     region_code = region_text.split(" ")[0]
                     login_url = get_login_url(region_code)
@@ -262,7 +262,7 @@ class PlatformsTabWidget(QWidget):
                             self.update_platform_btn_ui(btn, True)
                             self.connection_changed.emit("amazon", True)
                         else:
-                            QMessageBox.warning(self.window(), "Login Failed", "Failed to authenticate with Amazon Luna.")
+                            QMessageBox.warning(self.window(), translator.tr("msg_login_failed_title"), translator.tr("msg_amazon_login_failed"))
                         dlg.deleteLater()
                         self._active_dlg = None
                         
@@ -290,7 +290,7 @@ class PlatformsTabWidget(QWidget):
                         self.update_platform_btn_ui(btn, True)
                         self.connection_changed.emit("steamgriddb", True)
                     else:
-                        QMessageBox.warning(self.window(), "Login Failed", "Failed to capture SteamGridDB API Key automatically.")
+                        QMessageBox.warning(self.window(), translator.tr("msg_login_failed_title"), translator.tr("msg_steamgriddb_login_failed"))
                     dlg.deleteLater()
                     self._active_dlg = None
                     

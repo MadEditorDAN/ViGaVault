@@ -264,8 +264,8 @@ class ActionDialog(QDialog):
             if img_name:
                 reply = QMessageBox.question(
                     self,
-                    "Replace Cover Image",
-                    "A cover image already exists for this game. Would you like to overwrite it?",
+                    translator.tr("dialog_sgdb_overwrite_title"),
+                    translator.tr("dialog_sgdb_overwrite_msg"),
                     QMessageBox.Yes | QMessageBox.No,
                     QMessageBox.No
                 )
@@ -285,8 +285,8 @@ class ActionDialog(QDialog):
             dest_dir = manager.config.get('image_path', os.path.join(BASE_DIR, 'images'))
             dest_path = os.path.join(dest_dir, new_filename)
             
-            progress = QProgressDialog("Downloading cover image...", "Cancel", 0, 0, self)
-            progress.setWindowTitle("Downloading")
+            progress = QProgressDialog(translator.tr("dialog_sgdb_downloading_progress"), translator.tr("dialog_sgdb_btn_cancel"), 0, 0, self)
+            progress.setWindowTitle(translator.tr("dialog_sgdb_downloading_title"))
             progress.setWindowModality(Qt.WindowModal)
             progress.show()
             QApplication.processEvents()
@@ -303,10 +303,10 @@ class ActionDialog(QDialog):
                     self.updated_data['Has_Image'] = True
                     self.update_cover_display()
                 else:
-                    QMessageBox.warning(self, "Download Failed", f"HTTP error {response.status_code}")
+                    QMessageBox.warning(self, translator.tr("dialog_sgdb_download_failed"), translator.tr("dialog_sgdb_download_failed_msg", code=response.status_code))
             except Exception as e:
                 logging.error(f"Failed to download SteamGridDB cover: {e}")
-                QMessageBox.critical(self, "Error", f"Failed to download the cover: {e}")
+                QMessageBox.critical(self, translator.tr("dialog_sgdb_warning_title"), translator.tr("dialog_sgdb_download_error", error=str(e)))
             finally:
                 progress.close()
 

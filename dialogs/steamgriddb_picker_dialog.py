@@ -25,7 +25,7 @@ class SteamGridDBLoadWorker(QThread):
         try:
             covers = fetch_steamgriddb_covers_list(self.search_term)
             if not covers:
-                self.error_occurred.emit("No covers found or search failed. Make sure your SteamGridDB API key is connected in platforms settings.")
+                self.error_occurred.emit(translator.tr("dialog_sgdb_err_no_covers"))
                 return
             
             self.list_loaded.emit(covers)
@@ -48,7 +48,7 @@ class SteamGridDBLoadWorker(QThread):
 class SteamGridDBPickerDialog(QDialog):
     def __init__(self, initial_search, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Select SteamGridDB Cover")
+        self.setWindowTitle(translator.tr("dialog_sgdb_title"))
         self.resize(750, 600)
         center_window(self, parent)
         
@@ -61,17 +61,17 @@ class SteamGridDBPickerDialog(QDialog):
         # Search bar
         search_layout = QHBoxLayout()
         self.search_input = QLineEdit(initial_search)
-        self.search_input.setPlaceholderText("Enter game title to search...")
+        self.search_input.setPlaceholderText(translator.tr("dialog_sgdb_placeholder"))
         self.search_input.returnPressed.connect(self.start_search)
         search_layout.addWidget(self.search_input, 1)
         
-        self.btn_search = QPushButton("Search")
+        self.btn_search = QPushButton(translator.tr("dialog_sgdb_btn_search"))
         self.btn_search.clicked.connect(self.start_search)
         search_layout.addWidget(self.btn_search)
         layout.addLayout(search_layout)
 
         # Status label
-        self.status_label = QLabel("Enter a term and click search.")
+        self.status_label = QLabel(translator.tr("dialog_sgdb_status_ready"))
         self.status_label.setStyleSheet("color: gray;")
         layout.addWidget(self.status_label)
 
@@ -91,12 +91,12 @@ class SteamGridDBPickerDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
-        self.btn_select = QPushButton("Select Cover")
+        self.btn_select = QPushButton(translator.tr("dialog_sgdb_btn_select"))
         self.btn_select.setEnabled(False)
         self.btn_select.clicked.connect(self.select_current_item)
         button_layout.addWidget(self.btn_select)
         
-        btn_cancel = QPushButton("Cancel")
+        btn_cancel = QPushButton(translator.tr("dialog_sgdb_btn_cancel"))
         btn_cancel.clicked.connect(self.reject)
         button_layout.addWidget(btn_cancel)
         layout.addLayout(button_layout)
@@ -108,7 +108,7 @@ class SteamGridDBPickerDialog(QDialog):
     def start_search(self):
         term = self.search_input.text().strip()
         if not term:
-            QMessageBox.warning(self, "Warning", "Please enter a valid search term.")
+            QMessageBox.warning(self, translator.tr("dialog_sgdb_warning_title"), translator.tr("dialog_sgdb_warning_empty_search"))
             return
 
         # Cancel any active search
@@ -119,7 +119,7 @@ class SteamGridDBPickerDialog(QDialog):
         self.list_widget.clear()
         self.cover_items = []
         self.btn_select.setEnabled(False)
-        self.status_label.setText("Searching and loading covers...")
+        self.status_label.setText(translator.tr("dialog_sgdb_status_searching"))
         self.btn_search.setEnabled(False)
 
         self.worker = SteamGridDBLoadWorker(term, self)
@@ -131,7 +131,7 @@ class SteamGridDBPickerDialog(QDialog):
 
     def on_list_loaded(self, covers):
         self.cover_items = covers
-        self.status_label.setText(f"Found {len(covers)} covers. Downloading previews...")
+        self.status_label.setText(translator.tr("dialog_sgdb_status_previews", count=len(covers)))
         
         for idx, item in enumerate(covers):
             list_item = QListWidgetItem(f"Proposal #{idx + 1}")
@@ -149,14 +149,14 @@ class SteamGridDBPickerDialog(QDialog):
             self.list_widget.item(idx).setIcon(QIcon(pixmap))
 
     def on_finished_loading(self):
-        self.status_label.setText("All covers loaded.")
+        self.status_label.setText(translator.tr("dialog_sgdb_status_loaded"))
         self.btn_search.setEnabled(True)
         self.btn_select.setEnabled(True)
 
     def on_error(self, message):
-        self.status_label.setText("Error loading covers.")
+        self.status_label.setText(translator.tr("dialog_sgdb_status_error"))
         self.btn_search.setEnabled(True)
-        QMessageBox.information(self, "SteamGridDB Search", message)
+        QMessageBox.information(self, translator.tr("dialog_sgdb_search_msg_box_title"), message)
 
     def select_current_item(self):
         selected = self.list_widget.selectedItems()
