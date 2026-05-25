@@ -43,74 +43,69 @@ def fetch_steamgriddb_covers_list(search_term):
     if not search_data.get("success") or not search_data.get("data"):
         raise ValueError(f"No matching games found for '{search_term}' on SteamGridDB. Check the game title spelling.")
     
+    game = search_data["data"][0]
+    game_id = game.get("id")
+    game_name = game.get("name", search_term)
+    if not game_id:
+        raise ValueError(f"Found game search record for '{search_term}', but it lacks a valid SteamGridDB ID.")
+    
     all_covers = []
     was_fallback = False
     
-    # 2. Iterate through the top matching games in the autocomplete list
-    # and fetch grids (600x900) or other fallback media.
-    for game in search_data["data"][:5]:
-        game_id = game.get("id")
-        if not game_id:
-            continue
-            
-        grids_url = f"https://www.steamgriddb.com/api/v2/grids/game/{game_id}"
-        params = {"dimensions": "600x900", "nsfw": "false", "humor": "false"}
+    grids_url = f"https://www.steamgriddb.com/api/v2/grids/game/{game_id}"
+    params = {"dimensions": "600x900", "nsfw": "false", "humor": "false"}
+    
+    try:
+        grids_resp = requests.get(grids_url, headers=headers, params=params, timeout=10)
+    except requests.exceptions.RequestException as e:
+        raise RuntimeError(f"Network request failed while fetching covers.\n\nDetails: {e}")
         
+    if grids_resp.status_code == 401:
+        raise RuntimeError("Authentication failed (HTTP 401) during covers retrieval. Your API key is invalid.")
+    elif grids_resp.status_code != 200:
+        raise RuntimeError(f"Covers request failed: SteamGridDB returned HTTP status {grids_resp.status_code}.")
+        
+    try:
+        grids_data = grids_resp.json()
+    except Exception as e:
+        raise RuntimeError(f"Invalid response format: Failed to parse covers JSON.\n\nDetails: {e}")
+        
+    if grids_data.get("success") and grids_data.get("data"):
+        for g in grids_data["data"]:
+            if g.get("url"):
+                all_covers.append({"url": g.get("url"), "thumb": g.get("thumb", g.get("url")), "is_fallback": False})
+                
+    # Fallback 1: if no 600x900 vertical covers found for this game, try all grid dimensions
+    if not all_covers:
         try:
-            grids_resp = requests.get(grids_url, headers=headers, params=params, timeout=10)
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"Network request failed while fetching covers.\n\nDetails: {e}")
+            grids_resp_any = requests.get(grids_url, headers=headers, params={"nsfw": "false", "humor": "false"}, timeout=10)
+            if grids_resp_any.status_code == 200:
+                grids_data_any = grids_resp_any.json()
+                if grids_data_any.get("success") and grids_data_any.get("data"):
+                    for g in grids_data_any["data"]:
+                        if g.get("url"):
+                            all_covers.append({"url": g.get("url"), "thumb": g.get("thumb", g.get("url")), "is_fallback": True})
+                            was_fallback = True
+        except Exception:
+            pass
             
-        if grids_resp.status_code == 401:
-            raise RuntimeError("Authentication failed (HTTP 401) during covers retrieval. Your API key is invalid.")
-        elif grids_resp.status_code != 200:
-            raise RuntimeError(f"Covers request failed: SteamGridDB returned HTTP status {grids_resp.status_code}.")
-            
-        try:
-            grids_data = grids_resp.json()
-        except Exception as e:
-            raise RuntimeError(f"Invalid response format: Failed to parse covers JSON.\n\nDetails: {e}")
-            
-        if grids_data.get("success") and grids_data.get("data"):
-            for g in grids_data["data"]:
-                if g.get("url"):
-                    all_covers.append({"url": g.get("url"), "thumb": g.get("thumb", g.get("url")), "is_fallback": False})
-                    
-        # Fallback 1: if no 600x900 vertical covers found for this game, try all grid dimensions
-        if not all_covers:
+    # Fallback 2: if still no grids found, try heroes, logos, and icons for this game
+    if not all_covers:
+        for m_type in ["heroes", "logos", "icons"]:
             try:
-                grids_resp_any = requests.get(grids_url, headers=headers, params={"nsfw": "false", "humor": "false"}, timeout=10)
-                if grids_resp_any.status_code == 200:
-                    grids_data_any = grids_resp_any.json()
-                    if grids_data_any.get("success") and grids_data_any.get("data"):
-                        for g in grids_data_any["data"]:
+                m_url = f"https://www.steamgriddb.com/api/v2/{m_type}/game/{game_id}"
+                grids_resp_m = requests.get(m_url, headers=headers, params={"nsfw": "false", "humor": "false"}, timeout=10)
+                if grids_resp_m.status_code == 200:
+                    grids_data_m = grids_resp_m.json()
+                    if grids_data_m.get("success") and grids_data_m.get("data"):
+                        for g in grids_data_m["data"]:
                             if g.get("url"):
                                 all_covers.append({"url": g.get("url"), "thumb": g.get("thumb", g.get("url")), "is_fallback": True})
                                 was_fallback = True
             except Exception:
                 pass
                 
-        # Fallback 2: if still no grids found, try heroes, logos, and icons for this game
-        if not all_covers:
-            for m_type in ["heroes", "logos", "icons"]:
-                try:
-                    m_url = f"https://www.steamgriddb.com/api/v2/{m_type}/game/{game_id}"
-                    grids_resp_m = requests.get(m_url, headers=headers, params={"nsfw": "false", "humor": "false"}, timeout=10)
-                    if grids_resp_m.status_code == 200:
-                        grids_data_m = grids_resp_m.json()
-                        if grids_data_m.get("success") and grids_data_m.get("data"):
-                            for g in grids_data_m["data"]:
-                                if g.get("url"):
-                                    all_covers.append({"url": g.get("url"), "thumb": g.get("thumb", g.get("url")), "is_fallback": True})
-                                    was_fallback = True
-                except Exception:
-                    pass
-                    
-        # If we found any valid covers or alternative media formats for a match, we stop and display them
-        if all_covers:
-            break
-            
     if not all_covers:
-        raise ValueError(f"Found game page, but no vertical covers or other media were found for '{search_term}'.")
+        raise ValueError(f"No vertical covers or other media formats were found for '{game_name}' on SteamGridDB.")
         
     return all_covers
