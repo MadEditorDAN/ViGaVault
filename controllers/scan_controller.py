@@ -19,19 +19,28 @@ class ScanController(QObject):
         self.qt_log_handler = None
 
     def update_sync_log(self, message):
+        # WHY: Allow the user to pause auto-scrolling by moving the scrollbar up.
+        # Auto-scrolling only triggers if the scrollbar was already at/near the bottom.
+        scrollbar = self.mw.sidebar.scan_results.verticalScrollBar()
+        was_at_bottom = scrollbar.value() >= scrollbar.maximum() - 4
+
         # WHY: Targeted Update - Dynamically animates the log by replacing the text of the last item in place.
         if message.startswith("UI_START|"):
             clean_msg = message.replace("UI_START|", "")
             self.mw.sidebar.scan_results.addItem(clean_msg)
-            self.mw.sidebar.scan_results.scrollToBottom()
+            if was_at_bottom:
+                self.mw.sidebar.scan_results.scrollToBottom()
         elif message.startswith("UI_UPDATE|"):
             clean_msg = message.replace("UI_UPDATE|", "")
             if self.mw.sidebar.scan_results.count() > 0:
                 last_item = self.mw.sidebar.scan_results.item(self.mw.sidebar.scan_results.count() - 1)
                 last_item.setText(clean_msg)
+                if was_at_bottom:
+                    self.mw.sidebar.scan_results.scrollToBottom()
         else:
             self.mw.sidebar.scan_results.addItem(message)
-            self.mw.sidebar.scan_results.scrollToBottom()
+            if was_at_bottom:
+                self.mw.sidebar.scan_results.scrollToBottom()
 
     def open_scan_settings(self):
         # WHY: Roll up the filters smoothly instead of making them vanish abruptly.
