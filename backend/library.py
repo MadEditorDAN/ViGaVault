@@ -82,10 +82,13 @@ class LibraryManager:
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         images_only = self.config.get('images_only', False)
-        if images_only:
-            logging.info(f"[{now_str}] \n{' STANDALONE MEDIA BACKFILL STARTED ':=^80}")
-        else:
-            logging.info(f"[{now_str}] \n{' FULL INTELLIGENT SCAN STARTED ':=^80}")
+        
+        skip_checklist = self.config.get('skip_checklist_logging', False)
+        if not skip_checklist:
+            if images_only:
+                logging.info(f"[{now_str}] \n{' STANDALONE MEDIA BACKFILL STARTED ':=^80}")
+            else:
+                logging.info(f"[{now_str}] \n{' FULL INTELLIGENT SCAN STARTED ':=^80}")
             
         do_galaxy = self.config.get("enable_galaxy_db", True)
         do_gog = self.config.get("enable_gog_web", False)
@@ -95,7 +98,8 @@ class LibraryManager:
         local_cfg = self.config.get('local_scan_config', {})
         do_local = local_cfg.get("enable_local_scan", True)
         
-        logging.info(get_pre_scan_checklist_text(self.config) + "\n")
+        if not skip_checklist:
+            logging.info(get_pre_scan_checklist_text(self.config) + "\n")
 
         galaxy_stats = None
         gog_stats = None

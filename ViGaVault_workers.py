@@ -38,6 +38,7 @@ class FullScanWorker(QThread):
         self.config['enable_steam_web'] = self.do_steam
         self.config['enable_amazon_web'] = self.do_amazon
         self.config['download_images'] = self.do_download_images
+        self.config['skip_checklist_logging'] = True
         
         # WHY: Dynamic execution flag. If no platforms are checked but images are requested, trigger the standalone media backfill mode.
         self.config['images_only'] = not any([self.do_galaxy, self.do_local, self.do_gog_web, self.do_epic, self.do_steam, self.do_amazon]) and self.do_download_images

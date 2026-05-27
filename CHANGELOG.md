@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Resolved disappearing dynamic filter checkboxes during sidebar resizing by dynamically balancing layout column stretches and performing layout reflow on startup.
 - Resolved Amazon scan ImportError by implementing a persistent `get_amazon_profile` function within the login browser dialog module, securing headless cookie storage and preventing crash-on-close C++ parent-child cleanup races.
 - Fixed `TypeError` in `FullScanWorker` initialization during full scans by adding the missing `do_amazon` and `amazon_claims` parameters to the background thread constructor and dynamically feeding the retrieved cloud entries to the scanner engine.
+- Restored multi-year backward loop over GraphQL claims queries in the headless Amazon scanner, successfully retrieving complete multi-year claim catalogs and deduplicating records by item ID.
+- Re-architected scan startup logs to render the pre-scan checklist at the absolute beginning of full scans (on the main thread) before spawning any headless browser sessions.
 
 ## [1.2.0] - 2026-05-20
 ### Added

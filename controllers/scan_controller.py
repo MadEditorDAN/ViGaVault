@@ -250,49 +250,66 @@ fragment MediaAsset on MediaAsset {
                         var allClaims = [];
                         var queryStr = {safe_query};
                         
-                        var nextToken = null;
-                        var hasNextPage = true;
-                        var pageNum = 1;
-                        
-                        while (hasNextPage) {
-                            window.vgvProgress = "Fetching Amazon Games (Page " + pageNum + ")...";
-                            var variables = { "filters": { "endDate": "{current_year}-12-31T23:00:00Z" } };
-                            if (nextToken) variables.nextToken = nextToken;
-                            var payload = { "operationName": "ClaimsContextQuery", "variables": variables, "extensions": {}, "query": queryStr };
+                        // Loop backwards across active years to bypass Amazon's server-side date range limitations
+                        // and retrieve the user's complete catalog.
+                        for (var year = {current_year}; year >= 2020; year--) {
+                            var nextToken = null;
+                            var hasNextPage = true;
+                            var pageNum = 1;
+                            
+                            while (hasNextPage) {
+                                window.vgvProgress = "Fetching Amazon Games for " + year + " (Page " + pageNum + ")...";
+                                var variables = { "filters": { "endDate": year + "-12-31T23:00:00Z" } };
+                                if (nextToken) variables.nextToken = nextToken;
+                                var payload = { "operationName": "ClaimsContextQuery", "variables": variables, "extensions": {}, "query": queryStr };
 
-                            var response = await fetch('/graphql', {
-                                method: 'POST',
-                                credentials: 'same-origin',
-                                headers: { 'Content-Type': 'application/json', 'csrf-token': csrfToken },
-                                body: JSON.stringify(payload)
-                            });
+                                var response = await fetch('/graphql', {
+                                    method: 'POST',
+                                    credentials: 'same-origin',
+                                    headers: { 'Content-Type': 'application/json', 'csrf-token': csrfToken },
+                                    body: JSON.stringify(payload)
+                                });
 
-                            if (!response.ok) {
-                                var errText = "";
-                                try { errText = await response.text(); } catch(e) {}
-                                window.vgvScanFailed = true;
-                                window.vgvScanError = "GraphQL HTTP " + response.status + " - " + errText;
-                                return;
+                                if (!response.ok) {
+                                    var errText = "";
+                                    try { errText = await response.text(); } catch(e) {}
+                                    window.vgvScanFailed = true;
+                                    window.vgvScanError = "GraphQL HTTP " + response.status + " - " + errText;
+                                    return;
+                                }
+
+                                var data = await response.json();
+                                if (data.errors) {
+                                    window.vgvScanFailed = true;
+                                    window.vgvScanError = "GraphQL errors: " + JSON.stringify(data.errors);
+                                    return;
+                                }
+                                var claimsData = data.data && data.data.claims;
+
+                                if (claimsData && claimsData.claims) {
+                                    allClaims = allClaims.concat(claimsData.claims);
+                                    nextToken = claimsData.nextToken;
+                                    if (!nextToken) hasNextPage = false;
+                                } else {
+                                    hasNextPage = false;
+                                }
+                                pageNum++;
                             }
-
-                            var data = await response.json();
-                            if (data.errors) {
-                                window.vgvScanFailed = true;
-                                window.vgvScanError = "GraphQL errors: " + JSON.stringify(data.errors);
-                                return;
-                            }
-                            var claimsData = data.data && data.data.claims;
-
-                            if (claimsData && claimsData.claims) {
-                                allClaims = allClaims.concat(claimsData.claims);
-                                nextToken = claimsData.nextToken;
-                                if (!nextToken) hasNextPage = false;
-                            } else {
-                                hasNextPage = false;
-                            }
-                            pageNum++;
                         }
-                        window.vgvClaims = allClaims;
+                        
+                        // Deduplicate claims by item ID to guarantee no duplicate processing if there is overlapping pagination
+                        var uniqueClaims = [];
+                        var seenIds = new Set();
+                        for (var c of allClaims) {
+                            if (c && c.item && c.item.id) {
+                                if (!seenIds.has(c.item.id)) {
+                                    seenIds.add(c.item.id);
+                                    uniqueClaims.push(c);
+                                }
+                            }
+                        }
+                        
+                        window.vgvClaims = uniqueClaims;
                     } catch(e) {
                         window.vgvScanFailed = true;
                         window.vgvScanError = e.toString();
@@ -475,6 +492,30 @@ class ScanController(QObject):
         target_folders = []
         for folder, chk in self.mw.sidebar.chk_scan_folders.items():
             if chk.isChecked(): target_folders.append(folder)
+
+        # WHY: Print the pre-scan checklist first so the user gets immediate visual confirmation
+        # of the active storefront targets before any headless scans are spawned.
+        temp_config = build_scanner_config()
+        temp_config['enable_galaxy_db'] = do_galaxy
+        temp_config['enable_gog_web'] = do_gog_web
+        temp_config['enable_epic_web'] = do_epic
+        temp_config['enable_steam_web'] = do_steam
+        temp_config['enable_amazon_web'] = do_amazon
+        temp_config['download_images'] = do_dl_images
+        temp_config['images_only'] = not any([do_galaxy, do_local, do_gog_web, do_epic, do_steam, do_amazon]) and do_dl_images
+        if 'local_scan_config' not in temp_config:
+            temp_config['local_scan_config'] = {}
+        temp_config['local_scan_config']['enable_local_scan'] = do_local
+        
+        from backend.library import get_pre_scan_checklist_text
+        checklist_text = get_pre_scan_checklist_text(temp_config)
+        
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        if temp_config['images_only']:
+            logging.info(f"[{now_str}] \n{' STANDALONE MEDIA BACKFILL STARTED ':=^80}")
+        else:
+            logging.info(f"[{now_str}] \n{' FULL INTELLIGENT SCAN STARTED ':=^80}")
+        logging.info(checklist_text + "\n")
 
 
             
