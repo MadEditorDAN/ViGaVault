@@ -55,10 +55,14 @@ def disconnect_amazon():
         try: os.remove(SESSION_FILE)
         except: pass
 
-def save_amazon_session(cookie_value):
+def save_amazon_session(cookie_value, region="US"):
     os.makedirs(AMAZON_DIR, exist_ok=True)
-    save_encrypted_json(SESSION_FILE, {"session_cookie": cookie_value})
+    save_encrypted_json(SESSION_FILE, {"session_cookie": cookie_value, "region": region})
 
 def get_amazon_session():
     data = load_encrypted_json(SESSION_FILE)
     return data.get("session_cookie")
+
+def get_amazon_region():
+    data = load_encrypted_json(SESSION_FILE)
+    return data.get("region", "US")

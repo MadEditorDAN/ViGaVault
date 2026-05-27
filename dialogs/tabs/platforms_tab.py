@@ -264,7 +264,7 @@ class PlatformsTabWidget(QWidget):
                     
                     def on_amazon_finished(result):
                         if dlg.success_triggered and dlg.api_key:
-                            save_amazon_session(dlg.api_key)
+                            save_amazon_session(dlg.api_key, region_code)
                             self.update_platform_btn_ui(btn, True)
                             self.connection_changed.emit("amazon", True)
                         else:

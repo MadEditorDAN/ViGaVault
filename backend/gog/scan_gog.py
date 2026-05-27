@@ -102,7 +102,6 @@ def scan_gog_account(config, games_dict, worker_thread=None):
         report += f"Already in DB  : {stats['already_in_db']}\n"
         report += f"New Added      : {stats['new_added']}\n"
         report += f"Smart Merged   : {stats['matched_smart']}\n"
-        for t in stats['merged_titles']: report += f"                 {t}\n"
         report += f"Errors / Skips : {stats['failed']}\n"
         report += f"{'='*80}"
         logging.info(report)

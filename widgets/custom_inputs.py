@@ -98,8 +98,12 @@ class CollapsibleFilterGroup(QGroupBox):
 
         # WHY: Wrap the header in a dedicated layout so we can inject the All/None buttons perfectly in line with the Title.
         self.header_widget = QWidget()
+        self.header_widget.setObjectName("header_container")
+        self.header_widget.setStyleSheet("""
+            #header_container { background-color: palette(button); border-radius: 4px; }
+        """)
         self.header_layout = QHBoxLayout(self.header_widget)
-        self.header_layout.setContentsMargins(0, 0, 0, 0)
+        self.header_layout.setContentsMargins(0, 0, 4, 0)
         
         # Header Button (acts as the toggle trigger)
         self.toggle_btn = QPushButton(f"▶ {title}")

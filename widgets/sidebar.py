@@ -257,17 +257,8 @@ class Sidebar(QWidget):
         self.layout_scan_platforms.addWidget(self.chk_scan_epic, 1, 0)
         self.layout_scan_platforms.addWidget(self.chk_scan_steam, 1, 1)
 
-        # WHY: Inject placeholders for all upcoming platforms in a clean 2-column grid.
-        dummies = ["Amazon", "Uplay", "Battle.net", "Origin", "Itch", "Xbox"]
-        r, c = 2, 0
-        for d in dummies:
-            chk = QCheckBox(d)
-            chk.setEnabled(False)
-            self.layout_scan_platforms.addWidget(chk, r, c)
-            c += 1
-            if c > 1:
-                c = 0
-                r += 1
+        self.chk_scan_amazon = QCheckBox("Amazon")
+        self.layout_scan_platforms.addWidget(self.chk_scan_amazon, 2, 0)
 
         self.scan_settings_layout.addWidget(self.grp_scan_platforms)
 
@@ -344,7 +335,7 @@ class Sidebar(QWidget):
         
         # WHY: Bind instantaneous saving back to the checkboxes so the user's scan choices are safely persisted immediately.
         # This completely bypasses PySide6's notorious C++ object teardown race conditions during closeEvent.
-        for chk in [self.chk_scan_galaxy, self.chk_scan_gog_web, self.chk_scan_epic, self.chk_scan_steam, self.chk_scan_local, self.chk_scan_dl_images]:
+        for chk in [self.chk_scan_galaxy, self.chk_scan_gog_web, self.chk_scan_epic, self.chk_scan_steam, self.chk_scan_amazon, self.chk_scan_local, self.chk_scan_dl_images]:
             chk.toggled.connect(self.parent.save_settings)
             
         self.chk_scan_galaxy.toggled.connect(self.update_scan_button_state)
@@ -352,6 +343,7 @@ class Sidebar(QWidget):
         self.chk_scan_epic.toggled.connect(self.update_scan_button_state)
         self.chk_scan_local.toggled.connect(self.update_scan_button_state)
         self.chk_scan_steam.toggled.connect(self.update_scan_button_state)
+        self.chk_scan_amazon.toggled.connect(self.update_scan_button_state)
 
         # Scan Connections
         self.scan_btn.clicked.connect(self.parent.on_manual_search_trigger)

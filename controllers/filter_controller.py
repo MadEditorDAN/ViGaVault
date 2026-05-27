@@ -1,9 +1,36 @@
 import os
 from PySide6.QtCore import QObject, Qt, Slot, QTimer
-from PySide6.QtWidgets import QPushButton, QCheckBox, QApplication, QSizePolicy, QAbstractItemView
+from PySide6.QtWidgets import (QPushButton, QCheckBox, QApplication, QSizePolicy, 
+                               QAbstractItemView, QVBoxLayout, QHBoxLayout, 
+                               QGroupBox, QWidget, QLineEdit, QLabel)
+from PySide6.QtGui import QValidator
 from widgets import CollapsibleFilterGroup
 from ViGaVault_workers import FilterWorker
-from ViGaVault_utils import get_library_settings_file, load_encrypted_json, BASE_DIR
+from ViGaVault_utils import get_library_settings_file, load_encrypted_json, BASE_DIR, translator
+
+class YearRangeValidator(QValidator):
+    def __init__(self, min_y, max_y, parent=None):
+        super().__init__(parent)
+        self.min_y = min_y
+        self.max_y = max_y
+
+    def validate(self, text, pos):
+        if not text:
+            return QValidator.Acceptable, text, pos
+            
+        import re
+        if not re.match(r"^\d{0,4}(?:-\d{0,4})?$", text):
+            return QValidator.Invalid, text, pos
+            
+        parts = text.split("-")
+        for p in parts:
+            p = p.strip()
+            if len(p) == 4:
+                val = int(p)
+                if val < self.min_y or val > self.max_y:
+                    return QValidator.Invalid, text, pos
+                    
+        return QValidator.Acceptable, text, pos
 
 class FilterController(QObject):
     def __init__(self, main_window):
@@ -15,6 +42,7 @@ class FilterController(QObject):
         self.filter_groups = {}
 
     def populate_dynamic_filters(self, saved_state=None, saved_expansion=None):
+        self.current_cols = 0
         layout = self.mw.sidebar.filters_layout
         while layout.count():
             item = layout.takeAt(0)
@@ -34,9 +62,6 @@ class FilterController(QObject):
         scan_mode = local_config.get("scan_mode", "advanced")
         rules = local_config.get("folder_rules", {})
 
-        is_expanded = saved_expansion.get("Platforms", False) if saved_expansion else False
-        self.add_filter_group("Platforms", "Platforms", self.mw.sidebar.filters_layout, is_expanded)
-
         active_types = set()
         if scan_mode == "advanced":
             for folder, rule in rules.items():
@@ -47,17 +72,124 @@ class FilterController(QObject):
                 if "Direct" not in g_type and "None" not in g_type: active_types.add(g_type)
         
         type_map = {"Genre": "Genre", "Collection": "Collection", "Publisher": "Publisher", "Developer": "Developer", "Year": "Year_Folder"}
+        
+        # WHY: Dynamic Filter Auto-Discovery - Always display metadata filters if the loaded database has any non-empty values for that column.
+        # This prevents GOG/Steam/Epic/Amazon genres and collections from being hidden if the local scanner rules are not set.
+        db_has_data = {}
+        if hasattr(self.mw, 'master_df') and not self.mw.master_df.empty:
+            for type_name, col_name in type_map.items():
+                if col_name in self.mw.master_df.columns:
+                    has_val = self.mw.master_df[col_name].dropna().astype(str).str.strip().ne("").any()
+                    if has_val:
+                        db_has_data[type_name] = True
+
+        # First, add the Year filter at the absolute top of the filters layout if it's active or discovered in DB
+        show_year = ("Year" in active_types) or db_has_data.get("Year", False)
+        if show_year:
+            from datetime import datetime
+            years = []
+            col_name = "Year_Folder"
+            if hasattr(self.mw, 'master_df') and not self.mw.master_df.empty and col_name in self.mw.master_df.columns:
+                for y in self.mw.master_df[col_name].dropna().unique():
+                    y_str = str(y).strip()
+                    if y_str.isdigit() and len(y_str) == 4:
+                        years.append(int(y_str))
+            min_y = min(years) if years else 1970
+            max_y = max(years) if years else datetime.now().year
+            
+            
+            group = QGroupBox()
+            group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+            group_layout = QVBoxLayout(group)
+            group_layout.setContentsMargins(0, 0, 0, 0)
+            group_layout.setSpacing(0)
+            
+            header_widget = QWidget()
+            header_widget.setObjectName("header_container")
+            header_widget.setStyleSheet("""
+                #header_container { background-color: palette(button); border-radius: 4px; }
+            """)
+            header_layout = QHBoxLayout(header_widget)
+            header_layout.setContentsMargins(0, 0, 4, 0)
+            header_layout.setSpacing(6)
+            
+            lbl_year = QLabel("Year :")
+            lbl_year.setStyleSheet("""
+                font-weight: bold; 
+                font-size: 12px; 
+                color: palette(button-text); 
+                background: transparent; 
+                padding: 5px; 
+                border: none;
+            """)
+            
+            txt_year = QLineEdit()
+            txt_year.setPlaceholderText(f"e.g. {min_y} or {min_y}-{max_y}")
+            txt_year.setValidator(YearRangeValidator(min_y, max_y, txt_year))
+            txt_year.returnPressed.connect(self.request_filter_update)
+            txt_year.setFixedWidth(140)
+            txt_year.setStyleSheet("""
+                QLineEdit {
+                    background-color: palette(base);
+                    color: palette(text);
+                    border: 1px solid palette(dark);
+                    border-radius: 3px;
+                    padding: 2px 5px;
+                }
+            """)
+            
+            btn_all = QPushButton(translator.tr("sidebar_btn_all"))
+            btn_none = QPushButton(translator.tr("sidebar_btn_none"))
+            btn_style = "QPushButton { padding: 2px 5px; font-size: 11px; margin: 2px; border: 1px solid palette(dark); border-radius: 3px; background-color: palette(button); }"
+            btn_all.setStyleSheet(btn_style)
+            btn_none.setStyleSheet(btn_style)
+            btn_all.setCursor(Qt.PointingHandCursor)
+            btn_none.setCursor(Qt.PointingHandCursor)
+            
+            btn_all.setEnabled(False)
+            btn_none.setEnabled(True)
+            txt_year.textChanged.connect(lambda text: btn_all.setEnabled(bool(text.strip())))
+            
+            btn_all.clicked.connect(lambda: self.set_filter_group_state(col_name, True))
+            btn_none.clicked.connect(lambda: self.set_filter_group_state(col_name, False))
+            
+            header_layout.addWidget(lbl_year)
+            header_layout.addWidget(txt_year)
+            header_layout.addStretch(1)
+            header_layout.addWidget(btn_all)
+            header_layout.addWidget(btn_none)
+            
+            group_layout.addWidget(header_widget)
+            self.mw.sidebar.filters_layout.addWidget(group)
+            
+            self.dynamic_filters[col_name] = txt_year
+            self.filter_buttons[col_name] = (btn_all, btn_none)
+
+        is_expanded = saved_expansion.get("Platforms", False) if saved_expansion else False
+        self.add_filter_group("Platforms", "Platforms", self.mw.sidebar.filters_layout, is_expanded)
+
         for type_name, col_name in type_map.items():
-            if type_name in active_types:
+            if type_name == "Year":
+                continue
+            if type_name in active_types or db_has_data.get(type_name, False):
                 is_expanded = saved_expansion.get(type_name, False) if saved_expansion else False
                 self.add_filter_group(type_name, col_name, self.mw.sidebar.filters_layout, is_expanded)
         
         self.mw.sidebar.filters_layout.addStretch(0)
 
         if saved_state is not None:
-            for col, checkboxes in self.dynamic_filters.items():
+            for col, item in self.dynamic_filters.items():
                 if col in saved_state:
-                    for chk in checkboxes: chk.setChecked(chk.text() in saved_state.get(col, []))
+                    if col == "Year_Folder":
+                        if isinstance(item, QLineEdit):
+                            vals = saved_state.get(col, [])
+                            if vals:
+                                item.setText(vals[0])
+                    else:
+                        for chk in item:
+                            chk.setChecked(chk.text() in saved_state.get(col, []))
+                            
+        self.reflow_filters()
 
     def add_filter_group(self, title, col_name, parent_layout, is_expanded=False):
         group = CollapsibleFilterGroup(title, parent_layout)
@@ -65,7 +197,7 @@ class FilterController(QObject):
         group.checkbox_layout.setColumnStretch(1, 1)
         self.filter_groups[col_name] = group
         
-        if title in ["Platforms", "Genre", "Collection"]:
+        if title in ["Platforms", "Genre", "Collection", "Publisher", "Developer"]:
             group.btn_all.show()
             group.btn_none.show()
             group.btn_all.clicked.connect(lambda: self.set_filter_group_state(col_name, True))
@@ -96,8 +228,8 @@ class FilterController(QObject):
         
         self.dynamic_filters[col_name] = checkboxes
         self.update_filter_buttons(col_name)
+            
         parent_layout.addWidget(group)
-        
         if is_expanded: group.toggle_btn.setChecked(True)
 
     def reflow_filters(self):
@@ -111,25 +243,50 @@ class FilterController(QObject):
         self.current_cols = cols
         
         for col_name, group in self.filter_groups.items():
+            if col_name == "Year_Folder": continue
             checkboxes = self.dynamic_filters.get(col_name, [])
             if not checkboxes: continue
             
+            # WHY: Cleanly hide the widgets when taking them out of the layout to prevent 
+            # floating or overlapping artifacts from remaining visible.
             while group.checkbox_layout.count():
-                group.checkbox_layout.takeAt(0)
+                item = group.checkbox_layout.takeAt(0)
+                if item.widget():
+                    item.widget().hide()
+                
+            # WHY: Dynamically adjust the column stretches so each active column takes up exactly 
+            # equal width (e.g. 50% each for 2 columns, 33.3% each for 3 columns, etc.).
+            # This prevents columns beyond index 1 from being squeezed to 0 width.
+            for c in range(4):
+                if c < cols:
+                    group.checkbox_layout.setColumnStretch(c, 1)
+                else:
+                    group.checkbox_layout.setColumnStretch(c, 0)
                 
             row, col = 0, 0
             for chk in checkboxes:
                 group.checkbox_layout.addWidget(chk, row, col)
+                chk.show()
                 col = 0 if col + 1 >= cols else col + 1
                 if col == 0: row += 1
+                
+            # WHY: Recalculate and update the maximum height of the group box so the scroll 
+            # area adapts perfectly to the new height.
+            if group.toggle_btn.isChecked():
+                group.toggle_content(True)
 
     def set_filter_group_state(self, col_name, state):
         if col_name in self.dynamic_filters:
-            for chk in self.dynamic_filters[col_name]:
-                chk.blockSignals(True)
-                chk.setChecked(state)
-                chk.blockSignals(False)
-                self.update_filter_buttons(col_name)
+            if col_name == "Year_Folder":
+                item = self.dynamic_filters[col_name]
+                if isinstance(item, QLineEdit):
+                    item.clear()
+            else:
+                for chk in self.dynamic_filters[col_name]:
+                    chk.blockSignals(True)
+                    chk.setChecked(state)
+                    chk.blockSignals(False)
+                    self.update_filter_buttons(col_name)
             self.request_filter_update()
 
     def update_filter_buttons(self, col_name):
@@ -166,6 +323,8 @@ class FilterController(QObject):
     def start_filter_worker(self):
         if not hasattr(self.mw, 'master_df'): return
 
+        self._prev_focus_widget = QApplication.focusWidget()
+
         self.mw.sidebar.setEnabled(False)
         self.mw.list_widget.setEnabled(False)
         QApplication.setOverrideCursor(Qt.WaitCursor)
@@ -174,9 +333,15 @@ class FilterController(QObject):
         sort_col_map = ["temp_sort_title", "temp_sort_date", "temp_sort_index"]
         
         active_filters = {}
-        for col, checkboxes in self.dynamic_filters.items():
-            if checkboxes and not all(chk.isChecked() for chk in checkboxes):
-                active_filters[col] = [chk.text() for chk in checkboxes if chk.isChecked()]
+        for col, item in self.dynamic_filters.items():
+            if col == "Year_Folder":
+                if isinstance(item, QLineEdit):
+                    txt = item.text().strip()
+                    if txt:
+                        active_filters[col] = [txt]
+            else:
+                if item and not all(chk.isChecked() for chk in item):
+                    active_filters[col] = [chk.text() for chk in item if chk.isChecked()]
 
         # WHY: Safety Guard - Truncate excessively long search strings to prevent the regex engine from crashing on malformed text.
         search_text = self.mw.sidebar.search_bar.text()
@@ -238,4 +403,9 @@ class FilterController(QObject):
             
         self.mw.sidebar.setEnabled(True)
         self.mw.list_widget.setEnabled(True)
-        self.mw.sidebar.search_bar.setFocus()
+
+        if hasattr(self, '_prev_focus_widget') and self._prev_focus_widget:
+            try:
+                self._prev_focus_widget.setFocus()
+            except: pass
+            self._prev_focus_widget = None

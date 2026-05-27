@@ -325,7 +325,7 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
                 # WHY: Always save the URL to the DB for asynchronous backfilling.
                 game_obj.data['Cover_URL'] = cover_url
                 
-            if act_str in ["Added", "Merged", "Refresh"]:
+            if act_str in ["Added", "Merged"]:
                 img_str = "Yes" if game_obj.data.get('Cover_URL') or game_obj.data.get('Image_Link') else "No "
                 trl_str = "Yes" if game_obj.data.get('Trailer_Link') and game_obj.data.get('Trailer_Link') != 'Not_on_Steam' else "No "
                 
@@ -416,11 +416,8 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
     report += f"Games processed successfully: {stats['processed']}\n"
     report += f"New Added      : {stats['new']}\n"
     report += f"Smart Merged   : {stats['matched_smart']}\n"
-    for t in stats['merged_titles']: report += f"                 {t}\n"
     report += f"Ghosts Removed : {stats['deleted_ghosts']}\n"
-    for t in stats['deleted_ghost_titles']: report += f"                 {t}\n"
     report += f"Errors / Ignored: {stats['errors']}\n"
-    for t in stats['ignored_titles']: report += f"                 {t}\n"
     report += f"{'='*80}"
     
     logging.info(report)

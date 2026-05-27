@@ -97,6 +97,30 @@ class FilterWorker(QThread):
                     df = df.iloc[0:0] 
                     break
                 
+                if col == "Year_Folder":
+                    val = selected_values[0].strip()
+                    if "-" in val:
+                        parts = val.split("-")
+                        if len(parts) == 2:
+                            start_str, end_str = parts[0].strip(), parts[1].strip()
+                            start_y = int(start_str) if start_str.isdigit() else None
+                            end_y = int(end_str) if end_str.isdigit() else None
+                            
+                            year_nums = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
+                            if start_y is not None and end_y is not None:
+                                s, e = min(start_y, end_y), max(start_y, end_y)
+                                df = df[year_nums.between(s, e)]
+                            elif start_y is not None:
+                                df = df[year_nums >= start_y]
+                            elif end_y is not None:
+                                df = df[year_nums <= end_y]
+                            continue
+                    else:
+                        if val.isdigit():
+                            year_nums = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
+                            df = df[year_nums == int(val)]
+                            continue
+                
                 # Regex match for multi-value fields (e.g. "RPG, Action")
                 regex_pattern = '|'.join([re.escape(v) for v in selected_values])
                 df = df[df[col].astype(str).str.contains(regex_pattern, case=False, na=False)]

@@ -200,7 +200,6 @@ def scan_local_system(config, games_dict, worker_thread=None):
         # WHY: Suppressed the exhaustive list of merged titles as it creates excessive noise in the logs for large, stable libraries.
         # for t in stats['merged_titles']: report += f"                             {t}\n"
         report += f"{'Missing Purged':<28}: {stats['deleted']}\n"
-        for t in stats['deleted_titles']: report += f"                             {t}\n"
         report += f"{'='*80}"
         
     logging.info(report)

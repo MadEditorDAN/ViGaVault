@@ -16,10 +16,39 @@ from .api_galaxy import sync_galaxy_database
 from .gog.scan_gog import scan_gog_account
 from .epic.scan_epic import scan_epic_account
 from .steam.scan_steam import scan_steam_account
+from .amazon.sync_amazon import sync_amazon_database
 from .local_copy_scanner import scan_local_system
 
 BACKUP_DIR = os.path.join(BASE_DIR, "backups")
 MAX_FILES = 10 
+
+def get_pre_scan_checklist_text(config):
+    do_galaxy = config.get("enable_galaxy_db", True)
+    do_gog = config.get("enable_gog_web", False)
+    do_epic = config.get("enable_epic_web", False)
+    do_steam = config.get("enable_steam_web", False)
+    do_amazon = config.get("enable_amazon_web", False)
+    local_cfg = config.get('local_scan_config', {})
+    do_local = local_cfg.get("enable_local_scan", True)
+    target_folders = local_cfg.get("target_folders")
+    
+    checklist = f"{' PRE-SCAN CHECKLIST ':-^80}\n"
+    checklist += f"{'Galaxy Sync':<16}: {'ON' if do_galaxy else 'OFF'}\n"
+    checklist += f"{'GOG':<16}: {'ON' if do_gog else 'OFF'}\n"
+    checklist += f"{'Epic Games':<16}: {'ON' if do_epic else 'OFF'}\n"
+    checklist += f"{'Steam':<16}: {'ON' if do_steam else 'OFF'}\n"
+    checklist += f"{'Amazon':<16}: {'ON' if do_amazon else 'OFF'}\n"
+    if do_local:
+        checklist += f"{'Local Folders':<16}: ON\n"
+        if target_folders is not None and len(target_folders) > 0:
+            for tf in sorted(target_folders):
+                checklist += f"  - {tf}\n"
+        else:
+            checklist += "  - All Folders\n"
+    else:
+        checklist += f"{'Local Folders':<16}: OFF\n"
+    checklist += f"{'Images Download':<16}: {'ON' if config.get('download_images', True) else 'OFF'}"
+    return checklist
 
 class LibraryManager:
     def __init__(self, config):
@@ -37,17 +66,19 @@ class LibraryManager:
                 
                 # WHY: Guarantee schema integrity so dict unpacking never throws KeyErrors.
                 for col in self._get_db_schema():
-                    if col not in df.columns: df[col] = ''
-                    
-                for _, row in df.iterrows():
-                    game_data = {k: str(v) for k, v in row.to_dict().items()}
-                    folder = game_data.get('Folder_Name', '').strip()
+                    if col not in df.columns:
+                        df[col] = ''
+                
+                # WHY: Cleanly map each row to a fully populated, structured Game object in our in-memory cache.
+                for idx, row in df.iterrows():
+                    game_data = row.to_dict()
+                    folder = game_data.get('Folder_Name')
                     if folder:
                         self.games[folder] = Game(config=self.config, **game_data)
             except Exception as e:
                 logging.error(f"Error loading LibraryManager DB: {e}")
 
-    def scan_full(self, worker_thread=None):
+    def scan_full(self, worker_thread=None, amazon_claims=None):
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         images_only = self.config.get('images_only', False)
@@ -55,56 +86,52 @@ class LibraryManager:
             logging.info(f"[{now_str}] \n{' STANDALONE MEDIA BACKFILL STARTED ':=^80}")
         else:
             logging.info(f"[{now_str}] \n{' FULL INTELLIGENT SCAN STARTED ':=^80}")
-        
+            
         do_galaxy = self.config.get("enable_galaxy_db", True)
         do_gog = self.config.get("enable_gog_web", False)
         do_epic = self.config.get("enable_epic_web", False)
         do_steam = self.config.get("enable_steam_web", False)
+        do_amazon = self.config.get("enable_amazon_web", False)
         local_cfg = self.config.get('local_scan_config', {})
         do_local = local_cfg.get("enable_local_scan", True)
-        target_folders = local_cfg.get("target_folders")
         
-        # WHY: Display a clean, strictly formatted 80-column checklist mirroring user settings and mockup.
-        checklist = f"{' PRE-SCAN CHECKLIST ':-^80}\n"
-        checklist += f"{'Galaxy Sync':<16}: {'ON' if do_galaxy else 'OFF'}\n"
-        checklist += f"{'GOG':<16}: {'ON' if do_gog else 'OFF'}\n"
-        checklist += f"{'Epic Games':<16}: {'ON' if do_epic else 'OFF'}\n"
-        checklist += f"{'Steam':<16}: {'ON' if do_steam else 'OFF'}\n"
-        if do_local:
-            checklist += f"{'Local Folders':<16}: ON\n"
-            if target_folders is not None and len(target_folders) > 0:
-                for tf in sorted(target_folders):
-                    checklist += f"  - {tf}\n"
-            else:
-                checklist += "  - All Folders\n"
-        else:
-            checklist += f"{'Local Folders':<16}: OFF\n"
-        checklist += f"{'Images Download':<16}: {'ON' if self.config.get('download_images', True) else 'OFF'}"
-        logging.info(checklist + "\n")
+        logging.info(get_pre_scan_checklist_text(self.config) + "\n")
+
+        galaxy_stats = None
+        gog_stats = None
+        epic_stats = None
+        steam_stats = None
+        amazon_stats = None
+        local_stats = None
 
         if not images_only:
             if do_galaxy:
-                sync_galaxy_database(self.config, self.games, worker_thread=worker_thread)
+                galaxy_stats = sync_galaxy_database(self.config, self.games, worker_thread=worker_thread)
                 self.save_db()
                 if worker_thread and worker_thread.isInterruptionRequested(): return
             
             if do_gog:
-                gog_changes = scan_gog_account(self.config, self.games, worker_thread=worker_thread)
+                gog_changes, gog_stats = scan_gog_account(self.config, self.games, worker_thread=worker_thread)
                 if gog_changes: self.save_db()
                 if worker_thread and worker_thread.isInterruptionRequested(): return
                 
             if do_epic:
-                epic_changes = scan_epic_account(self.config, self.games, worker_thread=worker_thread)
+                epic_changes, epic_stats = scan_epic_account(self.config, self.games, worker_thread=worker_thread)
                 if epic_changes: self.save_db()
                 if worker_thread and worker_thread.isInterruptionRequested(): return
 
             if do_steam:
-                steam_changes = scan_steam_account(self.config, self.games, worker_thread=worker_thread)
+                steam_changes, steam_stats = scan_steam_account(self.config, self.games, worker_thread=worker_thread)
                 if steam_changes: self.save_db()
                 if worker_thread and worker_thread.isInterruptionRequested(): return
 
+            if do_amazon and amazon_claims:
+                amazon_changes, amazon_stats = sync_amazon_database(self.config, self.games, amazon_claims, worker_thread=worker_thread)
+                if amazon_changes: self.save_db()
+                if worker_thread and worker_thread.isInterruptionRequested(): return
+
             if do_local:
-                scan_local_system(self.config, self.games, worker_thread=worker_thread)
+                local_stats = scan_local_system(self.config, self.games, worker_thread=worker_thread)
                 self.save_db()
                 if worker_thread and worker_thread.isInterruptionRequested(): return
         
@@ -112,6 +139,64 @@ class LibraryManager:
         # WHY: Run the unified IGDB scrapper engine after all platforms have finished their fast data intake.
         self.run_igdb_scrapper(worker_thread=worker_thread, images_only=images_only)
         
+        # --- GLOBAL CONSOLIDATION REPORT ---
+        if not images_only:
+            global_rep = f"\n{' GLOBAL SYNCHRONIZATION REPORT ':=^80}\n"
+            global_rep += f"{' BREAKDOWN ':-^80}\n"
+            
+            total_scanned = 0
+            total_added = 0
+            total_merged = 0
+            total_ghosts = 0
+            
+            if do_galaxy and galaxy_stats:
+                global_rep += f"  Galaxy Sync   : Scanned: {galaxy_stats.get('total_found', 0):<4} | Added: {galaxy_stats.get('new', 0):<3} | Merged: {galaxy_stats.get('matched_smart', 0):<3} | Ghosts: {galaxy_stats.get('deleted_ghosts', 0)}\n"
+                total_scanned += galaxy_stats.get('total_found', 0)
+                total_added += galaxy_stats.get('new', 0)
+                total_merged += galaxy_stats.get('matched_smart', 0)
+                total_ghosts += galaxy_stats.get('deleted_ghosts', 0)
+                
+            if do_gog and gog_stats:
+                global_rep += f"  GOG.com       : Scanned: {gog_stats.get('total_cloud', 0):<4} | Added: {gog_stats.get('new_added', 0):<3} | Merged: {gog_stats.get('matched_smart', 0):<3} | Ghosts: 0\n"
+                total_scanned += gog_stats.get('total_cloud', 0)
+                total_added += gog_stats.get('new_added', 0)
+                total_merged += gog_stats.get('matched_smart', 0)
+                
+            if do_epic and epic_stats:
+                global_rep += f"  Epic Games    : Scanned: {epic_stats.get('total_cloud', 0):<4} | Added: {epic_stats.get('new_added', 0):<3} | Merged: {epic_stats.get('matched_smart', 0):<3} | Ghosts: 0\n"
+                total_scanned += epic_stats.get('total_cloud', 0)
+                total_added += epic_stats.get('new_added', 0)
+                total_merged += epic_stats.get('matched_smart', 0)
+                
+            if do_steam and steam_stats:
+                global_rep += f"  Steam         : Scanned: {steam_stats.get('total_cloud', 0):<4} | Added: {steam_stats.get('new_added', 0):<3} | Merged: {steam_stats.get('already_in_db', 0):<3} | Ghosts: 0\n"
+                total_scanned += steam_stats.get('total_cloud', 0)
+                total_added += steam_stats.get('new_added', 0)
+                total_merged += steam_stats.get('already_in_db', 0)
+                
+            if do_amazon and amazon_stats:
+                global_rep += f"  Amazon Luna   : Scanned: {amazon_stats.get('total_cloud', 0):<4} | Added: {amazon_stats.get('new_added', 0):<3} | Merged: {amazon_stats.get('matched_smart', 0):<3} | Ghosts: {amazon_stats.get('deleted_ghosts', 0)}\n"
+                total_scanned += amazon_stats.get('total_cloud', 0)
+                total_added += amazon_stats.get('new_added', 0)
+                total_merged += amazon_stats.get('matched_smart', 0)
+                total_ghosts += amazon_stats.get('deleted_ghosts', 0)
+                
+            if do_local and local_stats:
+                global_rep += f"  Local Folders : Scanned: {local_stats.get('scanned', 0):<4} | Added: {local_stats.get('new', 0):<3} | Merged: {local_stats.get('updated', 0):<3} | Ghosts: {local_stats.get('deleted', 0)}\n"
+                total_scanned += local_stats.get('scanned', 0)
+                total_added += local_stats.get('new', 0)
+                total_merged += local_stats.get('updated', 0)
+                total_ghosts += local_stats.get('deleted', 0)
+                
+            global_rep += f"{' GRAND TOTALS ':-^80}\n"
+            global_rep += f"  Total Cloud Games Scanned    : {total_scanned}\n"
+            global_rep += f"  Total New Games Added        : {total_added}\n"
+            global_rep += f"  Total Games Smart-Merged     : {total_merged}\n"
+            global_rep += f"  Total Ghost Games Removed    : {total_ghosts}\n\n"
+            global_rep += f"  Total Games in Database (VGV): {len(self.games)}\n"
+            global_rep += f"{'='*80}"
+            logging.info(global_rep)
+
         end_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         if images_only:
             logging.info(f"{' STANDALONE MEDIA BACKFILL FINISHED ':=^80}\n[{end_str}]\n")
@@ -242,7 +327,7 @@ class LibraryManager:
             if images_only:
                 should_scrape = needs_cover_rescue
             else:
-                should_scrape = ((status == 'NEW' and not str(game.data.get('Is_DLC')).lower() in ['true', '1']) or needs_cover_rescue)
+                should_scrape = (status in ['NEW', 'NEEDS_ATTENTION', ''] or needs_cover_rescue)
                 
             if should_scrape:
                 action_taken = True
@@ -284,7 +369,7 @@ class LibraryManager:
                     
                     if not action_taken:
                         title_disp = game.data.get('Clean_Title', folder)
-                        action_title = f"Scraping with IGDB : {title_disp}"
+                        action_title = f"Cover Download : {title_disp}"
                         logging.info(f"UI_START||{action_title[:56]:<56}| Img: ... | Trl: ... |")
                         action_taken = True
                         
@@ -340,11 +425,17 @@ class LibraryManager:
             # WHY: Smart Refresh Logging - Update the previously emitted UI line to strictly maintain ONE line per game.
             if action_taken:
                 title_disp = game.data.get('Clean_Title', folder)
-                action_title = f"Scraping with IGDB : {title_disp}"
                 has_img_now = str(game.data.get('Has_Image')).lower() in ['true', '1']
                 has_trl_now = bool(game.data.get('Trailer_Link') and str(game.data.get('Trailer_Link')).startswith('http'))
                 img_str = "Yes" if has_img_now else "No "
                 trl_str = "Yes" if has_trl_now else "No "
+                
+                # WHY: Distinguish visually between real IGDB queries and pure image downloads
+                if status in ['NEW', 'NEEDS_ATTENTION', '']:
+                    action_title = f"Scraping with IGDB : {title_disp}"
+                else:
+                    action_title = f"Cover Download : {title_disp}"
+                    
                 logging.info(f"UI_UPDATE||{action_title[:56]:<56}| Img: {img_str[:3]:<3} | Trl: {trl_str[:3]:<3} |")
 
         if changes_made: self.save_db()

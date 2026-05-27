@@ -1,9 +1,14 @@
+# WHY: Prevent noisy, harmless internal Chromium warning/error logs (like Bluetooth or WinRT adapter discovery failures) 
+# from spamming the console on Windows by completely disabling Chromium's internal terminal logging.
+# Crucial: Must be set BEFORE PySide6 widgets or engines are imported!
+import os
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-logging --log-level=3"
+
 # WHY: Re-architected application to solve the "Massive View Controller" pattern.
 # This file now strictly serves as the Core UI Coordinator, initializing the 
 # visual layout and instantly delegating logic to the modular Controllers.
 import sys
 import pandas as pd
-import os
 import json
 from PySide6.QtWidgets import (QApplication, QMainWindow, QListView, QWidget, 
                                QVBoxLayout, QSplitter, QAbstractItemView)
@@ -147,10 +152,6 @@ class MainWindow(QMainWindow):
         self.sidebar.setMaximumWidth(self.width() // 3)
 
 if __name__ == "__main__":
-    # WHY: Prevent noisy, harmless internal Chromium warning/error logs (like Bluetooth or WinRT adapter discovery failures) 
-    # from spamming the console on Windows by completely disabling Chromium's internal terminal logging.
-    os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-logging --log-level=3"
-
     setup_logging()
     app = QApplication(sys.argv)
 

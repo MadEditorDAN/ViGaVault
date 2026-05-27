@@ -26,7 +26,7 @@ class SettingsController(QObject):
         global_settings, lib_settings = self.get_user_settings()
         
         global_settings.update(display_state)
-        local_keys = ["sortDesc", "sortIndex", "searchText", "anchorFolder", "viewNew", "viewDlc", "viewReview", "filterStates", "filterExpansion", "scanGalaxy", "scanGog", "scanEpic", "scanSteam", "scanLocal", "scanFolders", "platformMap", "ignoredPrefixes", "rootPath", "localScanConfig", "enableGalaxyDb", "galaxyDbPath", "downloadImages", "downloadVideos", "imagePath", "videoPath"]
+        local_keys = ["sortDesc", "sortIndex", "searchText", "anchorFolder", "viewNew", "viewDlc", "viewReview", "filterStates", "filterExpansion", "scanGalaxy", "scanGog", "scanEpic", "scanSteam", "scanAmazon", "scanLocal", "scanFolders", "platformMap", "ignoredPrefixes", "rootPath", "localScanConfig", "enableGalaxyDb", "galaxyDbPath", "downloadImages", "downloadVideos", "imagePath", "videoPath"]
         for k in local_keys: global_settings.pop(k, None)
         
         save_encrypted_json(os.path.join(BASE_DIR, "settings.bin"), global_settings)
@@ -69,7 +69,7 @@ class SettingsController(QObject):
             # WHY: Safely ignore C++ teardown errors if save_settings is fired during application closure.
             pass
         
-        local_keys = ["sortDesc", "sortIndex", "searchText", "anchorFolder", "viewNew", "viewDlc", "viewReview", "filterStates", "filterExpansion", "scanGalaxy", "scanGog", "scanEpic", "scanSteam", "scanLocal", "scanFolders", "platformMap", "ignoredPrefixes", "rootPath", "localScanConfig", "enableGalaxyDb", "galaxyDbPath", "downloadImages", "downloadVideos", "imagePath", "videoPath"]
+        local_keys = ["sortDesc", "sortIndex", "searchText", "anchorFolder", "viewNew", "viewDlc", "viewReview", "filterStates", "filterExpansion", "scanGalaxy", "scanGog", "scanEpic", "scanSteam", "scanAmazon", "scanLocal", "scanFolders", "platformMap", "ignoredPrefixes", "rootPath", "localScanConfig", "enableGalaxyDb", "galaxyDbPath", "downloadImages", "downloadVideos", "imagePath", "videoPath"]
         for k in local_keys: global_settings.pop(k, None)
         
         save_encrypted_json(os.path.join(BASE_DIR, "settings.bin"), global_settings)
@@ -84,9 +84,16 @@ class SettingsController(QObject):
         try:
             filter_states = {}
             if hasattr(self.mw.filter_controller, 'dynamic_filters'):
-                for col, checkboxes in self.mw.filter_controller.dynamic_filters.items():
-                    if checkboxes and not all(chk.isChecked() for chk in checkboxes):
-                        filter_states[col] = [chk.text() for chk in checkboxes if chk.isChecked()]
+                for col, item in self.mw.filter_controller.dynamic_filters.items():
+                    if col == "Year_Folder":
+                        from PySide6.QtWidgets import QLineEdit
+                        if isinstance(item, QLineEdit):
+                            txt = item.text().strip()
+                            if txt:
+                                filter_states[col] = [txt]
+                    else:
+                        if item and not all(chk.isChecked() for chk in item):
+                            filter_states[col] = [chk.text() for chk in item if chk.isChecked()]
 
             saved_expansion = {}
             layout = self.mw.sidebar.filters_layout
@@ -112,6 +119,7 @@ class SettingsController(QObject):
                 "scanGog": self.mw.sidebar.chk_scan_gog_web.isChecked(),
                 "scanEpic": self.mw.sidebar.chk_scan_epic.isChecked(),
                 "scanSteam": self.mw.sidebar.chk_scan_steam.isChecked(),
+                "scanAmazon": self.mw.sidebar.chk_scan_amazon.isChecked(),
                 "scanLocal": self.mw.sidebar.chk_scan_local.isChecked(),
                 "scanFolders": checked_folders,
                 "downloadImages": self.mw.sidebar.chk_scan_dl_images.isChecked()
@@ -183,6 +191,12 @@ class SettingsController(QObject):
                 steam_enabled = is_steam_connected()
             except ImportError: steam_enabled = False
             self.mw.steam_connected_cache = steam_enabled
+
+            try:
+                from backend.amazon.login_amazon import is_amazon_connected
+                amazon_enabled = is_amazon_connected()
+            except ImportError: amazon_enabled = False
+            self.mw.amazon_connected_cache = amazon_enabled
             
             # WHY: Cache IGDB status immediately on load so the UI logic doesn't constantly ping the disk.
             try:
@@ -197,6 +211,13 @@ class SettingsController(QObject):
                 if not steam_enabled: self.mw.sidebar.chk_scan_steam.setChecked(False)
                 else: self.mw.sidebar.chk_scan_steam.setChecked(lib_settings.get("scanSteam", False))
                 self.mw.sidebar.chk_scan_steam.blockSignals(False)
+
+            if hasattr(self.mw.sidebar, 'chk_scan_amazon'):
+                self.mw.sidebar.chk_scan_amazon.setEnabled(amazon_enabled)
+                self.mw.sidebar.chk_scan_amazon.blockSignals(True)
+                if not amazon_enabled: self.mw.sidebar.chk_scan_amazon.setChecked(False)
+                else: self.mw.sidebar.chk_scan_amazon.setChecked(lib_settings.get("scanAmazon", False))
+                self.mw.sidebar.chk_scan_amazon.blockSignals(False)
                 
             self.mw.sidebar.update_scan_button_state()
             
