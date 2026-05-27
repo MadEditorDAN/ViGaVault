@@ -523,14 +523,6 @@ class ScanController(QObject):
 
             
         if do_amazon:
-            from backend.amazon.login_amazon import is_amazon_connected
-            if not is_amazon_connected():
-                logging.error("[AMAZON SCAN] Amazon account not connected. Please connect your account in the Platform Manager.")
-                self.mw.sidebar.scan_results.addItem("Amazon scan skipped: Connection needs to be set up.")
-                self.mw.sidebar.scan_results.scrollToBottom()
-                self.run_remaining_full_scan(do_galaxy, do_local, do_gog_web, do_epic, do_steam, False, None, do_dl_images, target_folders)
-                return
-
             self.mw.sidebar.scan_results.addItem("Connecting to Amazon Luna...")
             self.mw.sidebar.scan_results.scrollToBottom()
             

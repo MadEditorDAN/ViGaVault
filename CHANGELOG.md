@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Amazon Luna integration supporting multiple region selections and automated login token capture.
 - Standardized database date schema to YYYY-MM-DD with dynamic localization conversion for UI rendering.
 - Immediate list sorting reflow triggered in-memory upon editing game dates or titles.
-- Implemented real-time Amazon session validation checks both pre-scan (verifying connection status) and mid-scan (detecting login redirects), providing instant GUI feedback if the session needs to be re-applied.
+- Implemented real-time Amazon session validation check mid-scan (detecting login redirects), providing instant GUI feedback if the active session has expired and needs to be re-applied.
 
 ### Changed
 - Swapped custom non-native cover import file selector for the native system Windows Explorer dialog in the metadata editor.
