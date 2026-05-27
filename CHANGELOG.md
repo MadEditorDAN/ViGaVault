@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed the Amazon storefront ghost checking logic by swapping from any() to all(), ensuring Galaxy-synced prefix patterns are immune to unlinking during scans.
 - Resolved disappearing dynamic filter checkboxes during sidebar resizing by dynamically balancing layout column stretches and performing layout reflow on startup.
 - Resolved Amazon scan ImportError by implementing a persistent `get_amazon_profile` function within the login browser dialog module, securing headless cookie storage and preventing crash-on-close C++ parent-child cleanup races.
+- Fixed `TypeError` in `FullScanWorker` initialization during full scans by adding the missing `do_amazon` and `amazon_claims` parameters to the background thread constructor and dynamically feeding the retrieved cloud entries to the scanner engine.
 
 ## [1.2.0] - 2026-05-20
 ### Added

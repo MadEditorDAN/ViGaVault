@@ -15,13 +15,15 @@ from ViGaVault_utils import get_db_path, build_scanner_config, get_library_setti
 # Operations like scanning or filtering can take time. We run them in separate threads
 # to prevent the GUI from freezing (becoming unresponsive) while they process.
 class FullScanWorker(QThread):
-    def __init__(self, do_galaxy=True, do_local=True, do_gog_web=False, do_epic=False, do_steam=False, do_download_images=True, target_folders=None, parent=None):
+    def __init__(self, do_galaxy=True, do_local=True, do_gog_web=False, do_epic=False, do_steam=False, do_amazon=False, amazon_claims=None, do_download_images=True, target_folders=None, parent=None):
         super().__init__(parent)
         self.do_galaxy = do_galaxy
         self.do_local = do_local
         self.do_gog_web = do_gog_web
         self.do_epic = do_epic
         self.do_steam = do_steam
+        self.do_amazon = do_amazon
+        self.amazon_claims = amazon_claims or []
         self.do_download_images = do_download_images
         self.target_folders = target_folders
         self.config = build_scanner_config()
@@ -34,10 +36,11 @@ class FullScanWorker(QThread):
         self.config['enable_gog_web'] = self.do_gog_web
         self.config['enable_epic_web'] = self.do_epic
         self.config['enable_steam_web'] = self.do_steam
+        self.config['enable_amazon_web'] = self.do_amazon
         self.config['download_images'] = self.do_download_images
         
         # WHY: Dynamic execution flag. If no platforms are checked but images are requested, trigger the standalone media backfill mode.
-        self.config['images_only'] = not any([self.do_galaxy, self.do_local, self.do_gog_web, self.do_epic, self.do_steam]) and self.do_download_images
+        self.config['images_only'] = not any([self.do_galaxy, self.do_local, self.do_gog_web, self.do_epic, self.do_steam, self.do_amazon]) and self.do_download_images
         
         if 'local_scan_config' not in self.config:
             self.config['local_scan_config'] = {}
@@ -47,7 +50,7 @@ class FullScanWorker(QThread):
         try:
             manager = LibraryManager(self.config)
             manager.load_db()
-            manager.scan_full(worker_thread=self)
+            manager.scan_full(worker_thread=self, amazon_claims=self.amazon_claims)
         except Exception as e:
             logging.error(f"Critical error in full scan thread: {e}")
 
