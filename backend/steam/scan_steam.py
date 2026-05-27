@@ -15,7 +15,7 @@ def scan_steam_account(config, games_dict, worker_thread=None):
     
     if not secure_cookie or not steam_id:
         logging.error("[STEAM] No valid Steam Session found. Please connect Steam in the Platform Manager.")
-        return False
+        return False, {}
 
     api_key = session.get('api_key')
     
@@ -30,7 +30,7 @@ def scan_steam_account(config, games_dict, worker_thread=None):
                 games_list = data.get('response', {}).get('games', [])
             else:
                 logging.error(f"[STEAM] API Key scan failed: HTTP {response.status_code}")
-                return False
+                return False, {}
         else:
             logging.info("[STEAM] Using Web Scraper for scan...")
             url = f"https://steamcommunity.com/profiles/{steam_id}/games/?tab=all"
@@ -53,7 +53,7 @@ def scan_steam_account(config, games_dict, worker_thread=None):
             response = requests.get(url, cookies=cookies, headers=headers, timeout=15)
             if response.status_code != 200:
                 logging.error(f"[STEAM] Failed to fetch library: HTTP {response.status_code}")
-                return False
+                return False, {}
                 
             html = response.text
             match = re.search(r'var\s+rgGames\s*=\s*(\[.*?\]);', html, re.DOTALL)
@@ -62,15 +62,15 @@ def scan_steam_account(config, games_dict, worker_thread=None):
                 games_list = json.loads(match.group(1))
             else:
                 logging.warning("[STEAM] Could not find 'rgGames' data in the page HTML. The session may be invalid or the profile private.")
-                return False
+                return False, {}
                 
     except Exception as e:
         logging.error(f"[STEAM] Error fetching library: {e}")
-        return False
+        return False, {}
 
     if not games_list:
         logging.warning("[STEAM] No games found. Ensure your Game Details privacy is set to Public.")
-        return False
+        return False, {}
 
     existing_steam_set = set()
     for game in games_dict.values():
@@ -147,4 +147,4 @@ def scan_steam_account(config, games_dict, worker_thread=None):
 
     report = f"{' REPORT ':=^80}\nTotal Cloud    : {stats['total_cloud']}\nAlready in DB  : {stats['already_in_db']}\nNew Added      : {stats['new_added']}\n{'='*80}"
     logging.info(report)
-    return changes_made
+    return changes_made, stats

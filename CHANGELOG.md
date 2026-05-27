@@ -34,8 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Restored multi-year backward loop over GraphQL claims queries in the headless Amazon scanner, successfully retrieving complete multi-year claim catalogs and deduplicating records by item ID.
 - Re-architected scan startup logs to render the pre-scan checklist at the absolute beginning of full scans (on the main thread) before spawning any headless browser sessions.
 - Resolved "stuck redoing Page 1" UI confusion by modifying the year-loop progress messaging to only print page numbers for actual multi-page pagination lists.
-- Resolved redundant rescanning and duplication of existing Amazon games by implementing a clean UUID extractor `get_clean_amazon_id` to unify dot-prefixed cloud IDs with database GOG Galaxy formats.
 - Resolved infinite IGDB rescanning loops of incomplete games by excluding `NEEDS_ATTENTION` games from the automated scrapper queue, ensuring they are only queried once when added as `NEW` to prevent redundant network traffic.
+- Resolved `TypeError: cannot unpack non-iterable bool object` critical thread crash in full scan thread by aligning `scan_gog_account`, `scan_epic_account`, and `scan_steam_account` return signatures to return `(changes_made, stats)` tuples, matching GOG, Epic, and Steam backend sync expectations.
+- Resolved redundant rescanning and duplication of existing Amazon games by implementing a clean UUID extractor `get_clean_amazon_id` to unify dot-prefixed cloud IDs with database GOG Galaxy formats.
 
 ## [1.2.0] - 2026-05-20
 ### Added

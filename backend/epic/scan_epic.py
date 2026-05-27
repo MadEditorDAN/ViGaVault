@@ -25,7 +25,7 @@ def scan_epic_account(config, games_dict, worker_thread=None):
     
     if not access_token:
         logging.error("[EPIC GAMES] No valid OAuth token found. Please connect your account in the Platform Manager.")
-        return False
+        return False, {}
         
     logging.info(f"\n{' EPIC GAMES SCAN ':=^80}")
     
@@ -36,7 +36,7 @@ def scan_epic_account(config, games_dict, worker_thread=None):
     cursor = ""
     
     while True:
-        if worker_thread and worker_thread.isInterruptionRequested(): return False
+        if worker_thread and worker_thread.isInterruptionRequested(): return False, {}
         # WHY: includeMetadata=true is strictly required for the Epic Library API to return the responseMetadata block containing the pagination cursor!
         url = "https://library-service.live.use1a.on.epicgames.com/library/api/public/items?includeMetadata=true"
         if cursor: url += f"&cursor={cursor}"
@@ -274,4 +274,4 @@ def scan_epic_account(config, games_dict, worker_thread=None):
     report += f"{'='*80}"
     
     logging.info(report)
-    return changes_made
+    return changes_made, stats

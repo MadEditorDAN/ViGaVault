@@ -17,7 +17,7 @@ def scan_gog_account(config, games_dict, worker_thread=None):
     
     if not access_token:
         logging.error("[GOG.COM] No valid OAuth token found. Please reconnect your account in the Platform Manager.")
-        return False
+        return False, {}
     
     # WHY: Always refresh the token at the start of a scan to guarantee it hasn't expired.
     fresh_token = refresh_gog_token()
@@ -42,7 +42,7 @@ def scan_gog_account(config, games_dict, worker_thread=None):
         
         # WHY: Use the standard web library endpoint. It natively respects the gog-al session cookie and returns paginated data.
         while current_page <= total_pages:
-            if worker_thread and worker_thread.isInterruptionRequested(): return False
+            if worker_thread and worker_thread.isInterruptionRequested(): return False, {}
             
             url = f"https://www.gog.com/account/getFilteredProducts?mediaType=1&sortBy=title&page={current_page}"
             resp = requests.get(url, headers=headers, timeout=10)
@@ -50,7 +50,7 @@ def scan_gog_account(config, games_dict, worker_thread=None):
             content_type = resp.headers.get('Content-Type', '')
             if resp.status_code != 200 or 'application/json' not in content_type:
                 logging.error(f"[GOG.COM] Failed to fetch page {current_page}. Session might be expired.")
-                return False
+                return False, {}
                 
             data = resp.json()
             total_pages = data.get("totalPages", 1)
@@ -61,7 +61,7 @@ def scan_gog_account(config, games_dict, worker_thread=None):
             
     except Exception as e:
         logging.error(f"[GOG.COM] Error connecting to GOG: {e}")
-        return False
+        return False, {}
 
 
     # WHY: Pre-emptive Diffing. We isolate strictly new purchases to save API bandwidth and time.
@@ -108,7 +108,7 @@ def scan_gog_account(config, games_dict, worker_thread=None):
 
     if not new_ids:
         print_report()
-        return changes_made
+        return changes_made, stats
 
     for gog_id in new_ids:
         if worker_thread and worker_thread.isInterruptionRequested():
@@ -243,4 +243,4 @@ def scan_gog_account(config, games_dict, worker_thread=None):
         stats['new_added'] += 1
 
     print_report()
-    return changes_made
+    return changes_made, stats

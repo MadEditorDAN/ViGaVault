@@ -37,7 +37,7 @@ def test_steam_cookie_scraping_regex():
             config = {}
             
             # Execute the scanner
-            result = scan_steam_account(config, games_dict)
+            result, stats = scan_steam_account(config, games_dict)
             
             # Assertions
             mock_get.assert_called_once()
