@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed `TypeError` in `FullScanWorker` initialization during full scans by adding the missing `do_amazon` and `amazon_claims` parameters to the background thread constructor and dynamically feeding the retrieved cloud entries to the scanner engine.
 - Restored multi-year backward loop over GraphQL claims queries in the headless Amazon scanner, successfully retrieving complete multi-year claim catalogs and deduplicating records by item ID.
 - Re-architected scan startup logs to render the pre-scan checklist at the absolute beginning of full scans (on the main thread) before spawning any headless browser sessions.
+- Resolved "stuck redoing Page 1" UI confusion by modifying the year-loop progress messaging to only print page numbers for actual multi-page pagination lists.
+- Resolved redundant rescanning and duplication of existing Amazon games by implementing a clean UUID extractor `get_clean_amazon_id` to unify dot-prefixed cloud IDs with database GOG Galaxy formats.
 
 ## [1.2.0] - 2026-05-20
 ### Added

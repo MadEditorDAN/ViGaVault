@@ -7,6 +7,16 @@ import difflib
 from backend.game import Game
 from ViGaVault_utils import get_safe_filename
 
+def get_clean_amazon_id(raw_id):
+    """
+    WHY: Amazon GraphQL API returns prefixed IDs (e.g. 'amzn1.adg.product.UUID').
+    We extract the plain UUID portion to prevent re-scraping and maintain perfect compatibility 
+    with GOG Galaxy imports.
+    """
+    if not raw_id:
+        return ""
+    return raw_id.split('.')[-1].strip()
+
 def sync_amazon_database(config, games_dict, claims_list, worker_thread=None):
     logging.info(f"\n{' AMAZON SYNC ':=^80}")
     
@@ -37,7 +47,9 @@ def sync_amazon_database(config, games_dict, claims_list, worker_thread=None):
         for gid in gids:
             gid = gid.strip()
             if gid.startswith('amazon_'):
-                existing_amazon_set.add(gid.replace('amazon_', ''))
+                clean_id = get_clean_amazon_id(gid.replace('amazon_', ''))
+                if clean_id:
+                    existing_amazon_set.add(clean_id)
 
     changes_made = False
     
@@ -77,8 +89,10 @@ def sync_amazon_database(config, games_dict, claims_list, worker_thread=None):
         amazon_id = item.get('id')
         if not amazon_id: continue
         
+        clean_amazon_id = get_clean_amazon_id(amazon_id)
+        
         # Fast path skip
-        if amazon_id in existing_amazon_set:
+        if clean_amazon_id in existing_amazon_set:
             stats['already_in_db'] += 1
             continue
             
@@ -119,7 +133,7 @@ def sync_amazon_database(config, games_dict, claims_list, worker_thread=None):
         # Match found - Merge platforms and IDs
         if best_game and best_score >= threshold:
             current_ids = set(x.strip() for x in best_game.data.get('game_ID', '').split(',') if x.strip())
-            current_ids.add(f"amazon_{amazon_id}")
+            current_ids.add(f"amazon_{clean_amazon_id}")
             best_game.data['game_ID'] = ", ".join(sorted(list(current_ids)))
             
             p_set = set(x.strip() for x in best_game.data.get('Platforms', '').split(',') if x.strip())
@@ -134,17 +148,17 @@ def sync_amazon_database(config, games_dict, claims_list, worker_thread=None):
             
             stats['matched_smart'] += 1
             stats['merged_titles'].append(title_clean)
-            existing_amazon_set.add(amazon_id)  # Skip processing this game ID again if it is duplicated in pagination pages
+            existing_amazon_set.add(clean_amazon_id)  # Skip processing this game ID again if it is duplicated in pagination pages
             changes_made = True
             continue
             
         # No Match - Ingest as NEW Game
-        folder_name = get_safe_filename(title_clean) or f"Unknown Game [{amazon_id}]"
-        if folder_name in games_dict: folder_name = f"{title_clean} [{amazon_id}]"
+        folder_name = get_safe_filename(title_clean) or f"Unknown Game [{clean_amazon_id}]"
+        if folder_name in games_dict: folder_name = f"{title_clean} [{clean_amazon_id}]"
         
         game_obj = Game(config=config, Folder_Name=folder_name, Status_Flag='NEW', Path_Root='')
         game_obj.data['Clean_Title'] = title_clean
-        game_obj.data['game_ID'] = f"amazon_{amazon_id}"
+        game_obj.data['game_ID'] = f"amazon_{clean_amazon_id}"
         game_obj.data['Platforms'] = "Amazon"
         game_obj.data['Publisher'] = publisher
         game_obj.data['Summary'] = item_assets.get('description', '')
@@ -154,7 +168,7 @@ def sync_amazon_database(config, games_dict, claims_list, worker_thread=None):
             game_obj.data['Cover_URL'] = cover_url
             
         games_dict[folder_name] = game_obj
-        existing_amazon_set.add(amazon_id)  # Skip processing this game ID again if it is duplicated in pagination pages
+        existing_amazon_set.add(clean_amazon_id)  # Skip processing this game ID again if it is duplicated in pagination pages
         
         img_str = "Yes" if game_obj.data.get('Cover_URL') or game_obj.data.get('Image_Link') else "No "
         trl_str = "Yes" if game_obj.data.get('Trailer_Link') else "No "
@@ -168,7 +182,7 @@ def sync_amazon_database(config, games_dict, claims_list, worker_thread=None):
     # 4. GHOST DELETION LOGIC
     if not (worker_thread and worker_thread.isInterruptionRequested()):
         ghosts_to_delete = []
-        cloud_amazon_ids = set(c['item']['id'] for c in pc_games if c.get('item', {}).get('id'))
+        cloud_amazon_ids = set(get_clean_amazon_id(c['item']['id']) for c in pc_games if c.get('item', {}).get('id'))
         
         for folder_name, game in list(games_dict.items()):
             if not game.data.get('Path_Root'):
