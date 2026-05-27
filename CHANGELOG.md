@@ -7,13 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Integrated headless Prime Gaming & Luna GraphQL scanner on the main thread, with persistent browser sessions and automated title smart-merging under the Amazon platform tag.
+- Main-window-integrated Last Scan Log settings viewer, displaying monospace logs with auto-scaled fonts and direct settings transitions.
+- Consolidated global synchronization summary report at the end of the full library scans.
+- Enclosed the new Year filter in a styled, non-collapsible QGroupBox container with matching solid-grey button palette backgrounds.
+- Added All and None buttons aligned to the right side of the Year filter row.
 - SteamGridDB integration with automated API key extraction and an interactive manual cover picker dialog displaying alternative visual propositions.
 - Amazon Luna integration supporting multiple region selections and automated login token capture.
 - Standardized database date schema to YYYY-MM-DD with dynamic localization conversion for UI rendering.
 - Immediate list sorting reflow triggered in-memory upon editing game dates or titles.
 
 ### Changed
+- Swapped custom non-native cover import file selector for the native system Windows Explorer dialog in the metadata editor.
+- Removed legacy placeholder storefront checkboxes from the scan settings panel to maintain a clean, active-only storefront layout.
+- Restructured all storefront synchronization logs to return clean count-based metrics instead of spamming verbose game title list prints.
+- Refactored the Year filter in the sidebar to be a single-row layout displaying Year followed by a colon and the text input field, placed as the absolute first filter in the filters list.
+- Updated all collapsible filter group headers globally to use solid-grey button background styling, eliminating dark gap spaces.
+- Configured the All button of the Year filter to dynamically grey out when no year is typed, keeping the None button active and enabled by default.
 - Upgraded platform tagging system to cumulatively append local copy parenthesized platform tags rather than replacing existing storefront platforms.
+
+### Fixed
+- Fixed the Amazon storefront ghost checking logic by swapping from any() to all(), ensuring Galaxy-synced prefix patterns are immune to unlinking during scans.
+- Resolved disappearing dynamic filter checkboxes during sidebar resizing by dynamically balancing layout column stretches and performing layout reflow on startup.
 
 ## [1.2.0] - 2026-05-20
 ### Added
