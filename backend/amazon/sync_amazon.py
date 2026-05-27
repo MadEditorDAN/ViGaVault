@@ -18,7 +18,7 @@ def get_clean_amazon_id(raw_id):
     return raw_id.split('.')[-1].strip()
 
 def sync_amazon_database(config, games_dict, claims_list, worker_thread=None):
-    logging.info(f"\n{' AMAZON SYNC ':=^80}")
+    logging.info(f"\n{' AMAZON SCAN ':=^80}")
     
     # 1. Filter claims strictly for AMAZON_GAMES_APP (native PC games, matching the mobile scanner)
     pc_games = []
@@ -184,49 +184,51 @@ def sync_amazon_database(config, games_dict, claims_list, worker_thread=None):
         ghosts_to_delete = []
         cloud_amazon_ids = set(get_clean_amazon_id(c['item']['id']) for c in pc_games if c.get('item', {}).get('id'))
         
-        for folder_name, game in list(games_dict.items()):
-            if not game.data.get('Path_Root'):
-                # Absolute immunity for explicitly locked games
-                if game.data.get('Status_Flag') == 'LOCKED':
-                    continue
+        # Guard against wiping out local Amazon library cache if cloud catalog is empty due to transient scraper/network issues
+        if cloud_amazon_ids:
+            for folder_name, game in list(games_dict.items()):
+                if not game.data.get('Path_Root'):
+                    # Absolute immunity for explicitly locked games
+                    if game.data.get('Status_Flag') == 'LOCKED':
+                        continue
+                        
+                    game_ids = [x.strip() for x in game.data.get('game_ID', '').split(',') if x.strip()]
+                    amazon_ids = [gid.replace('amazon_', '') for gid in game_ids if gid.startswith('amazon_')]
                     
-                game_ids = [x.strip() for x in game.data.get('game_ID', '').split(',') if x.strip()]
-                amazon_ids = [gid.replace('amazon_', '') for gid in game_ids if gid.startswith('amazon_')]
-                
-                if not amazon_ids:
-                    continue
-                    
-                # Filter to native Amazon IDs (UUID format containing hyphens).
-                # GOG Galaxy imports Amazon games with numeric IDs (e.g. amazon_123456789) which should be ignored here
-                # so they are never deleted or unlinked by the native Amazon sync.
-                native_amazon_ids = [aid for aid in amazon_ids if '-' in aid]
-                 
-                if not native_amazon_ids:
-                    continue
+                    if not amazon_ids:
+                        continue
+                        
+                    # Filter to native Amazon IDs (UUID format containing hyphens).
+                    # GOG Galaxy imports Amazon games with numeric IDs (e.g. amazon_123456789) which should be ignored here
+                    # so they are never deleted or unlinked by the native Amazon sync.
+                    native_amazon_ids = [aid for aid in amazon_ids if '-' in aid]
                      
-                # If all native Amazon IDs are no longer in the cloud list
-                missing_all = all(aid not in cloud_amazon_ids for aid in native_amazon_ids)
-                if missing_all:
-                    other_ids = [gid for gid in game_ids if not gid.startswith('amazon_')]
-                    if not other_ids:
-                        ghosts_to_delete.append(folder_name)
-                    else:
-                        # Unlink Amazon platform ID & tag, preserving the rest of the game record
-                        game.data['game_ID'] = ", ".join(sorted(other_ids))
-                        p_set = set(x.strip() for x in game.data.get('Platforms', '').split(',') if x.strip())
-                        if 'Amazon' in p_set: p_set.remove('Amazon')
-                        game.data['Platforms'] = ", ".join(sorted(list(p_set)))
-                        action_title = f"Unlinked Amazon : {game.data.get('Clean_Title', folder_name)}"
-                        logging.info(f"|{action_title[:78]:<78}|")
-                        changes_made = True
+                    if not native_amazon_ids:
+                        continue
+                         
+                    # If all native Amazon IDs are no longer in the cloud list
+                    missing_all = all(aid not in cloud_amazon_ids for aid in native_amazon_ids)
+                    if missing_all:
+                        other_ids = [gid for gid in game_ids if not gid.startswith('amazon_')]
+                        if not other_ids:
+                            ghosts_to_delete.append(folder_name)
+                        else:
+                            # Unlink Amazon platform ID & tag, preserving the rest of the game record
+                            game.data['game_ID'] = ", ".join(sorted(other_ids))
+                            p_set = set(x.strip() for x in game.data.get('Platforms', '').split(',') if x.strip())
+                            if 'Amazon' in p_set: p_set.remove('Amazon')
+                            game.data['Platforms'] = ", ".join(sorted(list(p_set)))
+                            action_title = f"Unlinked Amazon : {game.data.get('Clean_Title', folder_name)}"
+                            logging.info(f"|{action_title[:78]:<78}|")
+                            changes_made = True
 
-        for folder in ghosts_to_delete:
-            action_title = f"Ghost Delete : {folder}"
-            logging.info(f"|{action_title[:78]:<78}|")
-            del games_dict[folder]
-            stats['deleted_ghosts'] += 1
-            stats['deleted_ghost_titles'].append(folder)
-            changes_made = True
+            for folder in ghosts_to_delete:
+                action_title = f"Ghost Delete : {folder}"
+                logging.info(f"|{action_title[:78]:<78}|")
+                del games_dict[folder]
+                stats['deleted_ghosts'] += 1
+                stats['deleted_ghost_titles'].append(folder)
+                changes_made = True
 
     report = f"{' REPORT ':=^80}\n"
     report += f"Total Cloud    : {stats['total_cloud']}\n"

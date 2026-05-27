@@ -129,8 +129,9 @@ class LibraryManager:
                 if steam_changes: self.save_db()
                 if worker_thread and worker_thread.isInterruptionRequested(): return
 
-            if do_amazon and amazon_claims:
-                amazon_changes, amazon_stats = sync_amazon_database(self.config, self.games, amazon_claims, worker_thread=worker_thread)
+            if do_amazon:
+                claims = amazon_claims if amazon_claims is not None else []
+                amazon_changes, amazon_stats = sync_amazon_database(self.config, self.games, claims, worker_thread=worker_thread)
                 if amazon_changes: self.save_db()
                 if worker_thread and worker_thread.isInterruptionRequested(): return
 

@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated all collapsible filter group headers globally to use solid-grey button background styling, eliminating dark gap spaces.
 - Configured the All button of the Year filter to dynamically grey out when no year is typed, keeping the None button active and enabled by default.
 - Upgraded platform tagging system to cumulatively append local copy parenthesized platform tags rather than replacing existing storefront platforms.
+- Aligned Amazon Luna scanning logs and report layout to perfectly match standard GOG and Epic formats, ensuring it always outputs a scan header and metrics report block even on empty fetches, and successfully integrates into the final consolidation breakdown and grand totals.
+- Added data-loss guard to Amazon ghost deletion logic, completely preventing the unlinking or deletion of local databases if a transient network/scraper issue returns an empty cloud catalog.
 
 ### Fixed
 - Fixed the Amazon storefront ghost checking logic by swapping from any() to all(), ensuring Galaxy-synced prefix patterns are immune to unlinking during scans.
