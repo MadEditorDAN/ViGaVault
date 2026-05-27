@@ -331,7 +331,7 @@ class LibraryManager:
             if images_only:
                 should_scrape = needs_cover_rescue
             else:
-                should_scrape = (status in ['NEW', 'NEEDS_ATTENTION', ''] or needs_cover_rescue)
+                should_scrape = (status in ['NEW', ''] or needs_cover_rescue)
                 
             if should_scrape:
                 action_taken = True
