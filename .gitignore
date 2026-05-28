@@ -23,6 +23,9 @@ DAN-todo.txt
 *.log
 *.csv
 *.spec
+*.bin
+*.dat
+*.vgv
 
 # Dossier VS Code
 .vscode/
