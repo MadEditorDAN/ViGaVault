@@ -464,8 +464,8 @@ class ScanController(QObject):
         self.mw.sidebar.btn_scan_settings.setEnabled(False)
         self.mw.sidebar.btn_full_scan.setEnabled(False)
         self.mw.sidebar.btn_full_scan.setText(translator.tr("sidebar_btn_scanning"))
-        self.mw.sidebar.btn_toggle_new.setEnabled(False)
-        self.mw.sidebar.btn_toggle_dlc.setEnabled(False)
+        if hasattr(self.mw.sidebar, 'combo_view_mode'):
+            self.mw.sidebar.combo_view_mode.setEnabled(False)
         self.mw.sidebar.chk_scan_galaxy.setEnabled(False)
         self.mw.sidebar.chk_scan_gog_web.setEnabled(False)
         self.mw.sidebar.chk_scan_epic.setEnabled(False)

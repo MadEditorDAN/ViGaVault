@@ -411,8 +411,8 @@ class Sidebar(QWidget):
         
         counts = [
             len(valid_df),
-            len(valid_df[~valid_df['Has_Image']]),
-            len(valid_df[valid_df['Trailer_Link'] == '']),
+            len(valid_df[~valid_df['Has_Image'].astype(str).str.lower().isin(['true', '1', 't'])]),
+            len(valid_df[valid_df['Trailer_Link'].fillna('') == '']),
             len(valid_df[valid_df['Status_Flag'].isin(['NEW', 'NEEDS_ATTENTION'])]),
             len(df[df['Is_DLC'] | df['Is_Excluded']])
         ]
@@ -513,11 +513,7 @@ class Sidebar(QWidget):
         self.findChild(QLabel, "sidebar_filters_label").setText(translator.tr("sidebar_filters_label"))
         # WHY: Retranslate the newly added 'Show :' label dynamically.
         self.lbl_show.setText(translator.tr("sidebar_lbl_show"))
-        self.btn_toggle_no_img.setText(translator.tr("sidebar_btn_toggle_no_img"))
-        self.btn_toggle_no_trl.setText(translator.tr("sidebar_btn_toggle_no_trl"))
-        self.btn_toggle_new.setText(translator.tr("sidebar_btn_toggle_new"))
-        self.btn_toggle_dlc.setText(translator.tr("sidebar_btn_toggle_dlc"))
-        self.btn_toggle_review.setText(translator.tr("sidebar_btn_toggle_review"))
+        self.update_view_mode_counts()
         self.btn_approve_review.setText(translator.tr("sidebar_btn_approve_review"))
         self.btn_scan_settings.setText(translator.tr("sidebar_btn_scan_settings"))
         self.findChild(QLabel, "scan_settings_title_lbl").setText(translator.tr("scan_settings_title"))

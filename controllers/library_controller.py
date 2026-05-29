@@ -69,12 +69,12 @@ class LibraryController(QObject):
         # under the "Show NEW" toggle umbrella so they don't become permanently invisible ghosts.
         has_new = 'NEW' in self.mw.master_df['Status_Flag'].values or 'NEEDS_ATTENTION' in self.mw.master_df['Status_Flag'].values
         has_dlc = self.mw.master_df['Is_DLC'].any() or self.mw.master_df['Is_Excluded'].any()
-        self.mw.sidebar.btn_toggle_new.setEnabled(has_new)
-        self.mw.sidebar.btn_toggle_dlc.setEnabled(has_dlc)
         
-        # Uncheck instantly if there are no more results to prevent a blank UI
-        if not has_new and self.mw.sidebar.btn_toggle_new.isChecked(): self.mw.sidebar.btn_toggle_new.setChecked(False)
-        if not has_dlc and self.mw.sidebar.btn_toggle_dlc.isChecked(): self.mw.sidebar.btn_toggle_dlc.setChecked(False)
+        combo = getattr(self.mw.sidebar, 'combo_view_mode', None)
+        if combo:
+            idx = combo.currentIndex()
+            if not has_new and idx == 3: combo.setCurrentIndex(0)
+            if not has_dlc and idx == 4: combo.setCurrentIndex(0)
 
     def update_library_info(self):
         lib_name = os.path.basename(get_db_path()).replace('.csv', '')
@@ -251,19 +251,23 @@ class LibraryController(QObject):
         self.mw.filter_controller.populate_dynamic_filters(saved_filters, saved_expansion)
 
         self.mw.sidebar.combo_sort.blockSignals(True)
-        self.mw.sidebar.btn_toggle_new.blockSignals(True)
-        self.mw.sidebar.btn_toggle_dlc.blockSignals(True)
+        if hasattr(self.mw.sidebar, 'combo_view_mode'):
+            self.mw.sidebar.combo_view_mode.blockSignals(True)
+            if lib_settings.get("viewDlc", False):
+                self.mw.sidebar.combo_view_mode.setCurrentIndex(4)
+            elif lib_settings.get("viewNew", False):
+                self.mw.sidebar.combo_view_mode.setCurrentIndex(3)
+            else:
+                self.mw.sidebar.combo_view_mode.setCurrentIndex(0)
 
         self.mw.sort_desc = lib_settings.get("sortDesc", True)
         self.mw.sidebar.combo_sort.setCurrentIndex(lib_settings.get("sortIndex", 0))
         self.mw.sidebar.search_bar.setText(lib_settings.get("searchText", ""))
-        self.mw.sidebar.btn_toggle_new.setChecked(lib_settings.get("viewNew", False))
-        self.mw.sidebar.btn_toggle_dlc.setChecked(lib_settings.get("viewDlc", False))
         self.mw.sidebar.update_sort_button(self.mw.sort_desc)
 
         self.mw.sidebar.combo_sort.blockSignals(False)
-        self.mw.sidebar.btn_toggle_new.blockSignals(False)
-        self.mw.sidebar.btn_toggle_dlc.blockSignals(False)
+        if hasattr(self.mw.sidebar, 'combo_view_mode'):
+            self.mw.sidebar.combo_view_mode.blockSignals(False)
         self.update_status_checkboxes_state()
 
         self.update_library_info()
