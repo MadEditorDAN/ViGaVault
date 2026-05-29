@@ -9,13 +9,15 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QWidget, QGrou
                                QCheckBox, QLineEdit, QTextEdit, QLabel, QPushButton, QFileDialog, 
                                QMessageBox, QApplication)
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QPixmap, QDesktopServices
 
 from backend.library import LibraryManager
 from ViGaVault_utils import BASE_DIR, get_image_path, build_scanner_config, translator, get_safe_filename, DIALOG_STD_SIZE, center_window
 
 # WHY: Use a relative import to access the Merge tool from within the same package safely.
 from .merge_tool_dialogs import MergeSelectionDialog
+from .trailer_search_dialog import TrailerSearchDialog
 
 class ActionDialog(QDialog):
     def __init__(self, title, data, parent=None):
@@ -141,6 +143,11 @@ class ActionDialog(QDialog):
         self.url_line_edit = QLineEdit()
         self.url_line_edit.textEdited.connect(self.on_field_edited)
         url_layout.addWidget(self.url_line_edit, 1)
+        
+        btn_import = QPushButton("Import")
+        btn_import.clicked.connect(self.search_youtube_trailer)
+        url_layout.addWidget(btn_import)
+        
         copy_btn = QPushButton(translator.tr("dialog_edit_trailer_copy_btn"))
         copy_btn.clicked.connect(self.copy_trailer_url)
         url_layout.addWidget(copy_btn)
@@ -338,7 +345,7 @@ class ActionDialog(QDialog):
             logging.info(f"URL copied to clipboard: {self.trailer_link}")
 
     def setup_trailer_section(self):
-        self.trailer_link = self.original_data.get('Trailer_Link', '')
+        self.trailer_link = self.url_line_edit.text() if self.url_line_edit.text() else self.original_data.get('Trailer_Link', '')
         self.url_line_edit.setText(self.trailer_link)
 
         if not self.trailer_link or not self.trailer_link.startswith('http'):
@@ -379,8 +386,20 @@ class ActionDialog(QDialog):
             self.trailer_thumbnail_label.setStyleSheet("border: 1px solid #555;")
 
     def play_trailer(self):
-        if not self.trailer_link: return
-        webbrowser.open(self.trailer_link, new=1)
+        url = self.url_line_edit.text().strip()
+        if url:
+            QDesktopServices.openUrl(QUrl(url))
+            
+    def search_youtube_trailer(self):
+        game_title = self.original_data.get('Title', 'Unknown')
+        dialog = TrailerSearchDialog(game_title, self)
+        if dialog.exec():
+            selected_url = dialog.get_selected_url()
+            if selected_url:
+                self.url_line_edit.setText(selected_url)
+                self.updated_data['Trailer_Link'] = selected_url
+                self.setup_trailer_section()
+                self.on_field_edited()
 
     def get_data(self):
         new_data = {}
