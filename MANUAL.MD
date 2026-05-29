@@ -25,7 +25,7 @@ where to look for your games.
 Connecting Your Platforms:
 --------------------------
 Navigate to the Platform Manager in the settings. Currently, ViGaVault 
-supports four active integrations (with others marked as "coming soon").
+supports five active integrations (with others marked as "coming soon").
 
 IGDB (Required for Metadata): Before anything else, input your IGDB/Twitch 
 Developer Client ID and Secret. This "Bring Your Own Key" (BYOK) system is 
@@ -43,6 +43,12 @@ Steam: Steam uses an embedded secure browser architecture. You log into Steam
 natively via a pop-up window, bypassing CAPTCHAs and Steam Guard 2FA. Once logged 
 in, a background "ghost script" silently extracts your secure session cookies to 
 safely sync your digital library without exposing your credentials.
+
+Amazon Games (Prime Gaming & Luna): ViGaVault includes a headless GraphQL 
+scanner that automatically logs in to your Amazon account (after an initial 
+session setup via the secure embedded browser) and dynamically crawls your 
+Prime Gaming and Luna libraries, flawlessly fetching years of claims and 
+merging them under the Amazon platform tag.
 
 GOG Galaxy (Local): If you use GOG Galaxy on your PC, ViGaVault can 
 automatically parse its local database to instantly import your existing 
@@ -72,7 +78,10 @@ Folder Names: ViGaVault cleans up folder names automatically
 Auto-Tagging Rules: You can configure ViGaVault to read specific tags in your 
 folder names or structures. For example, if you organize your hard drive like 
 D:\Games\RPGs\, you can set a rule so that any game scanned inside that folder
-automatically receives the "RPG" Genre tag.
+automatically receives the "RPG" Genre tag. You can also explicitly type in 
+Custom Values. The scanner applies a universal user-casing override: if you 
+type a Genre or Collection in ALL CAPS, it will stay in ALL CAPS, overriding 
+any default metadata casing from IGDB.
 
 Global Filters: You can tell the scanner to ignore hidden folders or specific 
 keywords so it doesn't accidentally scan internal application data or backup 
@@ -89,8 +98,8 @@ Understanding Scan Settings:
 Before clicking "Start Scan," you can toggle exactly what you want ViGaVault 
 to look for.
 
-- Galaxy Sync / GOG / Epic / Steam: Toggle these ON to fetch your latest 
-digital purchases from the cloud.
+- Galaxy Sync / Amazon / GOG / Epic / Steam: Toggle these ON to fetch your 
+latest digital purchases from the cloud.
 
 - Local Folders: Toggle ON to scan your physical hard drives for new local 
 copies. You can scan all folders or target specific ones.
@@ -147,6 +156,14 @@ to simply "Witcher 3"). ViGaVault will query IGDB with your custom term,
 allowing you to select the correct match and instantly backfill the missing 
 data and images.
 
+Manual Cover Picker (SteamGridDB):
+----------------------------------
+If IGDB returns a cover that you don't like, or if it doesn't have a cover at 
+all, you can click the cover image in the Edit Dialog to open the interactive 
+SteamGridDB cover picker. This tool instantly presents you with dozens of 
+alternative, high-quality, fan-made covers. Select the one you like, and 
+ViGaVault will download and apply it instantly!
+
 -------------------------------------------------------------------------------
 6. Batch Edit or Delete Games
 -------------------------------------------------------------------------------
@@ -191,7 +208,8 @@ Missing Media Check: The app continually tracks the physical status of your
 images. If you accidentally delete a cover from your hard drive, ViGaVault 
 detects it.
 
-Manual Overrides: Don't like the official poster? You can manually point 
+Manual Overrides: Don't like the official poster? You can use the built-in 
+SteamGridDB integration to fetch fan-made covers, or you can manually point 
 ViGaVault to a custom .jpg, .png, or .webp file on your computer to use as the cover.
 You can also use the inline "Edit" (gear) icon in the Media Manager to instantly
 open the Edit Dialog for any specific game.
@@ -203,6 +221,17 @@ Trailers: ViGaVault stores links to YouTube trailers or online mp4 files,
 allowing you to play rich media directly from the game's detail page. If the 
 automatic scraper misses a trailer, you can paste a YouTube link directly into
 the Media Manager to link it.
+
+-------------------------------------------------------------------------------
+8. Backup & Restore
+-------------------------------------------------------------------------------
+ViGaVault utilizes a highly-compressed, AES-256 encrypted `.vgv` archive format 
+for seamlessly backing up and restoring your database, settings, and native 
+image assets. 
+
+You can generate a backup at any time from the Main Menu. The backup file is 
+automatically named after your current database and contains absolutely 
+everything you need to completely restore your library on a brand new PC.
 
 -------------------------------------------------------------------------------
             __  __             _  ______     _  _  _                 

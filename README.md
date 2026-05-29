@@ -24,13 +24,13 @@ To run the application:
 
 ## What It Can Do (Current Features)
 
-*   Multi-Platform Aggregation: Natively scans and merges libraries from Steam, GOG.com, Epic Games Store, and the local GOG Galaxy database.
-*   Intelligent Local File Scanner: Advanced local folder scanning with customizable, per-folder rules. Automatically injects metadata (Genres, Collections, Years) based on your physical folder structure.
+*   Multi-Platform Aggregation: Natively scans and merges libraries from Steam, GOG.com, Epic Games Store, Amazon Games (Prime Gaming & Luna), and the local GOG Galaxy database.
+*   Intelligent Local File Scanner: Advanced local folder scanning with customizable, per-folder rules. Automatically injects metadata (Genres, Collections, Years) based on your physical folder structure, with universal user-casing overrides to ensure your exact formatting is preserved.
 *   Automated Deduplication & Merging: Employs a fuzzy-logic matching engine (`difflib`) to intelligently identify the same game across different platforms, merging them into a single definitive entry with combined platform tags.
 *   Rich Metadata Scraping: Integrates with the IGDB API (via your own developer key) to automatically backfill missing developers, publishers, release dates, summaries, and high-quality vertical cover art for your entire library.
 *   Advanced Scoring Algorithm: The IGDB scraper uses a tiered, weighted scoring algorithm with a strict 80% minimum confidence threshold to find the best metadata match. It intelligently recovers from failed searches by stripping modifiers like 'remake', and prioritizes Name, Release Year, and Developer/Publisher to ensure extreme accuracy, using media availability purely as a tie-breaker.
-*   Media & Trailer Management: Automatically downloads and caches cover images locally for offline viewing. Extracts and plays YouTube or MP4 trailers directly from the application. A dedicated Media Manager allows for manual import and repair of missing assets.
-*   Dynamic Filtering & Search: Filter massive libraries instantly using Excel-style multi-select dropdowns (by Genre, Platform, Publisher, etc.) that dynamically populate based on your library's content. The search bar supports targeting specific fields like Developer or Summary.
+*   Media & Trailer Management: Automatically downloads and caches cover images locally for offline viewing. Extracts and plays YouTube or MP4 trailers directly from the application. Integrates with SteamGridDB for an interactive manual cover picker, alongside a dedicated Media Manager for repairing missing assets.
+*   Dynamic Filtering & Search: Filter massive libraries instantly using Excel-style multi-select dropdowns (by Genre, Platform, Publisher, Year, etc.) that dynamically populate based on your library's content. The search bar supports targeting specific fields like Developer or Summary. All filtering is strictly case-insensitive for smooth operation.
 *   Batch Operations & Data Integrity: A dedicated Game Manager for batch editing metadata, batch deleting games, and managing custom exclusion lists via a dedicated "Hidden" toggle. A built-in file verification tool detects and corrects discrepancies between your database and physical disk.
 *   Zero-Trust Security: All local libraries (`.dat`), configuration files (`.bin`), and authentication sessions are secured with AES symmetric encryption to protect your data.
 *   Advanced Modular Backups: Replaces legacy exports with a highly-compressed, AES-256 encrypted `.vgv` archive format for seamlessly backing up and restoring your database, settings, and native image assets (including WebP support).
@@ -45,7 +45,7 @@ To run the application:
 ViGaVault is built on Python using the PySide6 (Qt) framework for a responsive, multi-threaded GUI, and Pandas for lightning-fast in-memory data manipulation.
 
 1.  Authentication (Embedded Browser & OAuth2): For maximum security and stability, ViGaVault uses a "Bring Your Own Key" model for IGDB. For Steam, it embeds a secure native browser to handle CAPTCHAs and 2FA before silently extracting the API key. For GOG and Epic, it uses a secure OAuth2 flow with automatic token refresh, ensuring you only have to log in once.
-2.  Scanning & Parsing: Background threads (`QThread`) orchestrate all data fetching to keep the UI 100% responsive. It uses a mix of official RESTful APIs (Epic, GOG, Steam) and local SQLite database parsing (GOG Galaxy) to pull ownership data.
+2.  Scanning & Parsing: Background threads (`QThread`) orchestrate all data fetching to keep the UI 100% responsive. It uses a mix of official RESTful APIs (Epic, GOG, Steam), headless GraphQL web scrapers (Amazon), and local SQLite database parsing (GOG Galaxy) to pull ownership data.
 3.  Data Enrichment: Games are initially flagged as `NEW`. A background Scrapper engine then queries IGDB, utilizing the tiered scoring algorithm to find the perfect metadata match before promoting the game status to `OK`. A circuit-breaker pattern prevents infinite loops on games with no available data.
 4.  Local Storage: Your entire library is securely saved to an AES-encrypted `VGVDB.dat` file for absolute security, while preserving lightning-fast in-memory Pandas performance. All application and library-specific settings are stored in encrypted `.bin` files. A dedicated Backup & Restore UI creates highly-compressed `.vgv` archives to permanently safeguard your collection.
 
@@ -55,7 +55,7 @@ ViGaVault is built on Python using the PySide6 (Qt) framework for a responsive, 
 
 ViGaVault is actively evolving. Key planned features include:
 
-*   Expanded Storefront Integrations: Implementing native scanners for additional platforms currently stubbed in the UI, such as Amazon Games, Ubisoft Connect (Uplay), Battle.net, and the EA App.
+*   Expanded Storefront Integrations: Implementing native scanners for additional platforms currently stubbed in the UI, such as Ubisoft Connect (Uplay), Battle.net, and the EA App.
 *   Mobile Version: The Android version is coming soon...
 
 ---
