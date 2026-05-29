@@ -441,9 +441,9 @@ class Sidebar(QWidget):
         valid_df = df[valid_mask]
         
         counts = [
-            len(valid_df),
+            len(valid_df[valid_df['Status_Flag'].isin(['OK', 'LOCKED'])]),
             len(valid_df[~valid_df['Has_Image'].astype(str).str.lower().isin(['true', '1', 't'])]),
-            len(valid_df[valid_df['Trailer_Link'].fillna('') == '']),
+            len(valid_df[~valid_df['Trailer_Link'].astype(str).str.startswith('http', na=False)]),
             len(valid_df[valid_df['Status_Flag'].isin(['NEW', 'NEEDS_ATTENTION'])]),
             len(df[df['Is_DLC'] | df['Is_Excluded']])
         ]
