@@ -15,26 +15,26 @@ class RightAlignedNumberDelegate(QStyledItemDelegate):
         self.initStyleOption(option, index)
         painter.save()
         
-        text = option.text
         option.text = ""  # Prevent default text rendering by the style
         
         style = option.widget.style() if option.widget else None
         if style:
             style.drawControl(QStyle.CE_ItemViewItem, option, painter, option.widget)
+        label = index.data(Qt.DisplayRole)
+        count_val = index.data(Qt.UserRole)
         
-        if text and " (" in text and text.endswith(")"):
-            label, count_part = text.rsplit(" (", 1)
-            count_part = "(" + count_part
+        if count_val is not None:
+            count_part = f"({count_val})"
             
             rect_left = option.rect.adjusted(5, 0, 0, 0)
-            painter.drawText(rect_left, Qt.AlignLeft | Qt.AlignVCenter, label)
+            painter.drawText(rect_left, Qt.AlignLeft | Qt.AlignVCenter, str(label))
             
             rect_right = option.rect.adjusted(0, 0, -5, 0)
             painter.drawText(rect_right, Qt.AlignRight | Qt.AlignVCenter, count_part)
         else:
-            if text:
+            if label:
                 rect = option.rect.adjusted(5, 0, 0, 0)
-                painter.drawText(rect, Qt.AlignLeft | Qt.AlignVCenter, text)
+                painter.drawText(rect, Qt.AlignLeft | Qt.AlignVCenter, str(label))
             
         painter.restore()
 
@@ -457,7 +457,8 @@ class Sidebar(QWidget):
         ]
         
         for i in range(5):
-            self.combo_view_mode.setItemText(i, f"{labels[i]} ({counts[i]})")
+            self.combo_view_mode.setItemText(i, labels[i])
+            self.combo_view_mode.setItemData(i, counts[i], Qt.UserRole)
             
     def adjust_scan_log_font(self):
         """WHY: Dynamically calculates the perfect pixel size required to fit exactly 80 monospace characters in the list width."""
