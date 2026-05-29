@@ -407,11 +407,11 @@ class GameManagerDialog(QDialog):
         ex_layout.addWidget(self.btn_save_exclusions)
         
         ex_layout.addStretch()
-        self.btn_batch_ok = QPushButton(translator.tr("game_manager_btn_batch_ok"))
-        self.btn_batch_ok.clicked.connect(self.request_batch_ok)
-        self.btn_batch_ok.setEnabled(False)
+        self.btn_cleanup_images = QPushButton(translator.tr("game_manager_btn_cleanup_images"))
+        self.btn_cleanup_images.clicked.connect(self.cleanup_images)
+        self.btn_cleanup_images.setEnabled(True)
 
-        ex_layout.addWidget(self.btn_batch_ok)
+        ex_layout.addWidget(self.btn_cleanup_images)
         
         layout.addWidget(ex_group)
         
@@ -635,13 +635,37 @@ class GameManagerDialog(QDialog):
         
         QMessageBox.information(self, "Done", "Batch Media Sync completed!")
 
-    def request_batch_ok(self):
-        selected_folders = self.get_selected_folders()
-        if not selected_folders: return
+    def cleanup_images(self):
+        from ViGaVault_utils import get_image_path
+        import os
+        import shutil
         
-        if hasattr(self.parent_window, 'game_operations_controller'):
-            self.parent_window.game_operations_controller.batch_update_games(selected_folders, {'Status_Flag': 'OK'})
-            self.load_data()
+        img_dir = get_image_path()
+        if not os.path.exists(img_dir):
+            QMessageBox.information(self, "Clean-Up", "Images directory not found.")
+            return
+            
+        orphan_dir = os.path.join(img_dir, "_orphan")
+        os.makedirs(orphan_dir, exist_ok=True)
+        
+        active_images = set(self.parent_window.master_df['Image_Link'].dropna().astype(str))
+        active_images = {os.path.basename(img) for img in active_images if img.strip()}
+        
+        moved_count = 0
+        for filename in os.listdir(img_dir):
+            if filename.lower() == "_orphan": continue
+            if not filename.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')): continue
+            
+            if filename not in active_images:
+                src = os.path.join(img_dir, filename)
+                dst = os.path.join(orphan_dir, filename)
+                try:
+                    shutil.move(src, dst)
+                    moved_count += 1
+                except Exception as e:
+                    print(f"Failed to move {filename}: {e}")
+                    
+        QMessageBox.information(self, "Clean-Up Complete", f"Moved {moved_count} unused images to the _orphan folder.")
 
     def load_exclusions(self):
         lib_settings_file = get_library_settings_file()
@@ -678,7 +702,7 @@ class GameManagerDialog(QDialog):
             self.btn_batch_edit.setEnabled(has_selection)
             self.btn_batch_delete.setEnabled(has_selection)
             if hasattr(self, 'btn_batch_sync'): self.btn_batch_sync.setEnabled(has_selection)
-            if hasattr(self, 'btn_batch_ok'): self.btn_batch_ok.setEnabled(has_selection)
+            pass
             
             # WHY: Smart Refresh - Synchronize the master "Select All" checkbox state based on the actual table data. 
             # Signals are blocked to prevent triggering an accidental cascade that overwrites the user's manual selections.

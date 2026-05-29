@@ -253,7 +253,7 @@
     "msg_steam_instructions": "1. Go to <a href='https://steamcommunity.com/dev/apikey'><span style='color: #2196F3;'>Steam API Key Page</span></a> to get your API Key.<br>Steam will ask for a domain, enter : <b>vigavault.app</b><br>And confirm using Steam Guard.<br>2. Enter your Steam API Key and your <b>Steam Profile URL</b> below.<br>3. Ensure your Steam Profile 'Game Details' privacy setting is set to <b>Public</b>.",
     "msg_steam_invalid_keys": "Invalid Steam Web API Key or Profile URL, or your Game Details are not set to Public.",
     "dialog_edit_status_ok": "Status: OK",
-    "game_manager_btn_batch_ok": "Mark Selected OK",
+    "game_manager_btn_cleanup_images": "Clean-Up Images Folder",
     "sidebar_btn_toggle_no_img": "No Image",
     "sidebar_btn_toggle_no_trl": "No Trailer",
     "dialog_sgdb_title": "Select SteamGridDB Cover",

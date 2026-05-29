@@ -252,7 +252,7 @@
     "msg_steam_instructions": "1. Allez sur la <a href='https://steamcommunity.com/dev/apikey'><span style='color: #2196F3;'>Page Clé API Steam</span></a> pour obtenir votre clé.<br>Steam vous demandera un domaine, entrez : <b>vigavault.app</b><br>Et confirmez avec Steam Guard.<br>2. Entrez votre clé API Steam et l'<b>URL de votre Profil Steam</b> ci-dessous.<br>3. Assurez-vous que la confidentialité des 'Détails des jeux' de votre profil Steam est définie sur <b>Public</b>.",
     "msg_steam_invalid_keys": "Clé API Steam ou URL de Profil invalide, ou vos détails de jeu ne sont pas définis sur Public.",
     "dialog_edit_status_ok": "Statut : OK",
-    "game_manager_btn_batch_ok": "Marquer la sélection OK",
+    "game_manager_btn_cleanup_images": "Nettoyer le dossier Images",
     "sidebar_btn_toggle_no_img": "Sans Image",
     "sidebar_btn_toggle_no_trl": "Sans Trailer",
     "dialog_sgdb_title": "Sélectionner une couverture SteamGridDB",
