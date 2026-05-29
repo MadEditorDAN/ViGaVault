@@ -15,11 +15,13 @@ class RightAlignedNumberDelegate(QStyledItemDelegate):
         self.initStyleOption(option, index)
         painter.save()
         
+        text = option.text
+        option.text = ""  # Prevent default text rendering by the style
+        
         style = option.widget.style() if option.widget else None
         if style:
             style.drawControl(QStyle.CE_ItemViewItem, option, painter, option.widget)
         
-        text = index.data(Qt.DisplayRole)
         if text and " (" in text and text.endswith(")"):
             label, count_part = text.rsplit(" (", 1)
             count_part = "(" + count_part
