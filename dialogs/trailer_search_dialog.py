@@ -1,6 +1,7 @@
 import json
 import subprocess
 import requests
+import sys
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QGridLayout, QLabel, QPushButton, 
     QWidget, QCheckBox, QHBoxLayout, QMessageBox, QProgressDialog, QScrollArea
@@ -23,7 +24,8 @@ class TrailerSearchWorker(QThread):
         try:
             # Fetch 18 results to allow multiple pages
             command = [
-                'yt-dlp', 
+                sys.executable,
+                '-m', 'yt_dlp', 
                 f'ytsearch18:{self.query} trailer', 
                 '--dump-json', 
                 '--no-playlist', 
