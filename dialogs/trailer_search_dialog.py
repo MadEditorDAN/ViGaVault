@@ -22,11 +22,14 @@ class TrailerSearchWorker(QThread):
 
     def run(self):
         try:
+            query = self.query
+            if not query.lower().endswith("trailer"):
+                query += " trailer"
             # Fetch 18 results to allow multiple pages
             command = [
                 sys.executable,
                 '-m', 'yt_dlp', 
-                f'ytsearch18:{self.query} trailer', 
+                f'ytsearch18:{query}', 
                 '--dump-json', 
                 '--no-playlist', 
                 '--flat-playlist'
@@ -172,7 +175,19 @@ class TrailerSearchDialog(QDialog):
         
         main_layout = QVBoxLayout(self)
         
-        self.lbl_status = QLabel(f"Searching YouTube for '{self.game_title}'...")
+        search_layout = QHBoxLayout()
+        search_layout.addWidget(QLabel("Search Query:"))
+        self.txt_search = QLineEdit(f"{self.game_title} trailer")
+        self.txt_search.textChanged.connect(self.on_search_text_changed)
+        search_layout.addWidget(self.txt_search, 1)
+        
+        self.btn_search = QPushButton("Search")
+        self.btn_search.setEnabled(False)
+        self.btn_search.clicked.connect(self.start_manual_search)
+        search_layout.addWidget(self.btn_search)
+        main_layout.addLayout(search_layout)
+        
+        self.lbl_status = QLabel("Initializing search...")
         self.lbl_status.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(self.lbl_status)
         
@@ -200,10 +215,24 @@ class TrailerSearchDialog(QDialog):
         
         main_layout.addLayout(btn_layout)
         
-        self.start_search()
+        self.start_manual_search()
 
-    def start_search(self):
-        self.worker = TrailerSearchWorker(self.game_title)
+    def on_search_text_changed(self, text):
+        self.btn_search.setEnabled(True)
+
+    def start_manual_search(self):
+        self.btn_search.setEnabled(False)
+        self.lbl_status.show()
+        self.lbl_status.setText(f"Searching YouTube for '{self.txt_search.text()}'...")
+        
+        while self.grid_layout.count():
+            item = self.grid_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        self.cards.clear()
+        self.current_page = 0
+        
+        self.worker = TrailerSearchWorker(self.txt_search.text())
         self.worker.finished.connect(self.on_search_finished)
         self.worker.error.connect(self.on_search_error)
         self.worker.start()

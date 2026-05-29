@@ -253,12 +253,7 @@ class LibraryController(QObject):
         self.mw.sidebar.combo_sort.blockSignals(True)
         if hasattr(self.mw.sidebar, 'combo_view_mode'):
             self.mw.sidebar.combo_view_mode.blockSignals(True)
-            if lib_settings.get("viewDlc", False):
-                self.mw.sidebar.combo_view_mode.setCurrentIndex(4)
-            elif lib_settings.get("viewNew", False):
-                self.mw.sidebar.combo_view_mode.setCurrentIndex(3)
-            else:
-                self.mw.sidebar.combo_view_mode.setCurrentIndex(0)
+            self.mw.sidebar.combo_view_mode.setCurrentIndex(lib_settings.get("viewIndex", 0))
 
         self.mw.sort_desc = lib_settings.get("sortDesc", True)
         self.mw.sidebar.combo_sort.setCurrentIndex(lib_settings.get("sortIndex", 0))
