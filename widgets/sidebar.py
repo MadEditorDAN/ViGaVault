@@ -1,12 +1,40 @@
 # WHY: Single Responsibility Principle - Strictly handles the layout and logic of the right-hand control panel.
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, 
                              QPushButton, QFrame, QSizePolicy, QCheckBox, 
-                             QLineEdit, QComboBox, QListWidget, QToolButton, QMenu, QGroupBox)
+                             QLineEdit, QComboBox, QListWidget, QToolButton, QMenu, QGroupBox,
+                             QStyledItemDelegate, QStyle)
+from PySide6.QtGui import QFont, QFontMetrics, QPainter
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QFont, QFontMetrics
 
 from ViGaVault_utils import translator
 from .custom_inputs import CollapsibleFilterGroup
+
+class RightAlignedNumberDelegate(QStyledItemDelegate):
+    def paint(self, painter, option, index):
+        self.initStyleOption(option, index)
+        painter.save()
+        
+        style = option.widget.style() if option.widget else None
+        if style:
+            style.drawControl(QStyle.CE_ItemViewItem, option, painter, option.widget)
+        
+        text = index.data(Qt.DisplayRole)
+        if text and " (" in text and text.endswith(")"):
+            label, count_part = text.rsplit(" (", 1)
+            count_part = "(" + count_part
+            
+            rect_left = option.rect.adjusted(5, 0, 0, 0)
+            painter.drawText(rect_left, Qt.AlignLeft | Qt.AlignVCenter, label)
+            
+            rect_right = option.rect.adjusted(0, 0, -5, 0)
+            painter.drawText(rect_right, Qt.AlignRight | Qt.AlignVCenter, count_part)
+        else:
+            if text:
+                rect = option.rect.adjusted(5, 0, 0, 0)
+                painter.drawText(rect, Qt.AlignLeft | Qt.AlignVCenter, text)
+            
+        painter.restore()
 
 # The right-hand sidebar containing Counters, Search, Sort, Filters, and the Scan Panel.
 class Sidebar(QWidget):
@@ -157,6 +185,7 @@ class Sidebar(QWidget):
         ])
         self.combo_view_mode.setCursor(Qt.PointingHandCursor)
         self.combo_view_mode.setMinimumWidth(160)
+        self.combo_view_mode.setItemDelegate(RightAlignedNumberDelegate(self.combo_view_mode))
         self.combo_view_mode.currentIndexChanged.connect(lambda index: self.parent.request_filter_update())
         
         filters_header_layout.addWidget(self.combo_view_mode)
