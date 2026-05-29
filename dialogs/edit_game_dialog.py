@@ -230,7 +230,7 @@ class ActionDialog(QDialog):
             self.btn_view_image.setEnabled(False)
 
     def select_new_image(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select Image", "", "Image Files (*.png *.jpg *.jpeg *.webp)", options=QFileDialog.DontUseNativeDialog)
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select Image", "", "Image Files (*.png *.jpg *.jpeg *.webp)")
         if not file_path: return
         safe_filename_base = get_safe_filename(self.original_data.get('Folder_Name', ''))
         _, ext = os.path.splitext(file_path)
@@ -241,7 +241,8 @@ class ActionDialog(QDialog):
         dest_path = os.path.join(dest_dir, new_filename)
         try:
             os.makedirs(dest_dir, exist_ok=True)
-            shutil.copy(file_path, dest_path)
+            if os.path.abspath(file_path) != os.path.abspath(dest_path):
+                shutil.copy(file_path, dest_path)
             self.updated_data['Image_Link'] = new_filename
             self.updated_data['Has_Image'] = True
             self.update_cover_display()

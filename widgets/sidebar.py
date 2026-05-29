@@ -147,27 +147,18 @@ class Sidebar(QWidget):
         filters_header_layout.addWidget(self.lbl_show)
 
         # --- MUTUAL EXCLUSIVE VIEW TOGGLES ---
-        self.btn_toggle_no_img = QPushButton(translator.tr("sidebar_btn_toggle_no_img"))
-        self.btn_toggle_no_trl = QPushButton(translator.tr("sidebar_btn_toggle_no_trl"))
-        self.btn_toggle_new = QPushButton(translator.tr("sidebar_btn_toggle_new"))
-        self.btn_toggle_dlc = QPushButton(translator.tr("sidebar_btn_toggle_dlc"))
+        self.combo_view_mode = QComboBox()
+        self.combo_view_mode.addItems([
+            "Game Catalog",
+            translator.tr("sidebar_btn_toggle_no_img"),
+            translator.tr("sidebar_btn_toggle_no_trl"),
+            translator.tr("sidebar_btn_toggle_new"),
+            translator.tr("sidebar_btn_toggle_dlc")
+        ])
+        self.combo_view_mode.setCursor(Qt.PointingHandCursor)
+        self.combo_view_mode.currentIndexChanged.connect(lambda index: self.parent.request_filter_update())
         
-        toggle_style = """
-            QPushButton { padding: 4px 8px; border: 1px solid palette(dark); border-radius: 4px; background-color: palette(button); }
-            QPushButton:checked { background-color: palette(highlight); color: palette(highlighted-text); font-weight: bold; }
-        """
-        
-        for btn in [self.btn_toggle_no_img, self.btn_toggle_no_trl, self.btn_toggle_new, self.btn_toggle_dlc]:
-            btn.setCheckable(True)
-            btn.setStyleSheet(toggle_style)
-            btn.setCursor(Qt.PointingHandCursor)
-            filters_header_layout.addWidget(btn)
-            
-        # WHY: Handled manually instead of QButtonGroup so the user can easily un-toggle everything to revert to the default safe view.
-        self.btn_toggle_no_img.toggled.connect(lambda checked: self.handle_view_toggle(self.btn_toggle_no_img, checked))
-        self.btn_toggle_no_trl.toggled.connect(lambda checked: self.handle_view_toggle(self.btn_toggle_no_trl, checked))
-        self.btn_toggle_new.toggled.connect(lambda checked: self.handle_view_toggle(self.btn_toggle_new, checked))
-        self.btn_toggle_dlc.toggled.connect(lambda checked: self.handle_view_toggle(self.btn_toggle_dlc, checked))
+        filters_header_layout.addWidget(self.combo_view_mode)
 
         filters_frame_layout.addLayout(filters_header_layout)
 
@@ -410,14 +401,6 @@ class Sidebar(QWidget):
                 col = 0
                 row += 1
 
-    def handle_view_toggle(self, toggled_btn, checked):
-        if checked:
-            for btn in [self.btn_toggle_no_img, self.btn_toggle_no_trl, self.btn_toggle_new, self.btn_toggle_dlc]:
-                if btn != toggled_btn:
-                    btn.blockSignals(True)
-                    btn.setChecked(False)
-                    btn.blockSignals(False)
-        self.parent.request_filter_update()
 
     def adjust_scan_log_font(self):
         """WHY: Dynamically calculates the perfect pixel size required to fit exactly 80 monospace characters in the list width."""

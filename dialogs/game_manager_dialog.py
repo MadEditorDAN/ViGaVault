@@ -654,10 +654,12 @@ class GameManagerDialog(QDialog):
         moved_count = 0
         for filename in os.listdir(img_dir):
             if filename.lower() == "_orphan": continue
-            if not filename.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')): continue
+            src = os.path.join(img_dir, filename)
+            
+            # Skip moving directories
+            if os.path.isdir(src): continue
             
             if filename not in active_images:
-                src = os.path.join(img_dir, filename)
                 dst = os.path.join(orphan_dir, filename)
                 try:
                     shutil.move(src, dst)
