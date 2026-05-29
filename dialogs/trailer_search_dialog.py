@@ -4,7 +4,7 @@ import requests
 import sys
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QGridLayout, QLabel, QPushButton, 
-    QWidget, QCheckBox, QHBoxLayout, QMessageBox, QProgressDialog, QScrollArea
+    QWidget, QCheckBox, QHBoxLayout, QMessageBox, QProgressDialog, QScrollArea, QLineEdit
 )
 from PySide6.QtCore import Qt, QThread, Signal, QSize
 from PySide6.QtGui import QPixmap, QDesktopServices, QIcon
