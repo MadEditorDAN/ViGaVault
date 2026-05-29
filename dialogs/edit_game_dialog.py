@@ -391,7 +391,7 @@ class ActionDialog(QDialog):
             QDesktopServices.openUrl(QUrl(url))
             
     def search_youtube_trailer(self):
-        game_title = self.updated_data.get('Title') or self.original_data.get('Title') or self.original_data.get('Folder_Name', 'Unknown')
+        game_title = self.updated_data.get('Clean_Title') or self.original_data.get('Clean_Title') or self.original_data.get('Title', 'Unknown')
         dialog = TrailerSearchDialog(game_title, self)
         if dialog.exec():
             selected_url = dialog.get_selected_url()
