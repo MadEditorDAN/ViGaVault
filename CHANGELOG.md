@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.3.0] - 2026-05-29
 ### Added
 - Integrated headless Prime Gaming & Luna GraphQL scanner on the main thread, with persistent browser sessions and automated title smart-merging under the Amazon platform tag.
 - Main-window-integrated Last Scan Log settings viewer, displaying monospace logs with auto-scaled fonts and direct settings transitions.
@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implemented real-time Amazon session validation check mid-scan (detecting login redirects), providing instant GUI feedback if the active session has expired and needs to be re-applied.
 
 ### Changed
+- Improved local copy injection rules to apply deduplication and user-casing overrides universally across Genre, Collection, Publisher, and Developer fields.
+- Removed normalization from injected Genres to respect explicit user input.
+- Standardized dialog button layouts globally to keep Cancel on the left and Save/Apply on the right.
+- Changed backup file name generation to use the actual current database name.
 - Re-engineered the Amazon scan execution pipeline to perform page-reload-free, year-by-year sequential dynamic crawls, rendering results in real-time under a single early header while completely silencing all intermediate headless browser progress logs from both the terminal console and sidebar app screens.
 - Aligned the Amazon headless browser's GraphQL query variables with the actual web UI filter parameters (timeWindow and offerType) and broadened Python claim filtering to include GOG/Epic platform codes, securing full catalog parity.
 - Swapped custom non-native cover import file selector for the native system Windows Explorer dialog in the metadata editor.
@@ -33,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Integrated robust millisecond-based Unix timestamp parsing inside the Amazon claim categorization system to ensure historical game acquisitions are perfectly distributed across active catalog year folders.
 
 ### Fixed
+- Fixed case-sensitive sorting in UI filters (Sidebar, Game Manager, Metadata Manager) to ensure mixed-case items sort correctly.
+- Fixed scroll-wheel unintentionally changing structure types in the local sources settings tab.
+- Removed "Go Wild" checkbox from the full intelligent scan panel.
+- Fixed games returning as NEW after being set to HIDDEN.
 - Fixed the Amazon storefront ghost checking logic by swapping from any() to all(), ensuring Galaxy-synced prefix patterns are immune to unlinking during scans.
 - Resolved disappearing dynamic filter checkboxes during sidebar resizing by dynamically balancing layout column stretches and performing layout reflow on startup.
 - Resolved Amazon scan ImportError by implementing a persistent `get_amazon_profile` function within the login browser dialog module, securing headless cookie storage and preventing crash-on-close C++ parent-child cleanup races.
