@@ -23,6 +23,10 @@ BACKUP_DIR = os.path.join(BASE_DIR, "backups")
 MAX_FILES = 10 
 
 def get_pre_scan_checklist_text(config):
+    from ViGaVault_utils import (
+        format_header_row, format_separator_row, format_box_bottom
+    )
+    
     do_galaxy = config.get("enable_galaxy_db", True)
     do_gog = config.get("enable_gog_web", False)
     do_epic = config.get("enable_epic_web", False)
@@ -31,24 +35,58 @@ def get_pre_scan_checklist_text(config):
     local_cfg = config.get('local_scan_config', {})
     do_local = local_cfg.get("enable_local_scan", True)
     target_folders = local_cfg.get("target_folders")
+    folder_rules = local_cfg.get("folder_rules", {})
+    do_images = config.get('download_images', True)
     
-    checklist = f"{' PRE-SCAN CHECKLIST ':-^80}\n"
-    checklist += f"{'Galaxy Sync':<16}: {'ON' if do_galaxy else 'OFF'}\n"
-    checklist += f"{'GOG':<16}: {'ON' if do_gog else 'OFF'}\n"
-    checklist += f"{'Epic Games':<16}: {'ON' if do_epic else 'OFF'}\n"
-    checklist += f"{'Steam':<16}: {'ON' if do_steam else 'OFF'}\n"
-    checklist += f"{'Amazon':<16}: {'ON' if do_amazon else 'OFF'}\n"
+    lines = [format_header_row("FULL SCAN CHECKLIST", is_secondary=False, col_spec=[17, 60])]
+    
+    def fmt_check_row(label, val):
+        col1 = f" {label:<15} "
+        col2 = f" {val:<58} "
+        return f"║{col1}│{col2}║"
+        
+    lines.append(fmt_check_row("Amazon", "ON" if do_amazon else "OFF"))
+    lines.append(fmt_check_row("GOG", "ON" if do_gog else "OFF"))
+    lines.append(fmt_check_row("Epic Games", "ON" if do_epic else "OFF"))
+    lines.append(fmt_check_row("Steam", "ON" if do_steam else "OFF"))
+    lines.append(fmt_check_row("Galaxy Sync", "ON" if do_galaxy else "OFF"))
+    
     if do_local:
-        checklist += f"{'Local Folders':<16}: ON\n"
-        if target_folders is not None and len(target_folders) > 0:
-            for tf in sorted(target_folders):
-                checklist += f"  - {tf}\n"
+        lines.append("╟" + "═"*17 + "╪" + "═"*36 + "╤" + "═"*23 + "╣")
+        
+        def fmt_3col_row(col1_val, col2_val, col3_val):
+            col1 = f" {col1_val:<15} "
+            col2 = f" {col2_val:<34} "
+            col3 = f" {col3_val:<21} "
+            return f"║{col1}│{col2}│{col3}║"
+            
+        lines.append(fmt_3col_row("Local Folders", "ON", "Content Type"))
+        lines.append("╟" + "─"*17 + "┼" + "─"*36 + "┼" + "─"*23 + "╢")
+        
+        active_folders = []
+        if target_folders is not None:
+            active_folders = sorted(list(target_folders))
         else:
-            checklist += "  - All Folders\n"
+            active_folders = sorted([f for f, r in folder_rules.items() if r.get("scan", False)])
+            
+        for f in active_folders:
+            rule = folder_rules.get(f, {})
+            c_type = rule.get("type", "None")
+            import os
+            f_display = os.path.basename(f)
+            if not f_display: f_display = f
+            lines.append(fmt_3col_row("Folder name", f_display, c_type))
+            
+        lines.append("╟" + "═"*17 + "╪" + "═"*36 + "╧" + "═"*23 + "╣")
     else:
-        checklist += f"{'Local Folders':<16}: OFF\n"
-    checklist += f"{'Images Download':<16}: {'ON' if config.get('download_images', True) else 'OFF'}"
-    return checklist
+        lines.append("╟" + "═"*17 + "╪" + "═"*60 + "╣")
+        lines.append(fmt_check_row("Local Folders", "OFF"))
+        lines.append("╟" + "═"*17 + "╪" + "═"*60 + "╣")
+        
+    lines.append(fmt_check_row("Image Download", "ON" if do_images else "OFF"))
+    lines.append(format_box_bottom([17, 60]))
+    
+    return "\n".join(lines)
 
 class LibraryManager:
     def __init__(self, config):
@@ -78,7 +116,7 @@ class LibraryManager:
             except Exception as e:
                 logging.error(f"Error loading LibraryManager DB: {e}")
 
-    def scan_full(self, worker_thread=None, amazon_claims=None):
+    def scan_full(self, worker_thread=None, amazon_claims=None, amazon_stats=None):
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         images_only = self.config.get('images_only', False)
@@ -105,36 +143,51 @@ class LibraryManager:
         gog_stats = None
         epic_stats = None
         steam_stats = None
-        amazon_stats = None
+        
+        # WHY: Store Amazon statistics accumulated sequentially in the dynamic crawl.
+        # We reuse the stats passed from the GUI controller if available.
+        # If running from a test or direct context, we execute the full sync.
+        
         local_stats = None
 
         if not images_only:
-            if do_galaxy:
-                galaxy_stats = sync_galaxy_database(self.config, self.games, worker_thread=worker_thread)
-                self.save_db()
+            # 1. Amazon (Runs first sequentially)
+            if do_amazon:
+                if amazon_stats is not None:
+                    # WHY: Amazon was already scanned and synced sequentially.
+                    # We reuse its statistics directly for the final matrix report.
+                    pass
+                else:
+                    claims = amazon_claims if amazon_claims is not None else []
+                    amazon_changes, amazon_stats = sync_amazon_database(self.config, self.games, claims, worker_thread=worker_thread, print_header=False)
+                    if amazon_changes: self.save_db()
                 if worker_thread and worker_thread.isInterruptionRequested(): return
-            
+
+            # 2. GOG
             if do_gog:
                 gog_changes, gog_stats = scan_gog_account(self.config, self.games, worker_thread=worker_thread)
                 if gog_changes: self.save_db()
                 if worker_thread and worker_thread.isInterruptionRequested(): return
-                
+
+            # 3. Epic Games
             if do_epic:
                 epic_changes, epic_stats = scan_epic_account(self.config, self.games, worker_thread=worker_thread)
                 if epic_changes: self.save_db()
                 if worker_thread and worker_thread.isInterruptionRequested(): return
 
+            # 4. Steam
             if do_steam:
                 steam_changes, steam_stats = scan_steam_account(self.config, self.games, worker_thread=worker_thread)
                 if steam_changes: self.save_db()
                 if worker_thread and worker_thread.isInterruptionRequested(): return
 
-            if do_amazon:
-                claims = amazon_claims if amazon_claims is not None else []
-                amazon_changes, amazon_stats = sync_amazon_database(self.config, self.games, claims, worker_thread=worker_thread)
-                if amazon_changes: self.save_db()
+            # 5. Galaxy Sync
+            if do_galaxy:
+                galaxy_stats = sync_galaxy_database(self.config, self.games, worker_thread=worker_thread)
+                self.save_db()
                 if worker_thread and worker_thread.isInterruptionRequested(): return
 
+            # 6. Local Copy
             if do_local:
                 local_stats = scan_local_system(self.config, self.games, worker_thread=worker_thread)
                 self.save_db()
@@ -146,61 +199,92 @@ class LibraryManager:
         
         # --- GLOBAL CONSOLIDATION REPORT ---
         if not images_only:
-            global_rep = f"\n{' GLOBAL SYNCHRONIZATION REPORT ':=^80}\n"
-            global_rep += f"{' BREAKDOWN ':-^80}\n"
-            
-            total_scanned = 0
-            total_added = 0
-            total_merged = 0
-            total_ghosts = 0
-            
-            if do_galaxy and galaxy_stats:
-                global_rep += f"  Galaxy Sync   : Scanned: {galaxy_stats.get('total_found', 0):<4} | Added: {galaxy_stats.get('new', 0):<3} | Merged: {galaxy_stats.get('matched_smart', 0):<3} | Ghosts: {galaxy_stats.get('deleted_ghosts', 0)}\n"
-                total_scanned += galaxy_stats.get('total_found', 0)
-                total_added += galaxy_stats.get('new', 0)
-                total_merged += galaxy_stats.get('matched_smart', 0)
-                total_ghosts += galaxy_stats.get('deleted_ghosts', 0)
-                
-            if do_gog and gog_stats:
-                global_rep += f"  GOG.com       : Scanned: {gog_stats.get('total_cloud', 0):<4} | Added: {gog_stats.get('new_added', 0):<3} | Merged: {gog_stats.get('matched_smart', 0):<3} | Ghosts: 0\n"
-                total_scanned += gog_stats.get('total_cloud', 0)
-                total_added += gog_stats.get('new_added', 0)
-                total_merged += gog_stats.get('matched_smart', 0)
-                
-            if do_epic and epic_stats:
-                global_rep += f"  Epic Games    : Scanned: {epic_stats.get('total_cloud', 0):<4} | Added: {epic_stats.get('new_added', 0):<3} | Merged: {epic_stats.get('matched_smart', 0):<3} | Ghosts: 0\n"
-                total_scanned += epic_stats.get('total_cloud', 0)
-                total_added += epic_stats.get('new_added', 0)
-                total_merged += epic_stats.get('matched_smart', 0)
-                
-            if do_steam and steam_stats:
-                global_rep += f"  Steam         : Scanned: {steam_stats.get('total_cloud', 0):<4} | Added: {steam_stats.get('new_added', 0):<3} | Merged: {steam_stats.get('already_in_db', 0):<3} | Ghosts: 0\n"
-                total_scanned += steam_stats.get('total_cloud', 0)
-                total_added += steam_stats.get('new_added', 0)
-                total_merged += steam_stats.get('already_in_db', 0)
-                
-            if do_amazon and amazon_stats:
-                global_rep += f"  Amazon Luna   : Scanned: {amazon_stats.get('total_cloud', 0):<4} | Added: {amazon_stats.get('new_added', 0):<3} | Merged: {amazon_stats.get('matched_smart', 0):<3} | Ghosts: {amazon_stats.get('deleted_ghosts', 0)}\n"
-                total_scanned += amazon_stats.get('total_cloud', 0)
-                total_added += amazon_stats.get('new_added', 0)
-                total_merged += amazon_stats.get('matched_smart', 0)
-                total_ghosts += amazon_stats.get('deleted_ghosts', 0)
-                
-            if do_local and local_stats:
-                global_rep += f"  Local Folders : Scanned: {local_stats.get('scanned', 0):<4} | Added: {local_stats.get('new', 0):<3} | Merged: {local_stats.get('updated', 0):<3} | Ghosts: {local_stats.get('deleted', 0)}\n"
-                total_scanned += local_stats.get('scanned', 0)
-                total_added += local_stats.get('new', 0)
-                total_merged += local_stats.get('updated', 0)
-                total_ghosts += local_stats.get('deleted', 0)
-                
-            global_rep += f"{' GRAND TOTALS ':-^80}\n"
-            global_rep += f"  Total Cloud Games Scanned    : {total_scanned}\n"
-            global_rep += f"  Total New Games Added        : {total_added}\n"
-            global_rep += f"  Total Games Smart-Merged     : {total_merged}\n"
-            global_rep += f"  Total Ghost Games Removed    : {total_ghosts}\n\n"
-            global_rep += f"  Total Games in Database (VGV): {len(self.games)}\n"
-            global_rep += f"{'='*80}"
-            logging.info(global_rep)
+            from ViGaVault_utils import (
+                format_matrix_row, format_matrix_divider, format_report_row,
+                format_total_db_row
+            )
+
+            gal_s = galaxy_stats or {}
+            gog_s = gog_stats or {}
+            epi_s = epic_stats or {}
+            stm_s = steam_stats or {}
+            amz_s = amazon_stats or {}
+            loc_s = local_stats or {}
+
+            amz_scan = amz_s.get('total_cloud', 0)
+            amz_add = amz_s.get('new_added', 0)
+            amz_merge = amz_s.get('matched_smart', 0)
+            amz_del = amz_s.get('deleted_ghosts', 0)
+            amz_already = amz_s.get('already_in_db', 0)
+            amz_err = 0
+
+            gal_scan = gal_s.get('total_found', 0)
+            gal_add = gal_s.get('new', 0)
+            gal_merge = gal_s.get('matched_smart', 0)
+            gal_del = gal_s.get('deleted_ghosts', 0)
+            gal_already = gal_scan - gal_add - gal_merge
+            if gal_already < 0: gal_already = 0
+            gal_err = gal_s.get('errors', 0)
+
+            gog_scan = gog_s.get('total_cloud', 0)
+            gog_add = gog_s.get('new_added', 0)
+            gog_merge = gog_s.get('matched_smart', 0)
+            gog_del = 0
+            gog_already = gog_s.get('already_in_db', 0)
+            gog_err = gog_s.get('failed', 0)
+
+            epi_scan = epi_s.get('total_cloud', 0)
+            epi_add = epi_s.get('new_added', 0)
+            epi_merge = epi_s.get('matched_smart', 0)
+            epi_del = 0
+            epi_already = epi_s.get('already_in_db', 0)
+            epi_err = epi_s.get('errors', 0) + epi_s.get('skipped', 0)
+
+            stm_scan = stm_s.get('total_cloud', 0)
+            stm_add = stm_s.get('new_added', 0)
+            stm_merge = stm_s.get('matched_smart', 0)
+            stm_del = 0
+            stm_already = stm_s.get('already_in_db', 0)
+            stm_err = 0
+
+            loc_scan = loc_s.get('scanned', 0)
+            loc_add = loc_s.get('new', 0)
+            loc_merge = loc_s.get('updated', 0)
+            loc_del = loc_s.get('deleted', 0)
+            loc_already = loc_scan - loc_add - loc_merge
+            if loc_already < 0: loc_already = 0
+            loc_err = 0
+
+            total_scanned = amz_scan + gal_scan + gog_scan + epi_scan + stm_scan + loc_scan
+            total_added = amz_add + gal_add + gog_add + epi_add + stm_add + loc_add
+            total_merged = amz_merge + gal_merge + gog_merge + epi_merge + stm_merge + loc_merge
+            total_deleted = amz_del + gal_del + gog_del + epi_del + stm_del + loc_del
+            total_already = amz_already + gal_already + gog_already + epi_already + stm_already + loc_already
+            total_errors = amz_err + gal_err + gog_err + epi_err + stm_err + loc_err
+
+            title_part = "╣ FULL SCAN REPORT ╠"
+            logging.info("╔" + "═"*18 + title_part + "═"*40 + "╗")
+            logging.info(format_matrix_divider(is_middle=False))
+
+            logging.info(format_matrix_row("Amazon", amz_scan, amz_add, amz_merge, amz_del))
+            logging.info(format_matrix_row("GOG.com", gog_scan, gog_add, gog_merge, gog_del))
+            logging.info(format_matrix_row("Epic Games", epi_scan, epi_add, epi_merge, epi_del))
+            logging.info(format_matrix_row("Steam", stm_scan, stm_add, stm_merge, stm_del))
+            logging.info(format_matrix_row("GALAXY", gal_scan, gal_add, gal_merge, gal_del))
+            logging.info(format_matrix_row("Local Copy", loc_scan, loc_add, loc_merge, loc_del))
+
+            logging.info(format_matrix_divider(is_middle=True))
+
+            logging.info(format_report_row("Total Games", total_scanned))
+            logging.info(format_report_row("Already in DB", total_already))
+            logging.info(format_report_row("New Added", total_added))
+            logging.info(format_report_row("Smart Merged", total_merged))
+            logging.info(format_report_row("Deleted", total_deleted))
+            logging.info(format_report_row("Errors/Ignored", total_errors))
+
+            logging.info("╠" + "═"*17 + "╧" + "═"*46 + "╤" + "═"*13 + "╣")
+            logging.info(format_total_db_row("TOTAL Games in the Database - VGV-DB.DAT", len(self.games)))
+            logging.info("╚" + "═"*64 + "╧" + "═"*13 + "╝")
 
         end_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         if images_only:
@@ -218,15 +302,15 @@ class LibraryManager:
             return success
         return False
 
-    def fetch_candidates(self, token, search_term, limit=10):
-        return query_igdb_api(token, search_term=str(search_term).strip(), limit=limit, by_id=str(search_term).strip().isdigit())
+    def fetch_candidates(self, token, search_term, limit=10, go_wild=False):
+        return query_igdb_api(token, search_term=str(search_term).strip(), limit=limit, by_id=str(search_term).strip().isdigit(), go_wild=go_wild)
 
     def get_access_token(self):
         return get_igdb_access_token()
 
     def _get_db_schema(self):
-        # WHY: Inject Is_DLC into the permanent schema matrix so manual batch tags persist perfectly to the hard drive.
-        return ['Folder_Name', 'Clean_Title', 'Search_Title', 'Path_Root', 'Status_Flag', 'Image_Link', 'Cover_URL', 'Year_Folder', 'Platforms', 'Developer', 'Publisher', 'Original_Release_Date', 'Summary', 'Genre', 'Collection', 'Trailer_Link', 'game_ID', 'Is_Local', 'Has_Image', 'Is_DLC'] + [f'platform_ID_{i:02d}' for i in range(1, 51)]
+        # WHY: Inject Is_DLC and Is_Excluded into the permanent schema matrix so manual batch tags persist perfectly to the hard drive.
+        return ['Folder_Name', 'Clean_Title', 'Search_Title', 'Path_Root', 'Status_Flag', 'Image_Link', 'Cover_URL', 'Year_Folder', 'Platforms', 'Developer', 'Publisher', 'Original_Release_Date', 'Summary', 'Genre', 'Collection', 'Trailer_Link', 'game_ID', 'Is_Local', 'Has_Image', 'Is_DLC', 'Is_Excluded'] + [f'platform_ID_{i:02d}' for i in range(1, 51)]
 
     def save_db(self):
         if os.path.exists(self.db_file):
@@ -306,7 +390,12 @@ class LibraryManager:
         flagged as 'NEW', queries IGDB for their missing metadata and cover URLs, 
         evaluates their final completion status, and performs batch image downloading.
         """
-        logging.info(f"\n{' IGDB SCRAPPER & MEDIA BACKFILL ':=^80}")
+        from ViGaVault_utils import (
+            format_header_row, format_middle_header, format_box_bottom,
+            format_separator_row, format_report_row, format_operation_row
+        )
+
+        logging.info(format_header_row("IGDB SCRAPPER", is_secondary=False, col_spec=[17, 36, 5, 5, 5, 5]))
         images_dir = self.config.get('image_path', os.path.join(BASE_DIR, 'images'))
         dl_images = self.config.get('download_images', True)
 
@@ -314,6 +403,7 @@ class LibraryManager:
         igdb_token = None
         
         stats = {'scraped': 0, 'downloads': 0, 'ok': 0, 'needs_attention': 0}
+        ops_logged = 0
 
         for folder, game in self.games.items():
             if worker_thread and worker_thread.isInterruptionRequested(): break
@@ -323,10 +413,7 @@ class LibraryManager:
             status = game.data.get('Status_Flag')
 
             # --- PHASE 1: METADATA SCRAPING ---
-            # WHY: Scrape NEW games, or existing games that physically lost their image and lack a backup Cover_URL.
-            # This prevents Local Copies from remaining permanently broken if their images are manually deleted.
             db_has_img = str(game.data.get('Has_Image')).lower() in ['true', '1']
-            # WHY: Strictly check for an empty string so we don't infinitely retry games permanently marked as 'NOT_FOUND'.
             needs_cover_rescue = not db_has_img and game.data.get('Cover_URL', '') == ''
             
             if images_only:
@@ -336,26 +423,27 @@ class LibraryManager:
                 
             if should_scrape:
                 action_taken = True
+                op_name = "Scraping"
                 title_disp = game.data.get('Clean_Title', folder)
-                action_title = f"Scraping with IGDB : {title_disp}"
-                logging.info(f"UI_START||{action_title[:56]:<56}| Img: ... | Trl: ... |")
+                
+                if ops_logged == 0:
+                    logging.info(format_separator_row([17, 36, 5, 5, 5, 5], ["┼", "┼", "┬", "┬", "┬"]))
+                
+                logging.info("UI_START|" + format_operation_row(op_name, title_disp, False, False))
+                ops_logged += 1
                 
                 if igdb_token is None: igdb_token = get_igdb_access_token()
                 
                 if igdb_token:
-                    # fill_missing_metadata intelligently skips fields that are already populated
                     if game.fill_missing_metadata(igdb_token, images_only=images_only):
                         stats['scraped'] += 1
                         changes_made = True
                         
-                # WHY: Circuit Breaker - If IGDB was queried but yielded no cover, permanently mark it 
-                # as NOT_FOUND so the scraper doesn't waste 300ms re-querying it every single scan forever.
                 if game.data.get('Cover_URL', '') == '':
                     game.data['Cover_URL'] = 'NOT_FOUND'
                     changes_made = True
                 
                 if not images_only:
-                    # Evaluate final completion status
                     missing_meta = not all([game.data.get(f) for f in ['Genre', 'Summary']])
                     has_cover = bool(game.data.get('Cover_URL')) or bool(game.data.get('Image_Link'))
                     
@@ -373,25 +461,27 @@ class LibraryManager:
                 if cover_url_raw and cover_url_raw != 'NOT_FOUND':
                     
                     if not action_taken:
+                        op_name = "Cover Download"
                         title_disp = game.data.get('Clean_Title', folder)
-                        action_title = f"Cover Download : {title_disp}"
-                        logging.info(f"UI_START||{action_title[:56]:<56}| Img: ... | Trl: ... |")
+                        
+                        if ops_logged == 0:
+                            logging.info(format_separator_row([17, 36, 5, 5, 5, 5], ["┼", "┼", "┬", "┬", "┬"]))
+                            
+                        logging.info("UI_START|" + format_operation_row(op_name, title_disp, False, False))
                         action_taken = True
+                        ops_logged += 1
                         
                     url_candidates = [u.strip() for u in cover_url_raw.split('|') if u.strip().startswith('http')]
                     active_candidates = url_candidates.copy()
                     success = False
                     for cover_url in url_candidates:
                         try:
-                            # WHY: Clean the URL of trailing parameters for a safe file extension extraction.
                             clean_url = cover_url.split('?')[0]
                             path = urlparse(clean_url).path
                             ext = os.path.splitext(path)[1]
                             if not ext: ext = '.jpg'
                             save_path = os.path.join(images_dir, f"{safe_filename}{ext}")
                             
-                            # WHY: Safety Guard. If the image physically exists on disk but the DB 
-                            # somehow lost the internal Has_Image flag, instantly re-link it without hitting the network.
                             if os.path.exists(save_path):
                                 game.data['Image_Link'] = f"{safe_filename}{ext}"
                                 game.data['Has_Image'] = True
@@ -400,7 +490,6 @@ class LibraryManager:
                                 break
                                 
                             headers = {'User-Agent': 'Mozilla/5.0'}
-                            # WHY: Reduce timeout strictly to 3 seconds to prevent massive delays when a server is unresponsive.
                             response = requests.get(cover_url, stream=True, timeout=3, headers=headers)
                             if response.status_code == 200:
                                 os.makedirs(images_dir, exist_ok=True)
@@ -412,43 +501,39 @@ class LibraryManager:
                                 changes_made = True
                                 success = True
                                 action_taken = True
-                                break # Stop trying fallbacks once we succeed!
+                                break
                             elif response.status_code in [404, 403]:
-                                # WHY: If the link is permanently dead (404/403), remove it from active candidates.
                                 if cover_url in active_candidates:
                                     active_candidates.remove(cover_url)
                         except Exception as e: pass
                     
                     if not success:
-                        # WHY: If all downloads failed, overwrite the Cover_URL field in the DB with NOT_FOUND. 
-                        # This permanently severs the infinite retry loop for dead links.
                         new_cover_raw = "|".join(active_candidates) if active_candidates else 'NOT_FOUND'
                         if game.data.get('Cover_URL') != new_cover_raw:
                             game.data['Cover_URL'] = new_cover_raw
                             changes_made = True
                             
-            # WHY: Smart Refresh Logging - Update the previously emitted UI line to strictly maintain ONE line per game.
             if action_taken:
                 title_disp = game.data.get('Clean_Title', folder)
                 has_img_now = str(game.data.get('Has_Image')).lower() in ['true', '1']
                 has_trl_now = bool(game.data.get('Trailer_Link') and str(game.data.get('Trailer_Link')).startswith('http'))
-                img_str = "Yes" if has_img_now else "No "
-                trl_str = "Yes" if has_trl_now else "No "
                 
-                # WHY: Distinguish visually between real IGDB queries and pure image downloads
                 if status in ['NEW', 'NEEDS_ATTENTION', '']:
-                    action_title = f"Scraping with IGDB : {title_disp}"
+                    op_name = "Scraping"
                 else:
-                    action_title = f"Cover Download : {title_disp}"
+                    op_name = "Cover Download"
                     
-                logging.info(f"UI_UPDATE||{action_title[:56]:<56}| Img: {img_str[:3]:<3} | Trl: {trl_str[:3]:<3} |")
+                logging.info("UI_UPDATE|" + format_operation_row(op_name, title_disp, has_img_now, has_trl_now))
 
         if changes_made: self.save_db()
         
-        report = f"{' SCRAPPER REPORT ':=^80}\n"
-        report += f"Games Scraped  : {stats['scraped']}\n"
-        report += f"Promoted to OK : {stats['ok']}\n"
-        report += f"Needs Attention: {stats['needs_attention']}\n"
-        report += f"Covers D/L'd   : {stats['downloads']}\n"
-        report += f"{'='*80}"
-        logging.info(report)
+        if ops_logged > 0:
+            logging.info(format_separator_row([17, 36, 5, 5, 5, 5], ["┼", "┼", "┴", "┴", "┴"]))
+            
+        logging.info(format_middle_header("REPORT", col_spec=[17, 36, 5, 5, 5, 5]))
+        logging.info(format_report_row("Games Scraped", stats['scraped']))
+        logging.info(format_report_row("OK", stats['ok']))
+        logging.info(format_report_row("Needs Attention", stats['needs_attention']))
+        logging.info(format_report_row("Covers D/L'd", stats['downloads']))
+        logging.info(format_box_bottom([17, 60]))
+

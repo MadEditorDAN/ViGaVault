@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QMessageBox, QApplication
 from PySide6.QtGui import QAction, QPalette
 
 from ViGaVault_utils import translator, BASE_DIR
-from dialogs import MediaManagerDialog, StatisticsDialog, SettingsDialog, DocumentationDialog, MetadataManagerDialog, GameManagerDialog
+from dialogs import StatisticsDialog, SettingsDialog, DocumentationDialog, MetadataManagerDialog, GameManagerDialog
 
 class MenuController(QObject):
     def __init__(self, main_window):
@@ -45,9 +45,6 @@ class MenuController(QObject):
         file_menu.addAction(action_quit)
         
         tools_menu = menu_bar.addMenu(translator.tr("menu_tools"))
-        action_media_manager = QAction(translator.tr("menu_tools_media_manager"), self.mw)
-        action_media_manager.triggered.connect(self.show_media_manager)
-        tools_menu.addAction(action_media_manager)
         
         action_metadata_manager = QAction(translator.tr("menu_tools_metadata_manager"), self.mw)
         action_metadata_manager.triggered.connect(self.show_metadata_manager)
@@ -79,13 +76,6 @@ class MenuController(QObject):
         dlg.tabs.setCurrentIndex(tab_index)
         dlg.exec()
 
-    def show_media_manager(self):
-        # WHY: Block media manager access during a full scan to prevent race conditions on database saves and file moves.
-        if self.mw.full_scan_in_progress:
-            QMessageBox.warning(self.mw, "Warning", translator.tr("msg_wait_for_scan"))
-            return
-        dlg = MediaManagerDialog(self.mw)
-        dlg.exec()
 
     def show_metadata_manager(self):
         # WHY: Block metadata manager access during a full scan to prevent data corruption via race conditions.

@@ -151,14 +151,13 @@ class Sidebar(QWidget):
         self.btn_toggle_no_trl = QPushButton(translator.tr("sidebar_btn_toggle_no_trl"))
         self.btn_toggle_new = QPushButton(translator.tr("sidebar_btn_toggle_new"))
         self.btn_toggle_dlc = QPushButton(translator.tr("sidebar_btn_toggle_dlc"))
-        self.btn_toggle_review = QPushButton(translator.tr("sidebar_btn_toggle_review"))
         
         toggle_style = """
             QPushButton { padding: 4px 8px; border: 1px solid palette(dark); border-radius: 4px; background-color: palette(button); }
             QPushButton:checked { background-color: palette(highlight); color: palette(highlighted-text); font-weight: bold; }
         """
         
-        for btn in [self.btn_toggle_no_img, self.btn_toggle_no_trl, self.btn_toggle_new, self.btn_toggle_dlc, self.btn_toggle_review]:
+        for btn in [self.btn_toggle_no_img, self.btn_toggle_no_trl, self.btn_toggle_new, self.btn_toggle_dlc]:
             btn.setCheckable(True)
             btn.setStyleSheet(toggle_style)
             btn.setCursor(Qt.PointingHandCursor)
@@ -169,12 +168,6 @@ class Sidebar(QWidget):
         self.btn_toggle_no_trl.toggled.connect(lambda checked: self.handle_view_toggle(self.btn_toggle_no_trl, checked))
         self.btn_toggle_new.toggled.connect(lambda checked: self.handle_view_toggle(self.btn_toggle_new, checked))
         self.btn_toggle_dlc.toggled.connect(lambda checked: self.handle_view_toggle(self.btn_toggle_dlc, checked))
-        self.btn_toggle_review.toggled.connect(lambda checked: self.handle_view_toggle(self.btn_toggle_review, checked))
-
-        self.btn_approve_review = QPushButton(translator.tr("sidebar_btn_approve_review"))
-        self.btn_approve_review.setStyleSheet("padding: 4px 8px; font-weight: bold; border: 1px solid palette(dark); border-radius: 4px; background-color: palette(button);")
-        self.btn_approve_review.setCursor(Qt.PointingHandCursor)
-        filters_header_layout.addWidget(self.btn_approve_review)
 
         filters_frame_layout.addLayout(filters_header_layout)
 
@@ -185,8 +178,8 @@ class Sidebar(QWidget):
         
         filters_frame_layout.addWidget(self.filters_container, 1)
         
-        self.top_layout.addWidget(self.frame_filters, 1) # Give it stretch to take available space
-        self.layout.addLayout(self.top_layout, 1) # Give top part stretch priority
+        self.top_layout.addWidget(self.frame_filters)
+        self.layout.addLayout(self.top_layout)
 
         # --- SCAN PANEL (Manual Scan / Full Scan Logs) ---
         # Hidden by default, shown when scanning starts
@@ -211,6 +204,10 @@ class Sidebar(QWidget):
         self.scan_limit_combo.setCurrentText('10')
         scan_action_layout.addWidget(self.scan_limit_combo, 1)
 
+        self.scan_go_wild = QCheckBox("Go Wild")
+        self.scan_go_wild.setToolTip("Search without any platform filter")
+        scan_action_layout.addWidget(self.scan_go_wild, 0)
+
         self.scan_results = QListWidget()
         self.scan_results.setIconSize(QSize(50, 70))
         # WHY: Force a monospace font and smaller text size to guarantee perfect vertical ASCII alignment for the new tabular logs.
@@ -232,6 +229,7 @@ class Sidebar(QWidget):
         # --- SCAN SETTINGS PANEL ---
         self.scan_settings_panel = QWidget()
         self.scan_settings_layout = QVBoxLayout(self.scan_settings_panel)
+        self.scan_settings_layout.setContentsMargins(0, 0, 0, 0)
         
         line_ss = QFrame()
         line_ss.setFrameShape(QFrame.HLine)
@@ -245,21 +243,24 @@ class Sidebar(QWidget):
 
         self.grp_scan_platforms = QGroupBox(translator.tr("scan_settings_platforms"))
         self.layout_scan_platforms = QGridLayout(self.grp_scan_platforms)
+        self.layout_scan_platforms.setVerticalSpacing(2)
         
-        self.chk_scan_galaxy = QCheckBox("Galaxy")
+        self.chk_scan_amazon = QCheckBox("Amazon")
         self.chk_scan_gog_web = QCheckBox("GOG.com")
-        # WHY: Renamed strictly to "Epic" to align with the visual consistency of the other short-named platforms.
         self.chk_scan_epic = QCheckBox("Epic")
         self.chk_scan_steam = QCheckBox("Steam")
+        self.chk_scan_galaxy = QCheckBox("Galaxy")
         
-        self.layout_scan_platforms.addWidget(self.chk_scan_galaxy, 0, 0)
-        self.layout_scan_platforms.addWidget(self.chk_scan_gog_web, 0, 1)
-        self.layout_scan_platforms.addWidget(self.chk_scan_epic, 1, 0)
-        self.layout_scan_platforms.addWidget(self.chk_scan_steam, 1, 1)
-
-        self.chk_scan_amazon = QCheckBox("Amazon")
-        self.layout_scan_platforms.addWidget(self.chk_scan_amazon, 2, 0)
-
+        self.platform_checkboxes = [
+            self.chk_scan_amazon,
+            self.chk_scan_gog_web,
+            self.chk_scan_epic,
+            self.chk_scan_steam,
+            self.chk_scan_galaxy
+        ]
+        
+        # Initial layout will be handled by reflow_platforms
+        
         self.scan_settings_layout.addWidget(self.grp_scan_platforms)
 
         self.grp_scan_local = QGroupBox(translator.tr("scan_settings_local"))
@@ -267,8 +268,23 @@ class Sidebar(QWidget):
         # WHY: Force the grid layout to pack tightly against the top instead of centering its rows in available space.
         self.layout_scan_local.setAlignment(Qt.AlignTop)
         self.chk_scan_local = QCheckBox("Local Copy")
-        # WHY: Make the master checkbox span across both columns so it acts as a header.
-        self.layout_scan_local.addWidget(self.chk_scan_local, 0, 0, 1, 2)
+        self.layout_scan_local.addWidget(self.chk_scan_local, 0, 0)
+        
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        
+        self.btn_scan_all = QPushButton("All")
+        self.btn_scan_all.setFixedSize(45, 24)
+        self.btn_scan_all.clicked.connect(lambda: [chk.setChecked(True) for chk in self.chk_scan_folders.values()])
+        btn_layout.addWidget(self.btn_scan_all)
+
+        self.btn_scan_none = QPushButton("None")
+        self.btn_scan_none.setFixedSize(45, 24)
+        self.btn_scan_none.clicked.connect(lambda: [chk.setChecked(False) for chk in self.chk_scan_folders.values()])
+        btn_layout.addWidget(self.btn_scan_none)
+
+        self.layout_scan_local.addLayout(btn_layout, 0, 1)
+        self.layout_scan_local.setRowMinimumHeight(0, 35)
 
         self.chk_scan_folders = {} # Stores references to dynamic checkboxes
         
@@ -282,11 +298,18 @@ class Sidebar(QWidget):
         self.grp_scan_options = QGroupBox(translator.tr("scan_settings_options"))
         self.layout_scan_options = QGridLayout(self.grp_scan_options)
         self.layout_scan_options.setAlignment(Qt.AlignTop)
+        self.layout_scan_options.setContentsMargins(5, 5, 5, 5)
         
         self.chk_scan_dl_images = QCheckBox(translator.tr("settings_data_media_download_images"))
         self.layout_scan_options.addWidget(self.chk_scan_dl_images, 0, 0)
         
         self.scan_settings_layout.addWidget(self.grp_scan_options)
+        
+        self.btn_restore_scan_db = QPushButton("")
+        self.refresh_backup_button_text()
+        self.btn_restore_scan_db.setCursor(Qt.PointingHandCursor)
+        self.scan_settings_layout.addWidget(self.btn_restore_scan_db)
+        
         self.scan_settings_layout.addStretch()
         
         self.btn_close_scan_settings = QPushButton(translator.tr("btn_close"))
@@ -300,7 +323,7 @@ class Sidebar(QWidget):
         self.bottom_layout.setContentsMargins(8, 8, 8, 8)
 
         self.btn_scan_settings = QPushButton(translator.tr("sidebar_btn_scan_settings"))
-        self.btn_scan_settings.setMinimumHeight(80)
+        self.btn_scan_settings.setMinimumHeight(60)
         font_scan_set = QFont()
         font_scan_set.setBold(True)
         font_scan_set.setPointSize(12)
@@ -308,7 +331,7 @@ class Sidebar(QWidget):
 
         # --- FULL SCAN BUTTON ---
         self.btn_full_scan = QPushButton(translator.tr("sidebar_btn_full_scan"))
-        self.btn_full_scan.setMinimumHeight(80) # WHY: Taller button to accommodate the 3 checkboxes visually
+        self.btn_full_scan.setMinimumHeight(60) # WHY: Taller button to accommodate the 3 checkboxes visually
         font_scan = QFont()
         font_scan.setBold(True)
         font_scan.setPointSize(16)
@@ -322,6 +345,7 @@ class Sidebar(QWidget):
         self.scan_panel.hide()
         self.layout.addWidget(self.scan_settings_panel)
         self.scan_settings_panel.hide()
+        self.layout.addStretch()
         self.layout.addWidget(self.frame_bottom)
         
         # --- CONNECTIONS ---
@@ -329,9 +353,9 @@ class Sidebar(QWidget):
         self.combo_sort.currentIndexChanged.connect(self.parent.request_filter_update)
         self.btn_toggle_sort.clicked.connect(self.parent.toggle_sort_order)
         self.btn_full_scan.clicked.connect(self.parent.start_full_scan)
-        self.btn_approve_review.clicked.connect(self.parent.approve_reviews)
         self.btn_scan_settings.clicked.connect(self.parent.open_scan_settings)
         self.btn_close_scan_settings.clicked.connect(self.parent.close_scan_settings)
+        self.btn_restore_scan_db.clicked.connect(self.parent.restore_pre_scan_backup)
         
         # WHY: Bind instantaneous saving back to the checkboxes so the user's scan choices are safely persisted immediately.
         # This completely bypasses PySide6's notorious C++ object teardown race conditions during closeEvent.
@@ -362,11 +386,33 @@ class Sidebar(QWidget):
         # WHY: Ping the controller to potentially repack the grid columns based on new width.
         if hasattr(self, 'parent') and hasattr(self.parent, 'filter_controller'):
             self.parent.filter_controller.reflow_filters()
+        self.reflow_platforms()
         self.adjust_scan_log_font()
+
+    def reflow_platforms(self):
+        if not hasattr(self, 'platform_checkboxes'): return
+        width = self.width()
+        cols = max(2, min(4, width // 100))
+        if getattr(self, 'current_platform_cols', 0) == cols: return
+        self.current_platform_cols = cols
+        
+        while self.layout_scan_platforms.count():
+            item = self.layout_scan_platforms.takeAt(0)
+            if item.widget():
+                item.widget().hide()
+                
+        row, col = 0, 0
+        for chk in self.platform_checkboxes:
+            self.layout_scan_platforms.addWidget(chk, row, col)
+            chk.show()
+            col += 1
+            if col >= cols:
+                col = 0
+                row += 1
 
     def handle_view_toggle(self, toggled_btn, checked):
         if checked:
-            for btn in [self.btn_toggle_no_img, self.btn_toggle_no_trl, self.btn_toggle_new, self.btn_toggle_dlc, self.btn_toggle_review]:
+            for btn in [self.btn_toggle_no_img, self.btn_toggle_no_trl, self.btn_toggle_new, self.btn_toggle_dlc]:
                 if btn != toggled_btn:
                     btn.blockSignals(True)
                     btn.setChecked(False)
@@ -395,6 +441,26 @@ class Sidebar(QWidget):
         informative rejection popups instead of silently locking the user out."""
         if not getattr(self.parent, 'full_scan_in_progress', False):
             self.btn_full_scan.setEnabled(True)
+
+    def refresh_backup_button_text(self):
+        """WHY: Dynamically probes the disk for the automated pre-scan backup and paints its exact timestamp on the UI."""
+        import os
+        from datetime import datetime
+        from ViGaVault_utils import get_db_path, build_scanner_config
+        
+        db_path = get_db_path()
+        backup_path = os.path.join(os.path.dirname(db_path), "backups", "VGV-DB_Pre_Scan.vgv")
+        
+        if os.path.exists(backup_path):
+            mtime = os.path.getmtime(backup_path)
+            config = build_scanner_config()
+            date_fmt = config.get('date_format', '%d/%m/%Y')
+            dt_str = datetime.fromtimestamp(mtime).strftime(f"{date_fmt} %H:%M")
+            self.btn_restore_scan_db.setText(translator.tr("scan_settings_btn_restore_available", date=dt_str))
+            self.btn_restore_scan_db.setEnabled(True)
+        else:
+            self.btn_restore_scan_db.setText(translator.tr("scan_settings_btn_restore_unavailable"))
+            self.btn_restore_scan_db.setEnabled(False)
 
     def set_search_target(self, target, ph_key):
         """Dynamically swaps the placeholder text and triggers an instant refilter."""

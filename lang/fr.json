@@ -285,5 +285,14 @@
     "msg_amazon_login_failed": "Échec de l'authentification avec Amazon Luna.",
     "msg_steamgriddb_login_failed": "Impossible de capturer la clé API SteamGridDB automatiquement.",
     "dialog_sgdb_warn_no_vertical_covers": "Page de jeu trouvée, mais aucune couverture verticale 600x900 n'a été trouvée pour '{game_title}'. Affichage des autres formats de médias disponibles.",
-    "msg_epic_login_failed": "Impossible de capturer automatiquement le code d'autorisation d'Epic Games."
+    "msg_epic_login_failed": "Impossible de capturer automatiquement le code d'autorisation d'Epic Games.",
+    "scan_settings_btn_restore_available": "Restaurer la dernière sauvegarde pré-scan - {date}",
+    "scan_settings_btn_restore_unavailable": "Aucune sauvegarde pré-scan disponible",
+    "gamecard_tooltip_youtube": "Regarder la bande-annonce sur YouTube",
+    "gamecard_tooltip_folder": "Ouvrir le dossier local",
+    "gamecard_tooltip_edit": "Modifier les métadonnées",
+    "gamecard_tooltip_scan": "Rechercher les métadonnées (IGDB)",
+    "gamecard_tooltip_set_ok": "Définir comme OK (Retirer de la liste Nouveau)",
+    "gamecard_tooltip_hide": "Masquer le jeu de la bibliothèque principale",
+    "gamecard_tooltip_unhide": "Afficher le jeu"
 }

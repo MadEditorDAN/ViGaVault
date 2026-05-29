@@ -479,4 +479,147 @@ class QtLogHandler(logging.Handler):
 
     def emit(self, record):
         msg = self.format(record)
+        # WHY: Filter out technical/noisy backend logs from the clean UI sidebar
+        if "Failed to rename image" in msg: return
+        if "Successfully created encrypted backup" in msg: return
+        if "Automated pre-scan database backup saved to" in msg: return
+        
         self.signal_emitter.message_written.emit(msg)
+
+
+# ==============================================================================
+# --- CENTRALIZED UNICODE BOX FORMATTING ENGINE ---
+# ==============================================================================
+
+def format_header_row(title, is_secondary=False, col_spec=None):
+    """
+    Renders standard headers centered in an 80-character boundary.
+    If is_secondary=False:
+      Primary Header: ╔═════════════════╤╣ TITLE ╠═════════════════════╗
+    If is_secondary=True:
+      Secondary Divider: ╟──────────────────────────────┤ TITLE ├──────────────────────────────╢
+    """
+    if not is_secondary:
+        title_part = f"╣ {title} ╠"
+        if col_spec:
+            header = "╔" + "═"*17 + "╤" + title_part
+            col2_leftover = col_spec[1] - len(title_part)
+            if col2_leftover < 0:
+                col2_leftover = 0
+            header += "═" * col2_leftover
+            for w in col_spec[2:]:
+                header += "╤" + "═"*w
+            header += "╗"
+            return header[:80]
+        else:
+            header = "╔" + "═"*17 + "╤" + title_part
+            leftover = 80 - len(header) - 1
+            if leftover < 0:
+                leftover = 0
+            header += "═" * leftover + "╗"
+            return header[:80]
+    else:
+        title_part = f"┤ {title} ├"
+        content_len = 78
+        leftover = content_len - len(title_part)
+        left_pad = leftover // 2
+        right_pad = content_len - len(title_part) - left_pad
+        return "╟" + "─"*left_pad + title_part + "─"*right_pad + "╢"
+
+def format_middle_header(title, col_spec=None):
+    """
+    Renders headers in the middle of a box container:
+    ╠═════════════════╪╣ REPORT ╠══════════════════════════╧═══════════════════════╣
+    """
+    title_part = f"╣ {title} ╠"
+    if col_spec:
+        header = "╠" + "═"*17 + "╪" + title_part
+        col2_leftover = col_spec[1] - len(title_part)
+        if col2_leftover < 0:
+            col2_leftover = 0
+        header += "═" * col2_leftover
+        for w in col_spec[2:]:
+            header += "╧" + "═"*w
+        header += "╣"
+        return header[:80]
+    else:
+        header = "╠" + "═"*17 + "╪" + title_part
+        leftover = 80 - len(header) - 1
+        if leftover < 0:
+            leftover = 0
+        header += "═" * leftover + "╣"
+        return header[:80]
+
+def format_box_bottom(col_spec=None):
+    """
+    Renders standard bottom borders:
+    ╚═════════════════╧════════════════════════════════════════════════════════════╝
+    """
+    if col_spec:
+        bottom = "╚" + "═"*17
+        for w in col_spec[1:]:
+            bottom += "╧" + "═"*w
+        bottom += "╝"
+        return bottom[:80]
+    else:
+        return "╚" + "═"*78 + "╝"
+
+def format_separator_row(col_spec, splits):
+    """
+    Renders standard sub-borders with custom split characters (e.g. ┼, ┬, ┴):
+    ╟─────────────────┼────────────────────────────────────┼─────┬─────┬─────┬─────╢
+    """
+    row = "╟" + "─"*col_spec[0]
+    for w, split_char in zip(col_spec[1:], splits):
+        row += split_char + "─"*w
+    row += "╢"
+    return row[:80]
+
+def format_report_row(label, value):
+    """
+    Renders standardized key-value rows aligned to column 20:
+    ║ Label           │ Value                                                      ║
+    """
+    val_str = str(value)
+    return f"║ {label:<15} │ {val_str:<58} ║"
+
+def format_operation_row(operation, title, img_ok, trl_ok):
+    """
+    Renders operational action logs in standard 6-column format:
+    ║ Added           │ Bramble The Mountain King          │ Img │ No  │ Trl │ Yes ║
+    """
+    img_str = "Yes" if img_ok else "No"
+    trl_str = "Yes" if trl_ok else "No"
+    col1 = f" {operation:<15} "
+    t_sliced = title[:34]
+    col2 = f" {t_sliced:<34} "
+    col3 = " Img "
+    col4 = f" {img_str:<3} "
+    col5 = " Trl "
+    col6 = f" {trl_str:<3} "
+    return f"║{col1}│{col2}│{col3}│{col4}│{col5}│{col6}║"
+
+def format_matrix_row(platform, scanned, added, merged, deleted):
+    """
+    Renders storefront summaries in the global full scan report matrix:
+    ║ Amazon          │ Scan │ 369   │ Add │ 0     │ Merge │ 0     │ Delete │ 0    ║
+    """
+    p_str = f" {platform:<15} "
+    return f"║{p_str}│ Scan │ {scanned:<5} │ Add │ {added:<5} │ Merge │ {merged:<5} │ Delete │ {deleted:<4} ║"
+
+def format_matrix_divider(is_middle=False):
+    """
+    Renders the matrix horizontal borders:
+    ╠═════════════════╤══════╤═══════╤═════╤═══════╤═══════╤═══════╤════════╤══════╣
+    """
+    mid = "╪" if is_middle else "╤"
+    bot = "╧" if is_middle else "╤"
+    return "╠" + "═"*17 + mid + "═"*6 + bot + "═"*7 + bot + "═"*5 + bot + "═"*7 + bot + "═"*7 + bot + "═"*7 + bot + "═"*8 + bot + "═"*6 + "╣"
+
+def format_total_db_row(label, value):
+    """
+    Renders the custom final database total row:
+    ║ TOTAL Games in the Database - VGV-DB.DAT                       │    2451     ║
+    """
+    val_str = str(value)
+    return f"║ {label:<62} │ {val_str:>11} ║"

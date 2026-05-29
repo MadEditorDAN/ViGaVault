@@ -54,7 +54,9 @@ class BackupDialog(QDialog):
 
     def execute_backup(self):
         # WHY: Always provide a safe file dialog so the user dictates exactly where the backup lives.
-        file_path, _ = QFileDialog.getSaveFileName(self, "Save Backup", "ViGaVault_Backup.vgv", "ViGaVault Backup (*.vgv)")
+        db_name = os.path.splitext(os.path.basename(self.db_path))[0] if self.db_path else "ViGaVault"
+        default_name = f"{db_name}_Backup.vgv"
+        file_path, _ = QFileDialog.getSaveFileName(self, "Save Backup", default_name, "ViGaVault Backup (*.vgv)")
         if not file_path:
             return
             

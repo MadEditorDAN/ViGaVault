@@ -213,7 +213,7 @@ class FilterController(QObject):
         
         checkboxes = []
         row, col = 0, 0
-        for val in sorted(list(values)):
+        for val in sorted(list(values), key=lambda x: x.lower()):
             chk = QCheckBox(val)
             chk.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
             chk.setChecked(True)
@@ -356,7 +356,6 @@ class FilterController(QObject):
             'sort_desc': self.mw.sort_desc,
             'scan_new': getattr(self.mw.sidebar, 'btn_toggle_new', None) and self.mw.sidebar.btn_toggle_new.isChecked(),
             'scan_dlc': getattr(self.mw.sidebar, 'btn_toggle_dlc', None) and self.mw.sidebar.btn_toggle_dlc.isChecked(),
-            'scan_review': getattr(self.mw.sidebar, 'btn_toggle_review', None) and self.mw.sidebar.btn_toggle_review.isChecked(),
             'scan_no_img': getattr(self.mw.sidebar, 'btn_toggle_no_img', None) and self.mw.sidebar.btn_toggle_no_img.isChecked(),
             'scan_no_trl': getattr(self.mw.sidebar, 'btn_toggle_no_trl', None) and self.mw.sidebar.btn_toggle_no_trl.isChecked(),
         }

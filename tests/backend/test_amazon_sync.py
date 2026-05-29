@@ -61,3 +61,33 @@ def test_gog_galaxy_amazon_game_is_immune_to_deletion():
 
     # - "Ghost Game" must be deleted because its native UUID is missing from the cloud claims list
     assert "Ghost Game" not in games_dict
+
+
+def test_get_claim_year():
+    # WHY: Test that get_claim_year correctly parses millisecond-based Unix timestamps, ISO 8601 strings, and fallback scenarios.
+    from backend.amazon.sync_amazon import get_claim_year
+    from datetime import datetime
+
+    # 1. Test ISO 8601 string
+    claim_iso = {"orderCreationDate": "2026-05-04T13:02:22Z"}
+    assert get_claim_year(claim_iso) == 2026
+
+    # 2. Test Unix millisecond timestamp string
+    claim_ms_str = {"orderCreationDate": "1716912345678"} # 2024-05-28
+    assert get_claim_year(claim_ms_str) == 2024
+
+    # 3. Test Unix millisecond timestamp integer
+    claim_ms_int = {"orderCreationDate": 1716912345678}
+    assert get_claim_year(claim_ms_int) == 2024
+
+    # 4. Test Unix second timestamp string
+    claim_sec_str = {"orderCreationDate": "1716912345"}
+    assert get_claim_year(claim_sec_str) == 2024
+
+    # 5. Test missing date fallback
+    claim_empty = {}
+    assert get_claim_year(claim_empty) == datetime.now().year
+
+    # 6. Test invalid string fallback
+    claim_invalid = {"orderCreationDate": "invalid_date"}
+    assert get_claim_year(claim_invalid) == datetime.now().year

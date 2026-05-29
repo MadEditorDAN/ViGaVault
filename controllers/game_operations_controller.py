@@ -14,32 +14,7 @@ class GameOperationsController(QObject):
         super().__init__(main_window)
         self.mw = main_window
 
-    def approve_reviews(self):
-        manager = LibraryManager(build_scanner_config())
-        manager.load_db()
-        changes_made = False
-        for folder, game in manager.games.items():
-            if game.data.get('Status_Flag') == 'REVIEW':
-                game.data['Status_Flag'] = 'OK'
-                changes_made = True
-                
-        if changes_made:
-            while True:
-                try:
-                    manager.save_db()
-                    break
-                except PermissionError:
-                    reply = QMessageBox.warning(self.mw, "File Locked", translator.tr("msg_file_locked", db_path=get_db_path()), QMessageBox.Ok | QMessageBox.Cancel)
-                    if reply == QMessageBox.Cancel: return
 
-            if 'Status_Flag' in self.mw.master_df.columns:
-                self.mw.master_df.loc[self.mw.master_df['Status_Flag'] == 'REVIEW', 'Status_Flag'] = 'OK'
-            if 'Status_Flag' in self.mw.current_df.columns:
-                self.mw.current_df.loc[self.mw.current_df['Status_Flag'] == 'REVIEW', 'Status_Flag'] = 'OK'
-
-            self.mw.library_controller.update_status_checkboxes_state()
-            self.mw.list_controller.update_visible_widgets()
-            logging.info(f"{'Approved':<15} : All games pending review have been approved")
 
     def update_game_data(self, folder_name, new_data):
         manager = LibraryManager(build_scanner_config())
@@ -157,6 +132,37 @@ class GameOperationsController(QObject):
         for folder in folder_names: self.update_game_data(folder, new_data)
 
     def batch_delete_metadata(self, field, items_to_delete):
-        # WHY: Reuse single-update engine for mass-scale safety.
-        for folder in self.mw.master_df['Folder_Name']:
-            self.update_game_data(folder, {field: ""}) # Simplified for brevity, standard string deletion omitted.
+        manager = LibraryManager(build_scanner_config())
+        manager.load_db()
+        items_set = set(items_to_delete)
+        
+        updated_folders = []
+        for folder_name, game_obj in manager.games.items():
+            current_val = game_obj.data.get(field, "")
+            if not current_val: continue
+            
+            parts = [p.strip() for p in str(current_val).split(',')]
+            new_parts = [p for p in parts if p not in items_set and p]
+            
+            if len(parts) != len(new_parts):
+                game_obj.data[field] = ", ".join(new_parts)
+                updated_folders.append(folder_name)
+                
+        if not updated_folders: return
+        
+        while True:
+            try:
+                manager.save_db()
+                break
+            except PermissionError:
+                reply = QMessageBox.warning(self.mw, "File Locked", translator.tr("msg_file_locked", db_path=get_db_path()), QMessageBox.Ok | QMessageBox.Cancel)
+                if reply == QMessageBox.Cancel: return
+                
+        for folder in updated_folders:
+            self.mw.library_controller.patch_memory_df(folder, manager.games[folder].to_dict())
+            # Safely update UI if visible
+            self.mw.list_controller.update_single_card(folder, force_media_reload=False)
+            
+        self.mw.library_controller.update_status_checkboxes_state()
+        self.mw.filter_controller.request_filter_update()
+        self.mw.settings_controller.save_settings()

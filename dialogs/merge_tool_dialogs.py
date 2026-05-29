@@ -72,8 +72,8 @@ class MergeSelectionDialog(QDialog):
         btn_confirm.clicked.connect(self.accept)
         btn_cancel.clicked.connect(self.reject)
         btn_box.addStretch()
-        btn_box.addWidget(btn_confirm)
         btn_box.addWidget(btn_cancel)
+        btn_box.addWidget(btn_confirm)
         layout.addLayout(btn_box)
 
     def populate_list(self):

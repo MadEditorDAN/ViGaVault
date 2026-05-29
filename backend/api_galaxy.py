@@ -10,12 +10,16 @@ import shutil
 from datetime import datetime
 from urllib.parse import urlparse
 
-from ViGaVault_utils import BASE_DIR, get_safe_filename, normalize_genre
+from ViGaVault_utils import (
+    BASE_DIR, get_safe_filename, normalize_genre,
+    format_header_row, format_middle_header, format_box_bottom,
+    format_separator_row, format_report_row, format_operation_row
+)
 from .game import Game
 from .api_igdb import get_igdb_access_token
 
 def sync_galaxy_database(config, games_dict, worker_thread=None):
-    logging.info(f"\n{' GALAXY SYNC ':=^80}")
+    logging.info(format_header_row("GALAXY SCAN", is_secondary=False, col_spec=[17, 36, 5, 5, 5, 5]))
     galaxy_db_path = config.get('galaxy_db_path', os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db'))
 
     if not os.path.exists(galaxy_db_path):
@@ -71,6 +75,7 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
     
     found_galaxy_keys = set()
     processed_games_session = set()
+    ops_logged = 0
 
     while True:
         if worker_thread and worker_thread.isInterruptionRequested(): break
@@ -114,6 +119,8 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
                 continue
 
             title = re.sub(r'\s*-\s*Amazon.*$', '', title, flags=re.IGNORECASE)
+            # WHY: Strip bracketed UUIDs that some platforms inject directly into their local DB titles.
+            title = re.sub(r'\s*\[[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}\]', '', title)
             title = re.sub(r'[^\w\s\-\.\:\,\;\!\?\(\)\[\]\&\'\"]', '', title)
 
             # WHY: Using an underscore leverages ASCII sorting to force it to the very top of the filter list.
@@ -326,11 +333,13 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
                 game_obj.data['Cover_URL'] = cover_url
                 
             if act_str in ["Added", "Merged"]:
-                img_str = "Yes" if game_obj.data.get('Cover_URL') or game_obj.data.get('Image_Link') else "No "
-                trl_str = "Yes" if game_obj.data.get('Trailer_Link') and game_obj.data.get('Trailer_Link') != 'Not_on_Steam' else "No "
+                if ops_logged == 0:
+                    logging.info(format_separator_row([17, 36, 5, 5, 5, 5], ["┼", "┼", "┬", "┬", "┬"]))
                 
-                action_title = f"{act_str} : {title}"
-                logging.info(f"|{action_title[:56]:<56}| Img: {img_str[:3]:<3} | Trl: {trl_str[:3]:<3} |")
+                has_img = bool(game_obj.data.get('Cover_URL') or game_obj.data.get('Image_Link'))
+                has_trl = bool(game_obj.data.get('Trailer_Link') and str(game_obj.data.get('Trailer_Link')).startswith('http'))
+                logging.info(format_operation_row(act_str, title, has_img, has_trl))
+                ops_logged += 1
                 
             # End of loop assignment
             if act_str == "Added" or force_media_refresh:
@@ -403,21 +412,28 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
                     ghosts_to_delete.append(folder_name)
 
         for folder in ghosts_to_delete:
-            action_title = f"Ghost Delete : {folder}"
-            # WHY: Simplified ghost deletion logging to match the new local scanner format.
-            logging.info(f"|{action_title[:78]:<78}|")
+            if ops_logged == 0:
+                logging.info(format_separator_row([17, 36, 5, 5, 5, 5], ["┼", "┼", "┬", "┬", "┬"]))
+            
+            logging.info(format_operation_row("Deleted", folder, False, False))
+            ops_logged += 1
+            
             del games_dict[folder]
             stats['deleted_ghosts'] += 1
-            # WHY: Fixed unexpected indent to properly align with the loop's execution block.
             stats['deleted_ghost_titles'].append(folder)
 
-    report = f"{' REPORT ':=^80}\n"
-    report += f"Games found in GALAXY: {stats['total_found']}\n"
-    report += f"Games processed successfully: {stats['processed']}\n"
-    report += f"New Added      : {stats['new']}\n"
-    report += f"Smart Merged   : {stats['matched_smart']}\n"
-    report += f"Ghosts Removed : {stats['deleted_ghosts']}\n"
-    report += f"Errors / Ignored: {stats['errors']}\n"
-    report += f"{'='*80}"
+    if ops_logged > 0:
+        logging.info(format_separator_row([17, 36, 5, 5, 5, 5], ["┼", "┼", "┴", "┴", "┴"]))
+        
+    logging.info(format_middle_header("REPORT", col_spec=[17, 36, 5, 5, 5, 5]))
     
-    logging.info(report)
+    already_db = stats['total_found'] - stats['new'] - stats['matched_smart']
+    if already_db < 0: already_db = 0
+    
+    logging.info(format_report_row("Total Games", stats['total_found']))
+    logging.info(format_report_row("Already in DB", already_db))
+    logging.info(format_report_row("New Added", stats['new']))
+    logging.info(format_report_row("Smart Merged", stats['matched_smart']))
+    logging.info(format_report_row("Deleted", stats['deleted_ghosts']))
+    logging.info(format_report_row("Errors/Ignored", stats['errors']))
+    logging.info(format_box_bottom([17, 60]))

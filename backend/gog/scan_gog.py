@@ -2,13 +2,16 @@
 import logging
 import requests
 import difflib
-import difflib
 import re
 from datetime import datetime
 from .login_gog import get_gog_cookies, refresh_gog_token
 from backend.api_igdb import get_igdb_access_token, query_igdb_api
 from backend.game import Game
-from ViGaVault_utils import get_safe_filename, normalize_genre
+from ViGaVault_utils import (
+    get_safe_filename, normalize_genre,
+    format_header_row, format_middle_header, format_box_bottom,
+    format_separator_row, format_report_row, format_operation_row
+)
 
 def scan_gog_account(config, games_dict, worker_thread=None):
     """Fetches user data from GOG.com via browser cookies and safely merges metadata."""
@@ -26,7 +29,7 @@ def scan_gog_account(config, games_dict, worker_thread=None):
     else:
         logging.warning("[GOG.COM] Could not refresh token. Attempting to use the existing one.")
 
-    logging.info(f"\n{' GOG SCAN ':=^80}")
+    logging.info(format_header_row("GOG SCAN", is_secondary=False, col_spec=[17, 36, 5, 5, 5, 5]))
 
     try:
         # WHY: Use the official Bearer token authorization instead of flaky web cookies to bypass Cloudflare.
@@ -95,16 +98,20 @@ def scan_gog_account(config, games_dict, worker_thread=None):
         'merged_titles': []
     }
 
+    ops_logged = 0
+
     def print_report():
+        if ops_logged > 0:
+            logging.info(format_separator_row([17, 36, 5, 5, 5, 5], ["┼", "┼", "┴", "┴", "┴"]))
         stats['failed'] = stats['new_to_fetch'] - stats['matched_smart'] - stats['new_added']
-        report = f"{' REPORT ':=^80}\n"
-        report += f"Total Cloud    : {stats['total_cloud']}\n"
-        report += f"Already in DB  : {stats['already_in_db']}\n"
-        report += f"New Added      : {stats['new_added']}\n"
-        report += f"Smart Merged   : {stats['matched_smart']}\n"
-        report += f"Errors / Skips : {stats['failed']}\n"
-        report += f"{'='*80}"
-        logging.info(report)
+        logging.info(format_middle_header("REPORT", col_spec=[17, 36, 5, 5, 5, 5]))
+        logging.info(format_report_row("Total Games", stats['total_cloud']))
+        logging.info(format_report_row("Already in DB", stats['already_in_db']))
+        logging.info(format_report_row("New Added", stats['new_added']))
+        logging.info(format_report_row("Smart Merged", stats['matched_smart']))
+        logging.info(format_report_row("Deleted", 0))
+        logging.info(format_report_row("Errors/Ignored", stats['failed']))
+        logging.info(format_box_bottom([17, 60]))
 
     if not new_ids:
         print_report()
@@ -162,10 +169,13 @@ def scan_gog_account(config, games_dict, worker_thread=None):
             p_set.add('GOG')
             best_game.data['Platforms'] = ", ".join(sorted(list(p_set)))
             
-            img_str = "Yes" if best_game.data.get('Image_Link') else "No "
-            trl_str = "Yes" if best_game.data.get('Trailer_Link') else "No "
-            action_title = f"Merged : {title_clean}"
-            logging.info(f"|{action_title[:56]:<56}| Img: {img_str[:3]:<3} | Trl: {trl_str[:3]:<3} |")
+            if ops_logged == 0:
+                logging.info(format_separator_row([17, 36, 5, 5, 5, 5], ["┼", "┼", "┬", "┬", "┬"]))
+            
+            img_ok = bool(best_game.data.get('Image_Link'))
+            trl_ok = bool(best_game.data.get('Trailer_Link') and str(best_game.data.get('Trailer_Link')).startswith('http'))
+            logging.info(format_operation_row("Merged", title_clean, img_ok, trl_ok))
+            ops_logged += 1
             
             stats['matched_smart'] += 1
             stats['merged_titles'].append(title_clean)
@@ -231,14 +241,16 @@ def scan_gog_account(config, games_dict, worker_thread=None):
                         game_obj.data['Original_Release_Date'] = dt.strftime('%Y-%m-%d')
                     except Exception: pass
 
-        if game_obj.data.get('Cover_URL') or game_obj.data.get('Image_Link'):
-            img_ok = "Yes"
-
         games_dict[folder_name] = game_obj
         changes_made = True
 
-        action_title = f"Added : {title_clean}"
-        logging.info(f"|{action_title[:56]:<56}| Img: {img_ok[:3]:<3} | Trl: No  |")
+        if ops_logged == 0:
+            logging.info(format_separator_row([17, 36, 5, 5, 5, 5], ["┼", "┼", "┬", "┬", "┬"]))
+        
+        has_img = bool(game_obj.data.get('Cover_URL') or game_obj.data.get('Image_Link'))
+        has_trl = bool(game_obj.data.get('Trailer_Link') and str(game_obj.data.get('Trailer_Link')).startswith('http'))
+        logging.info(format_operation_row("Added", title_clean, has_img, has_trl))
+        ops_logged += 1
         
         stats['new_added'] += 1
 

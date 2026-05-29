@@ -240,7 +240,8 @@ class Game:
                 g = best_match
                 self.data['Clean_Title'] = g.get('name', self.data['Clean_Title'])
                 self.data['Summary'] = g.get('summary', '')
-                self.data['Genre'] = normalize_genre(", ".join([ge.get('name', '') for ge in g.get('genres', [])]))
+                new_genres = ", ".join([ge.get('name', '') for ge in g.get('genres', [])])
+                self.data['Genre'] = normalize_genre(f"{new_genres}, {self.data.get('Genre', '')}")
                 
                 companies = g.get('involved_companies', [])
                 self.data['Developer'] = ", ".join([c.get('company', {}).get('name', '') for c in companies if c.get('developer') and c.get('company', {}).get('name')])
@@ -347,7 +348,8 @@ class Game:
                 g = best_match
                 self.data['Clean_Title'] = g.get('name', self.data['Clean_Title'])
                 self.data['Summary'] = g.get('summary', '')
-                self.data['Genre'] = normalize_genre(", ".join([ge.get('name', '') for ge in g.get('genres', [])]))
+                new_genres = ", ".join([ge.get('name', '') for ge in g.get('genres', [])])
+                self.data['Genre'] = normalize_genre(f"{new_genres}, {self.data.get('Genre', '')}")
                 
                 companies = g.get('involved_companies', [])
                 self.data['Developer'] = ", ".join([c.get('company', {}).get('name', '') for c in companies if c.get('developer') and c.get('company', {}).get('name')])
@@ -373,7 +375,8 @@ class Game:
     def apply_candidate_data(self, g):
         self.data['Clean_Title'] = g.get('name', self.data.get('Clean_Title'))
         self.data['Summary'] = g.get('summary', '')
-        self.data['Genre'] = normalize_genre(", ".join([ge.get('name', '') for ge in g.get('genres', [])]))
+        new_genres = ", ".join([ge.get('name', '') for ge in g.get('genres', [])])
+        self.data['Genre'] = normalize_genre(f"{new_genres}, {self.data.get('Genre', '')}")
         
         companies = g.get('involved_companies', [])
         self.data['Developer'] = ", ".join([c.get('company', {}).get('name', '') for c in companies if c.get('developer') and c.get('company', {}).get('name')])

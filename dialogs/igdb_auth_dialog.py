@@ -41,8 +41,8 @@ class IGDBAuthDialog(QDialog):
         btn_cancel.clicked.connect(self.reject)
         
         btn_layout.addStretch()
-        btn_layout.addWidget(self.btn_apply)
         btn_layout.addWidget(btn_cancel)
+        btn_layout.addWidget(self.btn_apply)
         layout.addLayout(btn_layout)
         
     def validate_and_save(self):

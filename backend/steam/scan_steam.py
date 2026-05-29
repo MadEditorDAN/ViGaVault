@@ -4,7 +4,11 @@ import logging
 import requests
 import re
 from backend.game import Game
-from ViGaVault_utils import get_safe_filename
+from ViGaVault_utils import (
+    get_safe_filename,
+    format_header_row, format_middle_header, format_box_bottom,
+    format_separator_row, format_report_row, format_operation_row
+)
 from .login_steam import get_steam_session
 
 def scan_steam_account(config, games_dict, worker_thread=None):
@@ -22,7 +26,6 @@ def scan_steam_account(config, games_dict, worker_thread=None):
     try:
         games_list = []
         if api_key:
-            logging.info("[STEAM] Using Legacy API Key for scan...")
             url = f"https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key={api_key}&steamid={steam_id}&include_appinfo=1"
             response = requests.get(url, timeout=15)
             if response.status_code == 200:
@@ -32,7 +35,6 @@ def scan_steam_account(config, games_dict, worker_thread=None):
                 logging.error(f"[STEAM] API Key scan failed: HTTP {response.status_code}")
                 return False, {}
         else:
-            logging.info("[STEAM] Using Web Scraper for scan...")
             url = f"https://steamcommunity.com/profiles/{steam_id}/games/?tab=all"
             
             import urllib.parse
@@ -80,8 +82,11 @@ def scan_steam_account(config, games_dict, worker_thread=None):
             if gid.startswith('steam_'):
                 existing_steam_set.add(gid.replace('steam_', ''))
 
+    logging.info(format_header_row("STEAM SCAN", is_secondary=False, col_spec=[17, 36, 5, 5, 5, 5]))
+
     changes_made = False
-    stats = {'total_cloud': len(games_list), 'already_in_db': 0, 'new_added': 0}
+    stats = {'total_cloud': len(games_list), 'already_in_db': 0, 'new_added': 0, 'matched_smart': 0}
+    ops_logged = 0
 
     for game in games_list:
         if worker_thread and worker_thread.isInterruptionRequested(): break
@@ -132,8 +137,16 @@ def scan_steam_account(config, games_dict, worker_thread=None):
             best_game.data['Platforms'] = ", ".join(sorted(list(p_set)))
             
             changes_made = True
-            stats['already_in_db'] += 1
-            logging.info(f"|{'Merged : ' + title_clean[:48]:<56}| Img: Yes | Trl: Yes |")
+            
+            if ops_logged == 0:
+                logging.info(format_separator_row([17, 36, 5, 5, 5, 5], ["┼", "┼", "┬", "┬", "┬"]))
+            
+            img_ok = bool(best_game.data.get('Image_Link'))
+            trl_ok = bool(best_game.data.get('Trailer_Link') and str(best_game.data.get('Trailer_Link')).startswith('http'))
+            logging.info(format_operation_row("Merged", title_clean, img_ok, trl_ok))
+            ops_logged += 1
+            
+            stats['matched_smart'] += 1
             continue
             
         folder_name = get_safe_filename(title_clean) or f"Unknown Game [{appid}]"
@@ -143,8 +156,24 @@ def scan_steam_account(config, games_dict, worker_thread=None):
         games_dict[folder_name] = game_obj
         changes_made = True
         stats['new_added'] += 1
-        logging.info(f"|{'Added : ' + title_clean[:48]:<56}| Img: No  | Trl: No  |")
+        
+        if ops_logged == 0:
+            logging.info(format_separator_row([17, 36, 5, 5, 5, 5], ["┼", "┼", "┬", "┬", "┬"]))
+        
+        has_img = bool(game_obj.data.get('Cover_URL') or game_obj.data.get('Image_Link'))
+        has_trl = bool(game_obj.data.get('Trailer_Link') and str(game_obj.data.get('Trailer_Link')).startswith('http'))
+        logging.info(format_operation_row("Added", title_clean, has_img, has_trl))
+        ops_logged += 1
 
-    report = f"{' REPORT ':=^80}\nTotal Cloud    : {stats['total_cloud']}\nAlready in DB  : {stats['already_in_db']}\nNew Added      : {stats['new_added']}\n{'='*80}"
-    logging.info(report)
+    if ops_logged > 0:
+        logging.info(format_separator_row([17, 36, 5, 5, 5, 5], ["┼", "┼", "┴", "┴", "┴"]))
+        
+    logging.info(format_middle_header("REPORT", col_spec=[17, 36, 5, 5, 5, 5]))
+    logging.info(format_report_row("Total Games", stats['total_cloud']))
+    logging.info(format_report_row("Already in DB", stats['already_in_db']))
+    logging.info(format_report_row("New Added", stats['new_added']))
+    logging.info(format_report_row("Smart Merged", stats['matched_smart']))
+    logging.info(format_report_row("Deleted", 0))
+    logging.info(format_report_row("Errors/Ignored", 0))
+    logging.info(format_box_bottom([17, 60]))
     return changes_made, stats

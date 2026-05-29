@@ -10,7 +10,11 @@ from .login_epic import get_epic_session, refresh_epic_token
 from .epic_platform_mapper import map_epic_platforms
 from backend.api_igdb import get_igdb_access_token
 from backend.game import Game
-from ViGaVault_utils import get_safe_filename, normalize_genre
+from ViGaVault_utils import (
+    get_safe_filename, normalize_genre,
+    format_header_row, format_middle_header, format_box_bottom,
+    format_separator_row, format_report_row, format_operation_row
+)
 
 def scan_epic_account(config, games_dict, worker_thread=None):
     session = get_epic_session()
@@ -27,7 +31,7 @@ def scan_epic_account(config, games_dict, worker_thread=None):
         logging.error("[EPIC GAMES] No valid OAuth token found. Please connect your account in the Platform Manager.")
         return False, {}
         
-    logging.info(f"\n{' EPIC GAMES SCAN ':=^80}")
+    logging.info(format_header_row("EPIC GAMES SCAN", is_secondary=False, col_spec=[17, 36, 5, 5, 5, 5]))
     
     headers = {"Authorization": f"Bearer {access_token}"}
     
@@ -80,6 +84,8 @@ def scan_epic_account(config, games_dict, worker_thread=None):
         'merged_titles': [],
         'ignored_titles': []
     }
+
+    ops_logged = 0
 
     for item in records:
         if worker_thread and worker_thread.isInterruptionRequested(): break
@@ -188,10 +194,13 @@ def scan_epic_account(config, games_dict, worker_thread=None):
                     if mp.strip(): p_set.add(mp.strip())
                 best_game.data['Platforms'] = ", ".join(sorted(list(p_set)))
                 
-                img_str = "Yes" if best_game.data.get('Image_Link') else "No "
-                trl_str = "Yes" if best_game.data.get('Trailer_Link') else "No "
-                action_title = f"Merged : {title_clean}"
-                logging.info(f"|{action_title[:56]:<56}| Img: {img_str[:3]:<3} | Trl: {trl_str[:3]:<3} |")
+                if ops_logged == 0:
+                    logging.info(format_separator_row([17, 36, 5, 5, 5, 5], ["┼", "┼", "┬", "┬", "┬"]))
+                
+                img_ok = bool(best_game.data.get('Image_Link'))
+                trl_ok = bool(best_game.data.get('Trailer_Link') and str(best_game.data.get('Trailer_Link')).startswith('http'))
+                logging.info(format_operation_row("Merged", title_clean, img_ok, trl_ok))
+                ops_logged += 1
                 
                 stats['matched_smart'] += 1
                 stats['merged_titles'].append(title_clean)
@@ -250,28 +259,33 @@ def scan_epic_account(config, games_dict, worker_thread=None):
                     game_obj.fill_missing_metadata(igdb_token)
                 
             game_obj.data['Status_Flag'] = 'OK'
-            img_ok = "Yes" if game_obj.data.get('Cover_URL') or game_obj.data.get('Image_Link') else "No "
             
             games_dict[folder_name] = game_obj
             changes_made = True
             stats['new_added'] += 1
             
-            action_title = f"Added : {title_clean}"
-            logging.info(f"|{action_title[:56]:<56}| Img: {img_ok[:3]:<3} | Trl: No  |")
+            if ops_logged == 0:
+                logging.info(format_separator_row([17, 36, 5, 5, 5, 5], ["┼", "┼", "┬", "┬", "┬"]))
+            
+            has_img = bool(game_obj.data.get('Cover_URL') or game_obj.data.get('Image_Link'))
+            has_trl = bool(game_obj.data.get('Trailer_Link') and str(game_obj.data.get('Trailer_Link')).startswith('http'))
+            logging.info(format_operation_row("Added", title_clean, has_img, has_trl))
+            ops_logged += 1
             
         except Exception as e:
             logging.error(f"    [EPIC ERROR] Failed processing {app_name}: {e}")
             stats['errors'] += 1
             stats['ignored_titles'].append(str(app_name))
             
-    # WHY: Dynamically append captured titles using exact space formatting so they cleanly indent under the colons.
-    report = f"{' REPORT ':=^80}\n"
-    report += f"Total Cloud    : {stats['total_cloud']}\n"
-    report += f"Already in DB  : {stats['already_in_db']}\n"
-    report += f"New Added      : {stats['new_added']}\n"
-    report += f"Smart Merged   : {stats['matched_smart']}\n"
-    report += f"DLCs/Ignored   : {stats['errors'] + stats['skipped']}\n"
-    report += f"{'='*80}"
+    if ops_logged > 0:
+        logging.info(format_separator_row([17, 36, 5, 5, 5, 5], ["┼", "┼", "┴", "┴", "┴"]))
     
-    logging.info(report)
+    logging.info(format_middle_header("REPORT", col_spec=[17, 36, 5, 5, 5, 5]))
+    logging.info(format_report_row("Total Games", stats['total_cloud']))
+    logging.info(format_report_row("Already in DB", stats['already_in_db']))
+    logging.info(format_report_row("New Added", stats['new_added']))
+    logging.info(format_report_row("Smart Merged", stats['matched_smart']))
+    logging.info(format_report_row("Deleted", 0))
+    logging.info(format_report_row("Errors/Ignored", stats['errors'] + stats['skipped']))
+    logging.info(format_box_bottom([17, 60]))
     return changes_made, stats

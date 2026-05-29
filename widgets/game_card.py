@@ -181,7 +181,7 @@ class GameCard(QWidget):
 
         self.buttons = {}
         self.actions_col.addStretch()
-        for name in ['scan', 'edit', 'folder', 'youtube']:
+        for name in ['scan', 'edit', 'folder', 'youtube', 'set_ok', 'toggle_hide']:
             btn = QPushButton()
             self.buttons[name] = btn
             btn.installEventFilter(self)
@@ -192,6 +192,8 @@ class GameCard(QWidget):
         self.buttons['folder'].clicked.connect(self.open_folder)
         self.buttons['edit'].clicked.connect(self.edit_game)
         self.buttons['scan'].clicked.connect(self.scan_game)
+        self.buttons['set_ok'].clicked.connect(self.set_as_ok)
+        self.buttons['toggle_hide'].clicked.connect(self.toggle_hide_game)
         
         main_layout.addWidget(self.actions_frame)
 
@@ -200,12 +202,18 @@ class GameCard(QWidget):
         settings = getattr(self.parent_window, 'display_settings', DEFAULT_DISPLAY_SETTINGS)
         btn_size = settings.get('button', DEFAULT_DISPLAY_SETTINGS['button'])
 
+        is_hidden = str(self.data.get('Is_Excluded', '')).lower() in ['true', '1'] or str(self.data.get('Is_DLC', '')).lower() in ['true', '1']
+        is_new = self.data.get('Status_Flag') in ['NEW', 'NEEDS_ATTENTION']
+        show_extra = is_new or is_hidden
+        
         # WHY: Injected tooltip translation keys directly into the dictionary to map them cleanly within the DRY loop.
         button_definitions = {
             'youtube':     {'enabled': has_trailer,     'fallback': "▶", 'font_size': "32px", 'tt_key': 'gamecard_tooltip_youtube'},
             'folder':      {'enabled': has_local_folder,'fallback': "📁", 'font_size': "32px", 'tt_key': 'gamecard_tooltip_folder'},
             'edit':        {'enabled': True,            'fallback': "✏️", 'font_size': "28px", 'tt_key': 'gamecard_tooltip_edit'},
-            'scan':        {'enabled': True,            'fallback': "🔍", 'font_size': "28px", 'tt_key': 'gamecard_tooltip_scan'}
+            'scan':        {'enabled': True,            'fallback': "🔍", 'font_size': "28px", 'tt_key': 'gamecard_tooltip_scan'},
+            'set_ok':      {'enabled': True,            'fallback': "✔️", 'font_size': "28px", 'tt_key': 'gamecard_tooltip_set_ok'},
+            'toggle_hide': {'enabled': True,            'fallback': "👁️" if is_hidden else "🙈", 'font_size': "28px", 'tt_key': 'gamecard_tooltip_unhide' if is_hidden else 'gamecard_tooltip_hide'}
         }
 
         for name, props in button_definitions.items():
@@ -249,7 +257,12 @@ class GameCard(QWidget):
                 btn.setIcon(QIcon())
             
             btn.setEnabled(props['enabled'])
-            btn.setToolTip(translator.tr(props['tt_key']))
+            # Only tr if the key exists, else fallback to raw string for new keys
+            tt_key = props['tt_key']
+            btn.setToolTip(translator.tr(tt_key))
+            
+            if name in ['set_ok', 'toggle_hide']:
+                btn.setVisible(show_extra)
 
     def refresh_ui_from_data(self, force_media_reload=False):
         """WHY: Allows surgical updates of the UI instantly without reloading the widget or the list."""
@@ -404,3 +417,20 @@ class GameCard(QWidget):
     def scan_game(self):
         if hasattr(self.parent_window, 'start_inline_scan'):
             self.parent_window.start_inline_scan(self.data)
+
+    def set_as_ok(self):
+        self.parent_window.update_game_data(self.data['Folder_Name'], {'Status_Flag': 'OK'})
+        
+    def toggle_hide_game(self):
+        is_hidden = str(self.data.get('Is_Excluded', '')).lower() in ['true', '1'] or str(self.data.get('Is_DLC', '')).lower() in ['true', '1']
+        # If it was hidden, we UNHIDE it (Is_Excluded = False, Is_DLC = False)
+        # If it was visible, we HIDE it (Is_Excluded = True)
+        new_data = {}
+        if is_hidden:
+            new_data['Is_Excluded'] = False
+            new_data['Is_DLC'] = False
+            new_data['Status_Flag'] = 'OK'
+        else:
+            new_data['Is_Excluded'] = True
+            
+        self.parent_window.update_game_data(self.data['Folder_Name'], new_data)

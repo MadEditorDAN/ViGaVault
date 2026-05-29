@@ -47,8 +47,16 @@ class DisplayTabWidget(QWidget):
         self.combo_date.currentIndexChanged.connect(self.notify_changed)
         col_date.addWidget(self.combo_date)
         
+        col_time = QVBoxLayout()
+        col_time.addWidget(QLabel(translator.tr("settings_display_time_format")))
+        self.combo_time = QComboBox()
+        self.combo_time.addItems(["24h", "12h"])
+        self.combo_time.currentIndexChanged.connect(self.notify_changed)
+        col_time.addWidget(self.combo_time)
+        
         layout_reg.addLayout(col_lang)
         layout_reg.addLayout(col_date)
+        layout_reg.addLayout(col_time)
         layout.addWidget(grp_reg)
         
         grp_sizes = QGroupBox(translator.tr("settings_display_sizes_group"))
@@ -114,6 +122,7 @@ class DisplayTabWidget(QWidget):
         
         self.combo_lang.setCurrentText(global_settings.get("language", "English"))
         self.combo_date.setCurrentText(global_settings.get("dateFormat", "DD/MM/YYYY"))
+        self.combo_time.setCurrentText(global_settings.get("timeFormat", "24h"))
 
         img_size = global_settings.get("cardImageSize", DEFAULT_DISPLAY_SETTINGS['image'])
         self.slider_img_size.setValue(self.IMG_SIZES.index(min(self.IMG_SIZES, key=lambda x:abs(x-img_size))))
@@ -131,6 +140,7 @@ class DisplayTabWidget(QWidget):
             "theme": theme_map_rev.get(self.combo_theme.currentText(), "System"),
             "language": self.combo_lang.currentText(),
             "dateFormat": self.combo_date.currentText(),
+            "timeFormat": self.combo_time.currentText(),
             "cardImageSize": self.IMG_SIZES[self.slider_img_size.value()],
             "cardButtonSize": self.BTN_SIZES[self.slider_btn_size.value()],
             "cardTextSize": self.TXT_SIZES[self.slider_text_size.value()]

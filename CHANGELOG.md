@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implemented real-time Amazon session validation check mid-scan (detecting login redirects), providing instant GUI feedback if the active session has expired and needs to be re-applied.
 
 ### Changed
+- Re-engineered the Amazon scan execution pipeline to perform page-reload-free, year-by-year sequential dynamic crawls, rendering results in real-time under a single early header while completely silencing all intermediate headless browser progress logs from both the terminal console and sidebar app screens.
+- Aligned the Amazon headless browser's GraphQL query variables with the actual web UI filter parameters (timeWindow and offerType) and broadened Python claim filtering to include GOG/Epic platform codes, securing full catalog parity.
 - Swapped custom non-native cover import file selector for the native system Windows Explorer dialog in the metadata editor.
 - Removed legacy placeholder storefront checkboxes from the scan settings panel to maintain a clean, active-only storefront layout.
 - Restructured all storefront synchronization logs to return clean count-based metrics instead of spamming verbose game title list prints.
@@ -28,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded platform tagging system to cumulatively append local copy parenthesized platform tags rather than replacing existing storefront platforms.
 - Aligned Amazon Luna scanning logs and report layout to perfectly match standard GOG and Epic formats, ensuring it always outputs a scan header and metrics report block even on empty fetches, and successfully integrates into the final consolidation breakdown and grand totals.
 - Added data-loss guard to Amazon ghost deletion logic, completely preventing the unlinking or deletion of local databases if a transient network/scraper issue returns an empty cloud catalog.
+- Integrated robust millisecond-based Unix timestamp parsing inside the Amazon claim categorization system to ensure historical game acquisitions are perfectly distributed across active catalog year folders.
 
 ### Fixed
 - Fixed the Amazon storefront ghost checking logic by swapping from any() to all(), ensuring Galaxy-synced prefix patterns are immune to unlinking during scans.

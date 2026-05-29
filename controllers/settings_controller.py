@@ -26,7 +26,7 @@ class SettingsController(QObject):
         global_settings, lib_settings = self.get_user_settings()
         
         global_settings.update(display_state)
-        local_keys = ["sortDesc", "sortIndex", "searchText", "anchorFolder", "viewNew", "viewDlc", "viewReview", "filterStates", "filterExpansion", "scanGalaxy", "scanGog", "scanEpic", "scanSteam", "scanAmazon", "scanLocal", "scanFolders", "platformMap", "ignoredPrefixes", "rootPath", "localScanConfig", "enableGalaxyDb", "galaxyDbPath", "downloadImages", "downloadVideos", "imagePath", "videoPath"]
+        local_keys = ["sortDesc", "sortIndex", "searchText", "anchorFolder", "viewNew", "viewDlc", "filterStates", "filterExpansion", "scanGalaxy", "scanGog", "scanEpic", "scanSteam", "scanAmazon", "scanLocal", "scanFolders", "platformMap", "ignoredPrefixes", "rootPath", "localScanConfig", "enableGalaxyDb", "galaxyDbPath", "downloadImages", "downloadVideos", "imagePath", "videoPath"]
         for k in local_keys: global_settings.pop(k, None)
         
         save_encrypted_json(os.path.join(BASE_DIR, "settings.bin"), global_settings)
@@ -69,7 +69,7 @@ class SettingsController(QObject):
             # WHY: Safely ignore C++ teardown errors if save_settings is fired during application closure.
             pass
         
-        local_keys = ["sortDesc", "sortIndex", "searchText", "anchorFolder", "viewNew", "viewDlc", "viewReview", "filterStates", "filterExpansion", "scanGalaxy", "scanGog", "scanEpic", "scanSteam", "scanAmazon", "scanLocal", "scanFolders", "platformMap", "ignoredPrefixes", "rootPath", "localScanConfig", "enableGalaxyDb", "galaxyDbPath", "downloadImages", "downloadVideos", "imagePath", "videoPath"]
+        local_keys = ["sortDesc", "sortIndex", "searchText", "anchorFolder", "viewNew", "viewDlc", "filterStates", "filterExpansion", "scanGalaxy", "scanGog", "scanEpic", "scanSteam", "scanAmazon", "scanLocal", "scanFolders", "platformMap", "ignoredPrefixes", "rootPath", "localScanConfig", "enableGalaxyDb", "galaxyDbPath", "downloadImages", "downloadVideos", "imagePath", "videoPath"]
         for k in local_keys: global_settings.pop(k, None)
         
         save_encrypted_json(os.path.join(BASE_DIR, "settings.bin"), global_settings)
@@ -112,7 +112,6 @@ class SettingsController(QObject):
                 "anchorFolder": self.mw.library_controller.get_second_visible_folder(),
                 "viewNew": self.mw.sidebar.btn_toggle_new.isChecked(),
                 "viewDlc": self.mw.sidebar.btn_toggle_dlc.isChecked(),
-                "viewReview": self.mw.sidebar.btn_toggle_review.isChecked(),
                 "filterStates": filter_states,
                 "filterExpansion": saved_expansion,
                 "scanGalaxy": self.mw.sidebar.chk_scan_galaxy.isChecked(),

@@ -91,14 +91,15 @@ class SteamGridDBPickerDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
+        btn_cancel = QPushButton(translator.tr("dialog_sgdb_btn_cancel"))
+        btn_cancel.clicked.connect(self.reject)
+        button_layout.addWidget(btn_cancel)
+        
         self.btn_select = QPushButton(translator.tr("dialog_sgdb_btn_select"))
         self.btn_select.setEnabled(False)
         self.btn_select.clicked.connect(self.select_current_item)
         button_layout.addWidget(self.btn_select)
         
-        btn_cancel = QPushButton(translator.tr("dialog_sgdb_btn_cancel"))
-        btn_cancel.clicked.connect(self.reject)
-        button_layout.addWidget(btn_cancel)
         layout.addLayout(button_layout)
 
         # Start search automatically if search term is provided

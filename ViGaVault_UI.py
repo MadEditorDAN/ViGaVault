@@ -122,7 +122,6 @@ class MainWindow(QMainWindow):
     # deprecated monolithic functions left over in this file.
     # =================================================================================
     def request_filter_update(self): self.filter_controller.request_filter_update()
-    def approve_reviews(self): self.game_operations_controller.approve_reviews()
     def toggle_sort_order(self): self.filter_controller.toggle_sort_order()
     def start_full_scan(self): self.scan_controller.start_full_scan()
     def open_scan_settings(self): self.scan_controller.open_scan_settings()
@@ -139,6 +138,7 @@ class MainWindow(QMainWindow):
     def save_settings(self): self.settings_controller.save_settings()
     def refresh_data(self): self.library_controller.refresh_data()
     def reload_global_settings(self): self.settings_controller.reload_global_settings()
+    def restore_pre_scan_backup(self): self.library_controller.restore_pre_scan_backup()
 
     def closeEvent(self, event):
         self.settings_controller.save_settings()

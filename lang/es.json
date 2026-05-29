@@ -285,5 +285,14 @@
     "msg_amazon_login_failed": "Error al autenticar con Amazon Luna.",
     "msg_steamgriddb_login_failed": "Error al capturar la clave API de SteamGridDB automáticamente.",
     "dialog_sgdb_warn_no_vertical_covers": "Se encontró la página del juego, pero no se encontraron portadas verticales de 600x900 para '{game_title}'. Mostrando otros formatos de medios disponibles.",
-    "msg_epic_login_failed": "No se pudo capturar el código de autorización de Epic Games automáticamente."
+    "msg_epic_login_failed": "No se pudo capturar el código de autorización de Epic Games automáticamente.",
+    "scan_settings_btn_restore_available": "Restaurar la última copia de seguridad previa al escaneo - {date}",
+    "scan_settings_btn_restore_unavailable": "No hay copia de seguridad previa al escaneo disponible",
+    "gamecard_tooltip_youtube": "Ver tráiler en YouTube",
+    "gamecard_tooltip_folder": "Abrir carpeta local",
+    "gamecard_tooltip_edit": "Editar metadatos",
+    "gamecard_tooltip_scan": "Obtener metadatos de IGDB",
+    "gamecard_tooltip_set_ok": "Marcar como OK (Quitar de la lista Nuevo)",
+    "gamecard_tooltip_hide": "Ocultar juego",
+    "gamecard_tooltip_unhide": "Mostrar juego"
 }

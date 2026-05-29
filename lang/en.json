@@ -75,6 +75,7 @@
     "settings_display_language": "Language",
     "settings_display_regional": "Regional Settings",
     "settings_display_date_format": "Date Format:",
+    "settings_display_time_format": "Time Format:",
     "settings_display_sizes_group": "Element Sizes",
     "settings_folders_scan_local": "Scan for Local Copies",
     "settings_folders_local_copies_group": "Local Copies",
@@ -285,5 +286,14 @@
     "msg_amazon_login_failed": "Failed to authenticate with Amazon Luna.",
     "msg_steamgriddb_login_failed": "Failed to capture SteamGridDB API Key automatically.",
     "dialog_sgdb_warn_no_vertical_covers": "Found game page, but no 600x900 vertical covers were found for '{game_title}'. Showing other available media formats instead.",
-    "msg_epic_login_failed": "Failed to capture Epic Games authorization code automatically."
+    "msg_epic_login_failed": "Failed to capture Epic Games authorization code automatically.",
+    "scan_settings_btn_restore_available": "Restore the last Pre-Scan Database Backup - {date}",
+    "scan_settings_btn_restore_unavailable": "No Pre-Scan Database Backup available",
+    "gamecard_tooltip_youtube": "Watch Trailer on YouTube",
+    "gamecard_tooltip_folder": "Open Local Folder",
+    "gamecard_tooltip_edit": "Edit Game Metadata",
+    "gamecard_tooltip_scan": "Scrape Metadata from IGDB",
+    "gamecard_tooltip_set_ok": "Set as OK (Remove from New list)",
+    "gamecard_tooltip_hide": "Hide Game from Main Library",
+    "gamecard_tooltip_unhide": "Unhide Game"
 }

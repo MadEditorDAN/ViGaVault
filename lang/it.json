@@ -285,5 +285,14 @@
     "msg_amazon_login_failed": "Impossibile autenticarsi con Amazon Luna.",
     "msg_steamgriddb_login_failed": "Impossibile acquisire automaticamente la chiave API di SteamGridDB.",
     "dialog_sgdb_warn_no_vertical_covers": "Pagina del gioco trovata, ma non è stata trovata alcuna copertina verticale 600x900 per '{game_title}'. Verranno mostrati gli altri formati multimediali disponibili.",
-    "msg_epic_login_failed": "Impossibile catturare automaticamente il codice di autorizzazione di Epic Games."
+    "msg_epic_login_failed": "Impossibile catturare automaticamente il codice di autorizzazione di Epic Games.",
+    "scan_settings_btn_restore_available": "Ripristina l'ultimo backup pre-scansione - {date}",
+    "scan_settings_btn_restore_unavailable": "Nessun backup pre-scansione disponibile",
+    "gamecard_tooltip_youtube": "Guarda il trailer su YouTube",
+    "gamecard_tooltip_folder": "Apri cartella locale",
+    "gamecard_tooltip_edit": "Modifica metadati del gioco",
+    "gamecard_tooltip_scan": "Ottieni metadati da IGDB",
+    "gamecard_tooltip_set_ok": "Imposta come OK (Rimuovi dalla lista Nuovo)",
+    "gamecard_tooltip_hide": "Nascondi gioco",
+    "gamecard_tooltip_unhide": "Mostra gioco"
 }

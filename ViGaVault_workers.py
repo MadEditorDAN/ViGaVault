@@ -15,7 +15,7 @@ from ViGaVault_utils import get_db_path, build_scanner_config, get_library_setti
 # Operations like scanning or filtering can take time. We run them in separate threads
 # to prevent the GUI from freezing (becoming unresponsive) while they process.
 class FullScanWorker(QThread):
-    def __init__(self, do_galaxy=True, do_local=True, do_gog_web=False, do_epic=False, do_steam=False, do_amazon=False, amazon_claims=None, do_download_images=True, target_folders=None, parent=None):
+    def __init__(self, do_galaxy=True, do_local=True, do_gog_web=False, do_epic=False, do_steam=False, do_amazon=False, amazon_claims=None, amazon_stats=None, do_download_images=True, target_folders=None, parent=None):
         super().__init__(parent)
         self.do_galaxy = do_galaxy
         self.do_local = do_local
@@ -24,6 +24,7 @@ class FullScanWorker(QThread):
         self.do_steam = do_steam
         self.do_amazon = do_amazon
         self.amazon_claims = amazon_claims or []
+        self.amazon_stats = amazon_stats # WHY: Propagate the accumulated Amazon sequential scan statistics.
         self.do_download_images = do_download_images
         self.target_folders = target_folders
         self.config = build_scanner_config()
@@ -51,7 +52,7 @@ class FullScanWorker(QThread):
         try:
             manager = LibraryManager(self.config)
             manager.load_db()
-            manager.scan_full(worker_thread=self, amazon_claims=self.amazon_claims)
+            manager.scan_full(worker_thread=self, amazon_claims=self.amazon_claims, amazon_stats=self.amazon_stats)
         except Exception as e:
             logging.error(f"Critical error in full scan thread: {e}")
 
@@ -87,53 +88,49 @@ class FilterWorker(QThread):
             
         is_scan_new = self.params.get('scan_new', False)
         is_scan_dlc = self.params.get('scan_dlc', False)
-        is_scan_review = self.params.get('scan_review', False)
         is_scan_no_img = self.params.get('scan_no_img', False)
         is_scan_no_trl = self.params.get('scan_no_trl', False)
 
         # 2. Dynamic Filters (Sidebar Checkboxes)
-        # Only apply if NOT scanning new games, as new games often lack metadata
-        if not is_scan_new and not is_scan_review and not is_scan_no_img and not is_scan_no_trl:
-            active_filters = self.params.get('active_filters', {})
-            for col, selected_values in active_filters.items():
-                if not selected_values:
-                    # If a category is active but has NO items selected, the result is empty.
-                    df = df.iloc[0:0] 
-                    break
-                
-                if col == "Year_Folder":
-                    val = selected_values[0].strip()
-                    if "-" in val:
-                        parts = val.split("-")
-                        if len(parts) == 2:
-                            start_str, end_str = parts[0].strip(), parts[1].strip()
-                            start_y = int(start_str) if start_str.isdigit() else None
-                            end_y = int(end_str) if end_str.isdigit() else None
-                            
-                            year_nums = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
-                            if start_y is not None and end_y is not None:
-                                s, e = min(start_y, end_y), max(start_y, end_y)
-                                df = df[year_nums.between(s, e)]
-                            elif start_y is not None:
-                                df = df[year_nums >= start_y]
-                            elif end_y is not None:
-                                df = df[year_nums <= end_y]
-                            continue
-                    else:
-                        if val.isdigit():
-                            year_nums = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
-                            df = df[year_nums == int(val)]
-                            continue
-                
-                # Regex match for multi-value fields (e.g. "RPG, Action")
-                regex_pattern = '|'.join([re.escape(v) for v in selected_values])
-                df = df[df[col].astype(str).str.contains(regex_pattern, case=False, na=False)]
+        active_filters = self.params.get('active_filters', {})
+        for col, selected_values in active_filters.items():
+            if not selected_values:
+                # If a category is active but has NO items selected, the result is empty.
+                df = df.iloc[0:0] 
+                break
+            
+            if col == "Year_Folder":
+                val = selected_values[0].strip()
+                if "-" in val:
+                    parts = val.split("-")
+                    if len(parts) == 2:
+                        start_str, end_str = parts[0].strip(), parts[1].strip()
+                        start_y = int(start_str) if start_str.isdigit() else None
+                        end_y = int(end_str) if end_str.isdigit() else None
+                        
+                        year_nums = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
+                        if start_y is not None and end_y is not None:
+                            s, e = min(start_y, end_y), max(start_y, end_y)
+                            df = df[year_nums.between(s, e)]
+                        elif start_y is not None:
+                            df = df[year_nums >= start_y]
+                        elif end_y is not None:
+                            df = df[year_nums <= end_y]
+                        continue
+                else:
+                    if val.isdigit():
+                        year_nums = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
+                        df = df[year_nums == int(val)]
+                        continue
+            
+            # Regex match for multi-value fields (e.g. "RPG, Action")
+            regex_pattern = '|'.join([re.escape(v) for v in selected_values])
+            df = df[df[col].astype(str).str.contains(regex_pattern, case=False, na=False)]
 
         # WHY: Status & DLC Filter - Ensures Excluded and DLC items strictly vanish from standard UI views unless manually requested via the DLC toggle.
         allowed_flags = []
         if is_scan_new: 
             allowed_flags.extend(['NEW', 'NEEDS_ATTENTION'])
-        if is_scan_review: allowed_flags.append('REVIEW')
         
         if is_scan_dlc:
             # Show strictly DLCs and Exclusions
@@ -190,15 +187,21 @@ class DbLoaderWorker(QThread):
                     
                 # WHY: Pass 1 - Strictly parse dates using the globally configured Regional Format to prevent day/month swapping.
                 
-                # WHY: Targeted Update - Instead of destructively dropping rows, strictly flag them via 'Is_Excluded' so they remain in memory.
-                df['Is_Excluded'] = False
+                # WHY: Track explicit user unhides to prevent settings exclusions from overwriting them
+                if 'Is_Excluded' not in df.columns: 
+                    df['Is_Excluded'] = ''
+                
+                explicit_false = df['Is_Excluded'].astype(str).str.lower().isin(['false', '0'])
+                df['Is_Excluded'] = df['Is_Excluded'].astype(str).str.lower().isin(['true', '1'])
+                
                 lib_settings_file = get_library_settings_file()
                 settings = load_encrypted_json(lib_settings_file)
                 exclusions = settings.get("exclusion_words", [])
                 if exclusions:
                     pattern = '|'.join([re.escape(w) for w in exclusions])
                     mask = df['Clean_Title'].str.contains(pattern, case=False, na=False)
-                    df.loc[mask, 'Is_Excluded'] = True
+                    # Apply exclusion ONLY if the user hasn't explicitly unhidden it
+                    df.loc[mask & ~explicit_false, 'Is_Excluded'] = True
 
                 parsed_dates = pd.to_datetime(df['Original_Release_Date'], format='%Y-%m-%d', errors='coerce')
                 # WHY: Pass 2 - Catch dates that failed (like pure "2020" years) and fallback to generic parsing.

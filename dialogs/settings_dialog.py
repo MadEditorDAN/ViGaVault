@@ -40,10 +40,10 @@ class SettingsDialog(QDialog):
         self.btn_apply.clicked.connect(self.apply_settings)
         btn_save.clicked.connect(self.accept)
         btn_cancel.clicked.connect(self.reject)
-        btn_layout.addStretch()
         btn_layout.addWidget(self.btn_apply)
-        btn_layout.addWidget(btn_save)
+        btn_layout.addStretch()
         btn_layout.addWidget(btn_cancel)
+        btn_layout.addWidget(btn_save)
         layout.addLayout(btn_layout)
         
         self.tab_display.changed.connect(self.mark_changed)

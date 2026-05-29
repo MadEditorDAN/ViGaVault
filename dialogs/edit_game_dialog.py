@@ -49,7 +49,6 @@ class ActionDialog(QDialog):
         self.chk_ok = QCheckBox(translator.tr("dialog_edit_status_ok"))
         self.chk_ok.setChecked(self.original_data.get('Status_Flag') == 'OK')
         
-        # WHY: Prevent the user from checking both status boxes at the same time.
         self.chk_locked.stateChanged.connect(lambda: self.chk_ok.setChecked(False) if self.chk_locked.isChecked() else None)
         self.chk_ok.stateChanged.connect(lambda: self.chk_locked.setChecked(False) if self.chk_ok.isChecked() else None)
         
@@ -82,6 +81,11 @@ class ActionDialog(QDialog):
             if field in fields_to_disable:
                 inp.setEnabled(False)
                 inp.setStyleSheet("background-color: palette(window);")
+            else:
+                if isinstance(inp, QLineEdit):
+                    inp.textEdited.connect(self.on_field_edited)
+                elif isinstance(inp, QTextEdit):
+                    inp.textChanged.connect(self.on_field_edited)
             self.form_layout.addRow(label_text, inp)
             self.inputs[field] = inp
  
@@ -135,6 +139,7 @@ class ActionDialog(QDialog):
         url_layout = QHBoxLayout()
         url_layout.addWidget(QLabel(translator.tr("dialog_edit_trailer_url_label")))
         self.url_line_edit = QLineEdit()
+        self.url_line_edit.textEdited.connect(self.on_field_edited)
         url_layout.addWidget(self.url_line_edit, 1)
         copy_btn = QPushButton(translator.tr("dialog_edit_trailer_copy_btn"))
         copy_btn.clicked.connect(self.copy_trailer_url)
@@ -173,12 +178,18 @@ class ActionDialog(QDialog):
         button_box.addStretch()
         
         btn_save = QPushButton(translator.tr("dialog_edit_save_btn"))
+        btn_save.setDefault(True)
         btn_cancel = QPushButton(translator.tr("dialog_edit_cancel_btn"))
         btn_save.clicked.connect(self.accept)
         btn_cancel.clicked.connect(self.reject)
-        button_box.addWidget(btn_save)
         button_box.addWidget(btn_cancel)
+        button_box.addWidget(btn_save)
         super_main_layout.addLayout(button_box)
+
+    def on_field_edited(self):
+        # WHY: Automatically lock the game if the user manually edits any metadata.
+        if not self.chk_locked.isChecked():
+            self.chk_locked.setChecked(True)
 
     def start_merge(self):
         dlg = MergeSelectionDialog(self.original_data, self.parent_window.master_df, self)
@@ -234,6 +245,7 @@ class ActionDialog(QDialog):
             self.updated_data['Image_Link'] = new_filename
             self.updated_data['Has_Image'] = True
             self.update_cover_display()
+            self.on_field_edited()
         except Exception as e:
             logging.error(f"Failed to copy new image: {e}")
             QMessageBox.critical(self, "Error", f"Could not copy the image: {e}")
@@ -302,6 +314,7 @@ class ActionDialog(QDialog):
                     self.updated_data['Image_Link'] = new_filename
                     self.updated_data['Has_Image'] = True
                     self.update_cover_display()
+                    self.on_field_edited()
                 else:
                     QMessageBox.warning(self, translator.tr("dialog_sgdb_download_failed"), translator.tr("dialog_sgdb_download_failed_msg", code=response.status_code))
             except Exception as e:

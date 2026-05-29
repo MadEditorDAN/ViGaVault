@@ -88,7 +88,7 @@ class MetadataManagerDialog(QDialog):
                 v = val.strip()
                 if v: values.add(v)
                 
-        self.all_values = sorted(list(values))
+        self.all_values = sorted(list(values), key=lambda x: x.lower())
         self.render_table()
         
     def update_checked_state(self, val, checked):
@@ -127,9 +127,9 @@ class MetadataManagerDialog(QDialog):
             if val in self.checked_values: chk.setChecked(True)
             chk.toggled.connect(lambda checked, v=val: self.update_checked_state(v, checked))
             
+            cell_layout.addWidget(chk)
             cell_layout.addWidget(lbl)
             cell_layout.addStretch()
-            cell_layout.addWidget(chk)
             
             self.table_widget.setCellWidget(row, col, cell_widget)
             

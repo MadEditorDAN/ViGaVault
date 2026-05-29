@@ -25,7 +25,8 @@ def get_igdb_access_token():
         logging.error(f"{'IGDB API ERROR':<15} : Token request failed: {e}")
         return None
 
-def query_igdb_api(token, search_term=None, limit=5, by_id=False, custom_query=None):
+def query_igdb_api(token, search_term="", limit=10, by_id=False, custom_query=None, go_wild=False):
+    """WHY: Centralized API abstraction enforcing standard field retrieval and platform filters."""
     from .igdb.login_igdb import get_igdb_keys
     client_id, _ = get_igdb_keys()
     if not client_id: return None
@@ -39,7 +40,8 @@ def query_igdb_api(token, search_term=None, limit=5, by_id=False, custom_query=N
                   'involved_companies.developer, involved_companies.publisher, '
                   'videos.video_id, release_dates.date, cover.url, category')
         if by_id: query = f'fields {fields}; where id = {search_term};'
-        else: query = f'search "{search_term}"; fields {fields}; where platforms = (3, 6, 13, 14, 34, 39, 48, 49, 130, 161, 162, 163, 164, 165, 167, 169); limit {limit};'
+        elif go_wild: query = f'search "{search_term}"; fields {fields}; limit {limit};'
+        else: query = f'search "{search_term}"; fields {fields}; where platforms = (3, 6, 13, 14, 34, 39, 48, 49, 130, 161, 162, 163, 164, 165, 167, 169, 384, 385, 386, 388, 390, 409, 471); limit {limit};'
             
     # WHY: Twitch/IGDB strictly limits API requests to 4 per second. 
     # We enforce a mandatory 300ms delay to prevent HTTP 429 (Too Many Requests) connection hangs.
@@ -50,6 +52,18 @@ def query_igdb_api(token, search_term=None, limit=5, by_id=False, custom_query=N
         if response.status_code == 200:
             results = response.json()
             if not results and not by_id and not custom_query:
+                # WHY: IGDB's full-text search engine aggressively filters out short/common English "stop words" 
+                # (like "Below", "Control", "Inside"), returning zero results. We bypass the full-text search 
+                # engine entirely by doing a direct exact-match fallback query.
+                exact_query = f'fields {fields}; where name ~ "{search_term}"; limit {limit};'
+                try:
+                    time.sleep(0.3)
+                    fallback_res = requests.post(api_url, headers=headers, data=exact_query, timeout=10)
+                    if fallback_res.status_code == 200 and fallback_res.json():
+                        return fallback_res.json()
+                except Exception:
+                    pass
+
                 import re
                 fallback_regex = re.compile(r'\s*\(?(\d{4}|classic|original|remake)\)?$', flags=re.IGNORECASE)
                 if fallback_regex.search(search_term):

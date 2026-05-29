@@ -53,8 +53,8 @@ class HeadlessAmazonScanner(QObject):
         config = get_region_config(region_code)
         
         url = f"https://{config.lunaDomain}/"
-        self.progress.emit("Spawning Headless Ghost Bot...")
         self.browser.load(QUrl(url))
+        # WHY: Start the 1-second polling timer so poll_js_state checks page states and executes the scan.
         self.poll_timer.start()
 
     def stop_scan(self):
@@ -75,8 +75,62 @@ class HeadlessAmazonScanner(QObject):
 
     def poll_js_state(self):
         current_year = datetime.now().year
-        graph_ql_query = r'''
-fragment Claims_Item_Media on Media {
+        
+        js = """
+        (function() {
+            try {
+                if (window.vgvScanFailed) {
+                    return JSON.stringify({ status: "error", error: window.vgvScanError });
+                }
+                
+                if (window.vgvClaims) {
+                    return JSON.stringify({ status: "success", claims: window.vgvClaims });
+                }
+                
+                if (window.vgvScanning) {
+                    return JSON.stringify({ status: "scanning", progress: window.vgvProgress });
+                }
+
+                var url = window.location.href;
+                if (!url.startsWith('http')) {
+                    return JSON.stringify({ status: "waiting_domain", progress: "Waiting for Amazon domain to load..." });
+                }
+
+                var pathname = window.location.pathname;
+                if (url.includes('/ap/') || url.includes('signin') || pathname.includes('/ap/')) {
+                    return JSON.stringify({ status: "error", error: "Amazon connection has expired or is invalid. It needs to be re-applied in the Platform Manager." });
+                }
+                
+                if (pathname.includes('/claims/claims/')) {
+                    window.location.href = '/claims/my-collection';
+                    return JSON.stringify({ status: "routing", progress: "Routing to collection page..." });
+                }
+                
+                if (!pathname.includes('/claims/my-collection')) {
+                    if (!window.vgvScanRouted) {
+                        window.vgvScanRouted = true;
+                        window.location.href = '/claims/my-collection';
+                        return JSON.stringify({ status: "routing", progress: "Routing to collection page..." });
+                    } else {
+                        // We already routed to my-collection but got kicked back to home/signin. The session has expired!
+                        return JSON.stringify({ status: "error", error: "Amazon session expired. Please reconnect in Platform Manager." });
+                    }
+                }
+
+                var csrfInput = document.querySelector('input[name="csrf-key"]');
+                if (!csrfInput || !csrfInput.value) {
+                    return JSON.stringify({ status: "waiting_csrf", progress: "Waiting for Amazon CSRF..." });
+                }
+                
+                window.vgvScanning = true;
+                window.vgvClaims = null;
+                window.vgvProgress = "Starting Amazon library scan...";
+                
+                (async function() {
+                    try {
+                        var csrfToken = csrfInput.value;
+                        var allClaims = [];
+                        var graph_ql_query = `fragment Claims_Item_Media on Media {
   alt
   description
   defaultMedia {
@@ -193,111 +247,59 @@ fragment MediaAsset on MediaAsset {
   src2x
   type
   __typename
-}
-'''
-        safe_query = json.dumps(graph_ql_query)
-        
-        js = """
-        (function() {
-            try {
-                if (window.vgvScanFailed) {
-                    return JSON.stringify({ status: "error", error: window.vgvScanError });
-                }
-                
-                if (window.vgvClaims) {
-                    return JSON.stringify({ status: "success", claims: window.vgvClaims });
-                }
-                
-                if (window.vgvScanning) {
-                    return JSON.stringify({ status: "scanning", progress: window.vgvProgress });
-                }
-
-                var url = window.location.href;
-                if (!url.startsWith('http')) {
-                    return JSON.stringify({ status: "waiting_domain", progress: "Waiting for Amazon domain to load..." });
-                }
-
-                var pathname = window.location.pathname;
-                if (url.includes('/ap/') || url.includes('signin') || pathname.includes('/ap/')) {
-                    return JSON.stringify({ status: "error", error: "Amazon connection has expired or is invalid. It needs to be re-applied in the Platform Manager." });
-                }
-                
-                if (pathname.includes('/claims/claims/')) {
-                    window.location.href = '/claims/my-collection';
-                    return JSON.stringify({ status: "routing", progress: "Routing to collection page..." });
-                }
-                
-                if (!pathname.includes('/claims/my-collection')) {
-                    if (!window.vgvScanRouted) {
-                        window.vgvScanRouted = true;
-                        window.location.href = '/claims/my-collection';
-                        return JSON.stringify({ status: "routing", progress: "Routing to collection page..." });
-                    } else {
-                        // We already routed to my-collection but got kicked back to home/signin. The session has expired!
-                        return JSON.stringify({ status: "error", error: "Amazon session expired. Please reconnect in Platform Manager." });
-                    }
-                }
-
-                var csrfInput = document.querySelector('input[name="csrf-key"]');
-                if (!csrfInput || !csrfInput.value) {
-                    return JSON.stringify({ status: "waiting_csrf", progress: "Waiting for Amazon CSRF..." });
-                }
-                
-                window.vgvScanning = true;
-                window.vgvClaims = null;
-                window.vgvProgress = "Starting Amazon library scan...";
-                
-                (async function() {
-                    try {
-                        var csrfToken = csrfInput.value;
-                        var allClaims = [];
-                        var queryStr = {safe_query};
+}`;
+                        var queryStr = graph_ql_query;
                         
-                        // Loop backwards across active years to bypass Amazon's server-side date range limitations
-                        // and retrieve the user's complete catalog.
-                        for (var year = {current_year}; year >= 2020; year--) {
-                            var nextToken = null;
-                            var hasNextPage = true;
-                            var pageNum = 1;
+                        // WHY: Fetch the complete catalog in a single dynamic background pass.
+                        // We query from the current year, which chronologically encompasses all historical claims.
+                        var year = new Date().getFullYear();
+                        var nextToken = null;
+                        var hasNextPage = true;
+                        var pageNum = 1;
+                        
+                        while (hasNextPage) {
+                            window.vgvProgress = "Fetching Amazon Games (Page " + pageNum + ")...";
                             
-                            while (hasNextPage) {
-                                window.vgvProgress = "Fetching Amazon Games for " + year + " (Page " + pageNum + ")...";
-                                var variables = { "filters": { "endDate": year + "-12-31T23:00:00Z" } };
-                                if (nextToken) variables.nextToken = nextToken;
-                                var payload = { "operationName": "ClaimsContextQuery", "variables": variables, "extensions": {}, "query": queryStr };
-
-                                var response = await fetch('/graphql', {
-                                    method: 'POST',
-                                    credentials: 'same-origin',
-                                    headers: { 'Content-Type': 'application/json', 'csrf-token': csrfToken },
-                                    body: JSON.stringify(payload)
-                                });
-
-                                if (!response.ok) {
-                                    var errText = "";
-                                    try { errText = await response.text(); } catch(e) {}
-                                    window.vgvScanFailed = true;
-                                    window.vgvScanError = "GraphQL HTTP " + response.status + " - " + errText;
-                                    return;
+                            // Use official variable payload (no pageSize override)
+                            var variables = { 
+                                "filters": { 
+                                    "endDate": year + "-12-31T23:00:00Z"
                                 }
+                            };
+                            if (nextToken) variables.nextToken = nextToken;
+                            var payload = { "operationName": "ClaimsContextQuery", "variables": variables, "extensions": {}, "query": queryStr };
 
-                                var data = await response.json();
-                                if (data.errors) {
-                                    window.vgvScanFailed = true;
-                                    window.vgvScanError = "GraphQL errors: " + JSON.stringify(data.errors);
-                                    return;
-                                }
-                                var claimsData = data.data && data.data.claims;
+                            var response = await fetch('/graphql', {
+                                method: 'POST',
+                                credentials: 'same-origin',
+                                headers: { 'Content-Type': 'application/json', 'csrf-token': csrfToken },
+                                body: JSON.stringify(payload)
+                            });
 
-                                if (claimsData && claimsData.claims) {
-                                    allClaims = allClaims.concat(claimsData.claims);
-                                    nextToken = claimsData.nextToken;
-                                    if (!nextToken) hasNextPage = false;
-                                } else {
-                                    hasNextPage = false;
-                                }
-                                pageNum++;
+                            if (!response.ok) {
+                                var errText = "";
+                                try { errText = await response.text(); } catch(e) {}
+                                window.vgvScanFailed = true;
+                                window.vgvScanError = "GraphQL HTTP " + response.status + " - " + errText;
+                                return;
                             }
+
+                            var data = await response.json();
+                            if (data.errors) {
+                                window.vgvScanFailed = true;
+                                window.vgvScanError = "GraphQL errors: " + JSON.stringify(data.errors);
+                                return;
+                            }
+                            var claimsData = data.data && data.data.claims;
+
+                            if (claimsData && claimsData.claims) {
+                                allClaims = allClaims.concat(claimsData.claims);
+                                nextToken = claimsData.nextToken;
+                                if (!nextToken) hasNextPage = false;
+                            } else {
+                                hasNextPage = false;
+                            }
+                            pageNum++;
                         }
                         
                         // Deduplicate claims by item ID to guarantee no duplicate processing if there is overlapping pagination
@@ -324,50 +326,58 @@ fragment MediaAsset on MediaAsset {
                 return JSON.stringify({ status: "error", error: e.toString() });
             }
         })();
-        """.replace("{safe_query}", safe_query).replace("{current_year}", str(current_year))
+        """
         self.page.runJavaScript(js, 0, self.on_js_result)
 
     def on_js_result(self, result):
         if not result or not isinstance(result, str):
-            print("[AMAZON SCAN] WebEngine initializing. Waiting for page context...")
+            # WHY: Silence raw browser progress stdout print to avoid console clutter.
+            # print("[AMAZON SCAN] WebEngine initializing. Waiting for page context...")
             return
             
         try:
             result = json.loads(result)
         except Exception as e:
-            print(f"[AMAZON SCAN] ERROR parsing JS result: {e}")
+            # WHY: Silence raw error parsing print as we handle failures cleanly via Qt signals.
+            # print(f"[AMAZON SCAN] ERROR parsing JS result: {e}")
             return
             
         status = result.get("status")
         progress = result.get("progress", "")
         
         if status == "waiting_domain":
-            print(f"[AMAZON SCAN] {progress}")
+            # WHY: Silenced to keep console logs completely clean and free of unaligned strings.
+            # print(f"[AMAZON SCAN] {progress}")
             self.progress.emit(progress)
         elif status == "routing":
-            print(f"[AMAZON SCAN] {progress}")
+            # WHY: Silenced to keep console logs completely clean and free of unaligned strings.
+            # print(f"[AMAZON SCAN] {progress}")
             self.progress.emit(progress)
         elif status == "waiting_csrf":
-            print(f"[AMAZON SCAN] {progress}")
+            # WHY: Silenced to keep console logs completely clean and free of unaligned strings.
+            # print(f"[AMAZON SCAN] {progress}")
             self.csrf_not_found_ticks += 1
             if self.csrf_not_found_ticks > 25:
                 self.poll_timer.stop()
-                print("[AMAZON SCAN] Session expired or invalid.")
+                # WHY: Silenced to prevent cluttering stdout before emitting clean UI error.
+                # print("[AMAZON SCAN] Session expired or invalid.")
                 self.error.emit("Amazon session expired. Please reconnect in Platform Manager.")
             else:
                 self.progress.emit(progress)
         elif status == "scanning":
-            print(f"[AMAZON SCAN] {progress}")
+            # WHY: Silenced to prevent verbose page-by-page scraping progress from cluttering terminal logs.
+            # print(f"[AMAZON SCAN] {progress}")
             self.progress.emit(progress)
         elif status == "error":
             self.poll_timer.stop()
             err_msg = result.get("error", "Unknown script error")
-            print(f"[AMAZON SCAN] ERROR: {err_msg}")
+            # WHY: Silenced to keep console logs completely clean and rely strictly on self.error signal.
+            # print(f"[AMAZON SCAN] ERROR: {err_msg}")
             self.error.emit(err_msg)
         elif status == "success":
             self.poll_timer.stop()
             claims = result.get("claims") or []
-            print(f"[AMAZON SCAN] Headless fetch completed. Retrieved {len(claims)} raw claims.")
+            # print(f"[AMAZON SCAN] Headless fetch completed. Retrieved {len(claims)} raw claims.")
             self.finished.emit(claims)
 
 class ScanController(QObject):
@@ -456,12 +466,11 @@ class ScanController(QObject):
         self.mw.sidebar.btn_full_scan.setText(translator.tr("sidebar_btn_scanning"))
         self.mw.sidebar.btn_toggle_new.setEnabled(False)
         self.mw.sidebar.btn_toggle_dlc.setEnabled(False)
-        self.mw.sidebar.btn_toggle_review.setEnabled(False)
-        self.mw.sidebar.btn_approve_review.setEnabled(False)
         self.mw.sidebar.chk_scan_galaxy.setEnabled(False)
         self.mw.sidebar.chk_scan_gog_web.setEnabled(False)
         self.mw.sidebar.chk_scan_epic.setEnabled(False)
         self.mw.sidebar.chk_scan_steam.setEnabled(False)
+        self.mw.sidebar.chk_scan_amazon.setEnabled(False)
         self.mw.sidebar.chk_scan_local.setEnabled(False)
         self.mw.sidebar.chk_scan_dl_images.setEnabled(False)
         self.mw.filter_controller.set_filters_ui_state(False)
@@ -471,6 +480,7 @@ class ScanController(QObject):
         self.mw.sidebar.scan_input.hide()
         self.mw.sidebar.scan_btn.hide()
         self.mw.sidebar.scan_limit_combo.hide()
+        self.mw.sidebar.scan_go_wild.hide()
         self.mw.sidebar.btn_confirm.hide()
         self.mw.sidebar.btn_cancel.setText(translator.tr("sidebar_btn_stop"))
         self.mw.sidebar.scan_results.clear()
@@ -520,11 +530,32 @@ class ScanController(QObject):
             logging.info(f"[{now_str}] \n{' FULL INTELLIGENT SCAN STARTED ':=^80}")
         logging.info(checklist_text + "\n")
 
+        # Create Automatic Pre-Scan Backup
+        try:
+            from backend.backup_manager import create_vgv_backup
+            from ViGaVault_utils import get_db_path
+            import os
+            db_path = get_db_path()
+            backup_dir = os.path.join(os.path.dirname(db_path), "backups")
+            os.makedirs(backup_dir, exist_ok=True)
+            backup_path = os.path.join(backup_dir, "VGV-DB_Pre_Scan.vgv")
+            # Only backup the DB itself to keep the process instantaneous
+            create_vgv_backup(db_path, "", {}, {}, backup_path)
+            logging.info(f"Automated pre-scan database backup saved to: {backup_path}\n")
+        except Exception as e:
+            logging.error(f"Failed to create pre-scan backup: {e}")
+
 
             
         if do_amazon:
-            self.mw.sidebar.scan_results.addItem("Connecting to Amazon Luna...")
-            self.mw.sidebar.scan_results.scrollToBottom()
+            # WHY: Print the primary AMAZON SCAN header block immediately to the console terminal
+            # before initializing the WebEngine browser. This gives the user instant confirmation
+            # that the scan has successfully started since spawning the headless engine takes time.
+            from ViGaVault_utils import format_header_row
+            logging.info(format_header_row("AMAZON SCAN", is_secondary=False, col_spec=[17, 36, 23]))
+
+            # RATIONALE: We completely remove any .addItem progress prints to keep the sidebar
+            # list widget 100% clean of raw browser progress logs, displaying only clean Unicode borders!
             
             from backend.amazon.login_amazon import get_amazon_region
             region = get_amazon_region()
@@ -532,8 +563,8 @@ class ScanController(QObject):
             self.amazon_scanner = HeadlessAmazonScanner(self)
             
             def on_amazon_progress(msg):
-                self.mw.sidebar.scan_results.addItem(msg)
-                self.mw.sidebar.scan_results.scrollToBottom()
+                # RATIONALE: Kept completely silent to avoid polluting the app screen list widget.
+                pass
                 
             def on_amazon_error(err):
                 logging.error(f"[AMAZON SCAN] {err}")
@@ -545,11 +576,34 @@ class ScanController(QObject):
                 self.run_remaining_full_scan(do_galaxy, do_local, do_gog_web, do_epic, do_steam, False, None, do_dl_images, target_folders)
                 
             def on_amazon_finished(claims):
-                logging.info(f"[AMAZON SCAN] Headless fetch completed. Retrieved {len(claims)} raw entries.")
                 self.amazon_scanner.clean_up()
                 self.amazon_scanner.deleteLater()
                 self.amazon_scanner = None
-                self.run_remaining_full_scan(do_galaxy, do_local, do_gog_web, do_epic, do_steam, True, claims, do_dl_images, target_folders)
+                
+                # WHY: Immediately run Python sync year-by-year for all claims on the active database in-memory,
+                # saving results to disk and printing the clean Unicode box rows sequentially in real-time.
+                from backend.amazon.sync_amazon import sync_amazon_database
+                from ViGaVault_utils import build_scanner_config
+                cfg = build_scanner_config()
+                
+                if not hasattr(self, 'temp_manager'):
+                    from backend.library import LibraryManager
+                    self.temp_manager = LibraryManager(cfg)
+                    self.temp_manager.load_db()
+                    
+                changes, stats = sync_amazon_database(
+                    cfg, self.temp_manager.games, claims, 
+                    print_header=False, print_report=True
+                )
+                if changes:
+                    self.temp_manager.save_db()
+                
+                # WHY: Run remaining storefront scans, passing accumulated claims and stats to the worker thread.
+                self.run_remaining_full_scan(
+                    do_galaxy, do_local, do_gog_web, do_epic, do_steam, True, 
+                    claims, do_dl_images, target_folders,
+                    amazon_stats=stats
+                )
                 
             self.amazon_scanner.progress.connect(on_amazon_progress)
             self.amazon_scanner.error.connect(on_amazon_error)
@@ -558,7 +612,7 @@ class ScanController(QObject):
         else:
             self.run_remaining_full_scan(do_galaxy, do_local, do_gog_web, do_epic, do_steam, False, None, do_dl_images, target_folders)
 
-    def run_remaining_full_scan(self, do_galaxy, do_local, do_gog_web, do_epic, do_steam, do_amazon, amazon_claims, do_dl_images, target_folders):
+    def run_remaining_full_scan(self, do_galaxy, do_local, do_gog_web, do_epic, do_steam, do_amazon, amazon_claims, do_dl_images, target_folders, amazon_stats=None):
         self.full_scan_worker = FullScanWorker(
             do_galaxy=do_galaxy,
             do_local=do_local,
@@ -567,6 +621,7 @@ class ScanController(QObject):
             do_steam=do_steam,
             do_amazon=do_amazon,
             amazon_claims=amazon_claims,
+            amazon_stats=amazon_stats, # WHY: Pass the accumulated Amazon stats to the background worker thread.
             do_download_images=do_dl_images,
             target_folders=target_folders,
             parent=self
@@ -612,6 +667,7 @@ class ScanController(QObject):
             except: pass
             self.mw.sidebar.btn_cancel.clicked.connect(self.cancel_inline_scan)
 
+        self.mw.sidebar.refresh_backup_button_text()
         self.mw.library_controller.refresh_data()
 
     def start_inline_scan(self, game_data):
@@ -678,7 +734,8 @@ class ScanController(QObject):
         token = manager.get_access_token()
 
         limit = int(self.mw.sidebar.scan_limit_combo.currentText())
-        candidates = manager.fetch_candidates(token, term, limit=limit)
+        go_wild = self.mw.sidebar.scan_go_wild.isChecked()
+        candidates = manager.fetch_candidates(token, term, limit=limit, go_wild=go_wild)
         
         self.mw.sidebar.scan_results.clear()
         for g in candidates:
@@ -714,7 +771,10 @@ class ScanController(QObject):
         self.mw.sidebar.scan_title_label.setText(translator.tr("sidebar_manual_scan_title"))
         self.mw.sidebar.scan_input.show()
         self.mw.sidebar.scan_btn.show()
+        self.mw.sidebar.scan_limit_combo.setCurrentText("10")
         self.mw.sidebar.scan_limit_combo.show()
+        self.mw.sidebar.scan_go_wild.setChecked(False)
+        self.mw.sidebar.scan_go_wild.show()
         self.mw.sidebar.btn_confirm.show()
         self.mw.sidebar.btn_cancel.setText(translator.tr("sidebar_manual_scan_cancel_btn"))
 
@@ -730,6 +790,7 @@ class ScanController(QObject):
         self.mw.sidebar.chk_scan_gog_web.setEnabled(getattr(self.mw, 'gog_connected_cache', False))
         self.mw.sidebar.chk_scan_epic.setEnabled(getattr(self.mw, 'epic_connected_cache', False))
         self.mw.sidebar.chk_scan_steam.setEnabled(getattr(self.mw, 'steam_connected_cache', False))
+        self.mw.sidebar.chk_scan_amazon.setEnabled(getattr(self.mw, 'amazon_connected_cache', False))
         self.mw.sidebar.chk_scan_local.setEnabled(config.get('local_scan_config', {}).get('enable_local_scan', True))
         self.mw.sidebar.chk_scan_dl_images.setEnabled(True)
         
@@ -744,7 +805,23 @@ class ScanController(QObject):
         chosen_game = item.data(Qt.UserRole)
         manager = LibraryManager(build_scanner_config())
         manager.load_db()
-        game_obj = manager.games.get(self.mw.current_scan_game.get('Folder_Name'))
+        current_folder = self.mw.current_scan_game.get('Folder_Name')
+        game_obj = manager.games.get(current_folder)
+        
+        # Check for duplicates before applying
+        target_igdb_id = f"igdb_{chosen_game.get('id')}"
+        conflict_folder = None
+        for folder, g in manager.games.items():
+            if folder == current_folder: continue
+            ids = [x.strip() for x in str(g.data.get('game_ID', '')).split(',')]
+            if target_igdb_id in ids:
+                conflict_folder = folder
+                break
+                
+        if conflict_folder:
+            self.mw.execute_merge(conflict_folder, current_folder)
+            self.cancel_inline_scan()
+            return
         
         if game_obj.apply_candidate_data(chosen_game):
             while True:
@@ -765,6 +842,7 @@ class ScanController(QObject):
             self.mw.library_controller.update_status_checkboxes_state()
                 
             self.mw.list_controller.update_single_card(folder_name, force_media_reload=True)
+            self.mw.filter_controller.request_filter_update()
             
             self.mw.sidebar.scan_results.clear()
             item = QListWidgetItem(translator.tr("sidebar_log_update_complete"))
@@ -773,4 +851,4 @@ class ScanController(QObject):
             self.mw.sidebar.scan_results.addItem(item)
             
             QTimer.singleShot(2000, self.cancel_inline_scan)
-
+

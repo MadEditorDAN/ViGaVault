@@ -68,17 +68,12 @@ class LibraryController(QObject):
         # WHY: Include both strictly new games AND games that failed the metadata fetch (NEEDS_ATTENTION)
         # under the "Show NEW" toggle umbrella so they don't become permanently invisible ghosts.
         has_new = 'NEW' in self.mw.master_df['Status_Flag'].values or 'NEEDS_ATTENTION' in self.mw.master_df['Status_Flag'].values
-        has_review = 'REVIEW' in self.mw.master_df['Status_Flag'].values
         has_dlc = self.mw.master_df['Is_DLC'].any() or self.mw.master_df['Is_Excluded'].any()
-        
         self.mw.sidebar.btn_toggle_new.setEnabled(has_new)
-        self.mw.sidebar.btn_toggle_review.setEnabled(has_review)
         self.mw.sidebar.btn_toggle_dlc.setEnabled(has_dlc)
-        self.mw.sidebar.btn_approve_review.setEnabled(has_review)
         
         # Uncheck instantly if there are no more results to prevent a blank UI
         if not has_new and self.mw.sidebar.btn_toggle_new.isChecked(): self.mw.sidebar.btn_toggle_new.setChecked(False)
-        if not has_review and self.mw.sidebar.btn_toggle_review.isChecked(): self.mw.sidebar.btn_toggle_review.setChecked(False)
         if not has_dlc and self.mw.sidebar.btn_toggle_dlc.isChecked(): self.mw.sidebar.btn_toggle_dlc.setChecked(False)
 
     def update_library_info(self):
@@ -124,7 +119,7 @@ class LibraryController(QObject):
                         "rootPath": "",
                         "localScanConfig": {"enable_local_scan": False, "ignore_hidden": True, "scan_mode": "simple", "global_type": "Genre", "global_filter": True, "folder_rules": {}},
                         "galaxyDbPath": os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), 'GOG.com', 'Galaxy', 'storage', 'galaxy-2.0.db'),
-                        "enableGalaxyDb": False, "downloadImages": True, "downloadVideos": False, "sortDesc": True, "sortIndex": 0, "viewNew": False, "viewDlc": False, "viewReview": False, "filterStates": {}, "filterExpansion": {}
+                        "enableGalaxyDb": False, "downloadImages": True, "downloadVideos": False, "sortDesc": True, "sortIndex": 0, "viewNew": False, "viewDlc": False, "filterStates": {}, "filterExpansion": {}
                     }
                     save_encrypted_json(lib_settings_path, default_lib_settings)
 
@@ -165,6 +160,44 @@ class LibraryController(QObject):
             logging.info(f"{'RESTORE':<15} : Successfully restored data from .vgv archive.")
             # Smart Refresh - Instantly inject the new data without forcing an application restart.
             self.reload_ui_for_new_library()
+
+    def restore_pre_scan_backup(self):
+        """WHY: Automatically restores the dedicated pre-scan backup without launching the UI picker."""
+        db_path = get_db_path()
+        backup_dir = os.path.join(os.path.dirname(db_path), "backups")
+        backup_path = os.path.join(backup_dir, "VGV-DB_Pre_Scan.vgv")
+        
+        if not os.path.exists(backup_path):
+            QMessageBox.warning(self.mw, "Restore Failed", "No pre-scan backup found. You must run a scan at least once to create one.")
+            return
+
+        reply = QMessageBox.question(self.mw, "Confirm Restore", 
+                                     "Are you sure you want to restore the database to its exact state before the last scan?",
+                                     QMessageBox.Yes | QMessageBox.No)
+        if reply == QMessageBox.No:
+            return
+
+        if hasattr(self, 'startup_worker') and self.startup_worker and self.startup_worker.isRunning():
+            logging.info("[RESTORE] Cancelling and waiting for running startup worker thread before restoring backup...")
+            self.startup_worker.requestInterruption()
+            self.startup_worker.wait()
+
+        from backend.backup_manager import restore_vgv_backup
+        try:
+            result = restore_vgv_backup(
+                backup_path,
+                restore_db=True,
+                restore_images=False,
+                restore_settings=False,
+                target_db_path=db_path,
+                target_img_dir=None
+            )
+            logging.info(f"{'RESTORE':<15} : Successfully auto-restored pre-scan database.")
+            QMessageBox.information(self.mw, "Success", "Database successfully restored to pre-scan state!")
+            self.reload_ui_for_new_library()
+        except Exception as e:
+            logging.error(f"Auto-Restore failed: {e}")
+            QMessageBox.critical(self.mw, "Error", f"Failed to restore backup:\n{e}")
 
     def create_backup(self):
         """WHY: Launches the modular UI allowing users to export their database, cached media, and settings into an encrypted .vgv archive."""
@@ -220,20 +253,17 @@ class LibraryController(QObject):
         self.mw.sidebar.combo_sort.blockSignals(True)
         self.mw.sidebar.btn_toggle_new.blockSignals(True)
         self.mw.sidebar.btn_toggle_dlc.blockSignals(True)
-        self.mw.sidebar.btn_toggle_review.blockSignals(True)
 
         self.mw.sort_desc = lib_settings.get("sortDesc", True)
         self.mw.sidebar.combo_sort.setCurrentIndex(lib_settings.get("sortIndex", 0))
         self.mw.sidebar.search_bar.setText(lib_settings.get("searchText", ""))
         self.mw.sidebar.btn_toggle_new.setChecked(lib_settings.get("viewNew", False))
         self.mw.sidebar.btn_toggle_dlc.setChecked(lib_settings.get("viewDlc", False))
-        self.mw.sidebar.btn_toggle_review.setChecked(lib_settings.get("viewReview", False))
         self.mw.sidebar.update_sort_button(self.mw.sort_desc)
 
         self.mw.sidebar.combo_sort.blockSignals(False)
         self.mw.sidebar.btn_toggle_new.blockSignals(False)
         self.mw.sidebar.btn_toggle_dlc.blockSignals(False)
-        self.mw.sidebar.btn_toggle_review.blockSignals(False)
         self.update_status_checkboxes_state()
 
         self.update_library_info()

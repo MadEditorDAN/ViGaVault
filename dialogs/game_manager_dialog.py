@@ -2,11 +2,13 @@
 import os
 import re
 import pandas as pd
+import shutil
+import requests
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                                QTableView, QLineEdit, QLabel, QGroupBox, QAbstractItemView,
-                               QHeaderView, QCheckBox, QFormLayout, QMessageBox, QStyledItemDelegate)
+                               QHeaderView, QCheckBox, QFormLayout, QMessageBox, QStyledItemDelegate, QFileDialog)
 from PySide6.QtCore import Qt, QAbstractTableModel, QTimer, Signal
-from ViGaVault_utils import translator, get_library_settings_file, center_window, load_encrypted_json, save_encrypted_json
+from ViGaVault_utils import translator, get_library_settings_file, center_window, load_encrypted_json, save_encrypted_json, BASE_DIR, get_safe_filename
 from widgets import CheckableComboBox
 
 class ReadOnlyTextDelegate(QStyledItemDelegate):
@@ -48,11 +50,24 @@ class BatchEditDialog(QDialog):
             self.form_layout.addRow(label_text, inp)
             self.inputs[field] = inp
             
+        self.chk_ok = QCheckBox("Set as OK")
+        self.chk_new = QCheckBox("Set as NEW")
+        
+        self.chk_ok.toggled.connect(lambda checked: self.chk_new.setChecked(False) if checked else None)
+        self.chk_new.toggled.connect(lambda checked: self.chk_ok.setChecked(False) if checked else None)
+
         # WHY: Use a tristate checkbox so the user can explicitly choose to mark, unmark, or completely ignore the DLC status during batch edits.
         self.chk_dlc = QCheckBox(translator.tr("batch_edit_mark_dlc"))
         self.chk_dlc.setTristate(True)
         self.chk_dlc.setCheckState(Qt.PartiallyChecked)
-        self.form_layout.addRow(self.chk_dlc)
+        
+        status_layout = QHBoxLayout()
+        status_layout.addWidget(self.chk_ok)
+        status_layout.addWidget(self.chk_new)
+        status_layout.addWidget(self.chk_dlc)
+        status_layout.addStretch()
+        
+        self.form_layout.addRow(status_layout)
         
         layout.addWidget(form_group)
 
@@ -62,8 +77,8 @@ class BatchEditDialog(QDialog):
         btn_save.clicked.connect(self.accept)
         btn_cancel.clicked.connect(self.reject)
         btn_box.addStretch()
-        btn_box.addWidget(btn_save)
         btn_box.addWidget(btn_cancel)
+        btn_box.addWidget(btn_save)
         layout.addLayout(btn_box)
 
     def get_data(self):
@@ -75,6 +90,11 @@ class BatchEditDialog(QDialog):
             data['Is_DLC'] = True
         elif self.chk_dlc.checkState() == Qt.Unchecked:
             data['Is_DLC'] = False
+            
+        if self.chk_ok.isChecked():
+            data['Status_Flag'] = 'OK'
+        elif self.chk_new.isChecked():
+            data['Status_Flag'] = 'NEW'
             
         return data
 
@@ -115,13 +135,21 @@ class GameManagerModel(QAbstractTableModel):
             # WHY: Hide the string value "True/False" from displaying next to the checkbox.
             if col_name == '_selected': return ""
             if col_name == '_edit': return "⚙️"
+            if col_name == '_has_img': return "✔" if self._df.iloc[index.row()][col_name] else "❌"
+            if col_name == '_has_trl': return "✔" if self._df.iloc[index.row()][col_name] else "❌"
             if col_name == 'Original_Release_Date':
                 from ViGaVault_utils import format_date_for_ui
                 return format_date_for_ui(str(self._df.iloc[index.row()][col_name]), self.date_format_str)
             return str(self._df.iloc[index.row()][col_name])
             
-        if role == Qt.TextAlignmentRole and col_name == '_edit':
+        if role == Qt.TextAlignmentRole and col_name in ['_edit', '_has_img', '_has_trl']:
             return int(Qt.AlignCenter)
+        
+        if role == Qt.ForegroundRole:
+            from PySide6.QtGui import QColor
+            if col_name in ['_has_img', '_has_trl']:
+                return QColor("green") if self._df.iloc[index.row()][col_name] else QColor("red")
+            
         return None
 
     def setData(self, index, value, role=Qt.EditRole):
@@ -140,6 +168,8 @@ class GameManagerModel(QAbstractTableModel):
                 col_name = self.display_cols[section]
                 if col_name == '_selected': return ""
                 if col_name == '_edit': return ""
+                if col_name == '_has_img': return translator.tr("media_manager_col_image")
+                if col_name == '_has_trl': return translator.tr("media_manager_col_trailer")
                 # WHY: DRY Principle - Centralized mapping to apply dynamic JSON translations to the raw Pandas column headers.
                 headers_map = {
                     'Original_Release_Date': translator.tr("game_manager_col_rel_date"),
@@ -203,6 +233,11 @@ class GameManagerDialog(QDialog):
         self.btn_batch_edit.clicked.connect(self.request_batch_edit)
         self.btn_batch_delete.clicked.connect(self.request_batch_delete)
         
+        self.btn_batch_sync = QPushButton(translator.tr("game_manager_btn_batch_sync"))
+        self.btn_batch_sync.setEnabled(False)
+        self.btn_batch_sync.clicked.connect(self.request_batch_sync)
+        btn_layout.addWidget(self.btn_batch_sync)
+        
         btn_layout.addStretch()
         
         self.btn_filter_new = QPushButton(translator.tr("sidebar_btn_toggle_new"))
@@ -213,12 +248,26 @@ class GameManagerDialog(QDialog):
         self.btn_filter_hidden.setCheckable(True)
         self.btn_filter_hidden.clicked.connect(self.filter_table)
         
-        # WHY: Make quick filters mutually exclusive to prevent impossible compound queries.
-        self.btn_filter_new.clicked.connect(lambda: self.btn_filter_hidden.setChecked(False) if self.btn_filter_new.isChecked() else None)
-        self.btn_filter_hidden.clicked.connect(lambda: self.btn_filter_new.setChecked(False) if self.btn_filter_hidden.isChecked() else None)
+        self.btn_filter_no_img = QPushButton(translator.tr("sidebar_btn_toggle_no_img"))
+        self.btn_filter_no_img.setCheckable(True)
+        self.btn_filter_no_img.clicked.connect(self.filter_table)
         
+        self.btn_filter_no_trl = QPushButton(translator.tr("sidebar_btn_toggle_no_trl"))
+        self.btn_filter_no_trl.setCheckable(True)
+        self.btn_filter_no_trl.clicked.connect(self.filter_table)
+
+        # WHY: Make quick filters mutually exclusive to prevent impossible compound queries.
+        self.btn_filter_new.clicked.connect(lambda: [btn.setChecked(False) for btn in [self.btn_filter_hidden, self.btn_filter_no_img, self.btn_filter_no_trl]] if self.btn_filter_new.isChecked() else None)
+        self.btn_filter_hidden.clicked.connect(lambda: [btn.setChecked(False) for btn in [self.btn_filter_new, self.btn_filter_no_img, self.btn_filter_no_trl]] if self.btn_filter_hidden.isChecked() else None)
+        self.btn_filter_no_img.clicked.connect(lambda: [btn.setChecked(False) for btn in [self.btn_filter_new, self.btn_filter_hidden, self.btn_filter_no_trl]] if self.btn_filter_no_img.isChecked() else None)
+        self.btn_filter_no_trl.clicked.connect(lambda: [btn.setChecked(False) for btn in [self.btn_filter_new, self.btn_filter_hidden, self.btn_filter_no_img]] if self.btn_filter_no_trl.isChecked() else None)
+        
+        lbl_show = QLabel("Show : ")
+        btn_layout.addWidget(lbl_show)
         btn_layout.addWidget(self.btn_filter_new)
         btn_layout.addWidget(self.btn_filter_hidden)
+        btn_layout.addWidget(self.btn_filter_no_img)
+        btn_layout.addWidget(self.btn_filter_no_trl)
         
         layout.addLayout(btn_layout)
 
@@ -315,6 +364,39 @@ class GameManagerDialog(QDialog):
         
         layout.addWidget(self.table)
 
+        # Inspector Panel
+        self.inspector_group = QGroupBox(translator.tr("game_manager_inspector_title"))
+        self.inspector_group.setVisible(False)
+        self.current_insp_folder = None
+        insp_layout = QHBoxLayout(self.inspector_group)
+        
+        self.lbl_insp_name = QLabel()
+        self.lbl_insp_name.setStyleSheet("font-weight: bold;")
+        insp_layout.addWidget(self.lbl_insp_name)
+        
+        self.btn_insp_local = QPushButton("📁")
+        self.btn_insp_local.setToolTip(translator.tr("media_manager_choice_local"))
+        self.btn_insp_local.clicked.connect(self.insp_select_local)
+        insp_layout.addWidget(self.btn_insp_local)
+        
+        from backend.steamgriddb.login_steamgriddb import is_steamgriddb_connected
+        if is_steamgriddb_connected():
+            self.btn_insp_sgdb = QPushButton("SGDB")
+            self.btn_insp_sgdb.clicked.connect(self.insp_search_sgdb)
+            insp_layout.addWidget(self.btn_insp_sgdb)
+            
+        self.insp_url = QLineEdit()
+        self.insp_url.setPlaceholderText(translator.tr("media_manager_url_placeholder"))
+        insp_layout.addWidget(self.insp_url)
+        
+        self.btn_insp_apply = QPushButton(translator.tr("media_manager_btn_apply"))
+        self.btn_insp_apply.setEnabled(False)
+        self.insp_url.textChanged.connect(lambda text: self.btn_insp_apply.setEnabled(bool(text.strip()) or bool(self.btn_insp_local.property("selected_file"))))
+        self.btn_insp_apply.clicked.connect(self.insp_apply_media)
+        insp_layout.addWidget(self.btn_insp_apply)
+        
+        layout.addWidget(self.inspector_group)
+
         # Bottom: Exclusion Word List
         ex_group = QGroupBox(translator.tr("game_manager_exclusion_label"))
         ex_layout = QHBoxLayout(ex_group)
@@ -341,8 +423,11 @@ class GameManagerDialog(QDialog):
     def on_table_clicked(self, index):
         if not index.isValid(): return
         col_name = self.model.display_cols[index.column()]
+        folder_name = self.model._df.iloc[index.row()]['Folder_Name']
+        
+        self.update_inspector(folder_name)
+        
         if col_name == '_edit':
-            folder_name = self.model._df.iloc[index.row()]['Folder_Name']
             if hasattr(self.parent_window, 'master_df'):
                 game_data = self.parent_window.master_df[self.parent_window.master_df['Folder_Name'] == folder_name].iloc[0].to_dict()
                 from dialogs import ActionDialog
@@ -387,6 +472,169 @@ class GameManagerDialog(QDialog):
                 self.parent_window.game_operations_controller.batch_update_games(selected_folders, new_data)
                 self.load_data()
 
+    def update_inspector(self, folder_name):
+        self.current_insp_folder = folder_name
+        if hasattr(self.parent_window, 'master_df'):
+            df = self.parent_window.master_df
+            matches = df[df['Folder_Name'] == folder_name]
+            if not matches.empty:
+                title = matches.iloc[0].get('Clean_Title', folder_name)
+                self.lbl_insp_name.setText(title)
+                
+                self.btn_insp_local.setProperty("selected_file", "")
+                self.btn_insp_local.setStyleSheet("")
+                self.insp_url.clear()
+                self.inspector_group.setVisible(True)
+
+    def insp_select_local(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, 
+            translator.tr("media_manager_import_dialog_title"), 
+            "", 
+            "Image Files (*.jpg *.jpeg *.png *.webp)"
+        )
+        if file_path:
+            self.btn_insp_local.setProperty("selected_file", file_path)
+            self.btn_insp_local.setStyleSheet("background-color: #4CAF50;")
+            self.btn_insp_apply.setEnabled(True)
+
+    def insp_search_sgdb(self):
+        if not self.current_insp_folder: return
+        title_to_search = self.lbl_insp_name.text()
+        from dialogs.steamgriddb_picker_dialog import SteamGridDBPickerDialog
+        dlg = SteamGridDBPickerDialog(title_to_search, self)
+        if dlg.exec():
+            selected_url = dlg.selected_url
+            if selected_url:
+                self.insp_url.setText(selected_url)
+
+    def insp_apply_media(self):
+        folder_name = self.current_insp_folder
+        if not folder_name: return
+        
+        local_file = self.btn_insp_local.property("selected_file")
+        url = self.insp_url.text().strip()
+        if not local_file and not url: return
+            
+        from backend.library import LibraryManager
+        from ViGaVault_utils import build_scanner_config
+        import logging
+        manager = LibraryManager(build_scanner_config())
+        manager.load_db()
+        game = manager.games.get(folder_name)
+        if not game: return
+            
+        img_exts = ['.jpg', '.jpeg', '.png', '.webp']
+        is_youtube = False
+        if url and ('youtube.com' in url or 'youtu.be' in url): is_youtube = True
+            
+        local_type = None
+        if local_file:
+            ext = os.path.splitext(local_file)[1].lower()
+            if ext in img_exts: local_type = 'image'
+            
+        url_type = None
+        if url:
+            if not url.startswith('http://') and not url.startswith('https://'):
+                QMessageBox.warning(self, "Error", translator.tr("media_manager_err_invalid_url"))
+                return
+            if is_youtube:
+                url_type = 'trailer'
+            else:
+                match = re.search(r'\.(jpg|jpeg|png|webp)\b', url, re.IGNORECASE)
+                if match:
+                    ext = match.group(0).lower()
+                    if ext in img_exts: url_type = 'image'
+                else:
+                    QMessageBox.warning(self, "Error", translator.tr("media_manager_err_invalid_ext"))
+                    return
+        
+        use_local = local_file
+        use_url = url
+        
+        if local_file and url and local_type == url_type and local_type is not None:
+            msg = QMessageBox(self)
+            msg.setWindowTitle(translator.tr("media_manager_choice_title"))
+            msg.setText(translator.tr("media_manager_choice_msg"))
+            btn_loc = msg.addButton(translator.tr("media_manager_choice_local"), QMessageBox.AcceptRole)
+            btn_net = msg.addButton(translator.tr("media_manager_choice_url"), QMessageBox.AcceptRole)
+            msg.exec()
+            if msg.clickedButton() == btn_loc: use_url = None
+            else: use_local = None
+
+        safe_filename = get_safe_filename(game.data.get('Folder_Name', ''))
+        changes_made = False
+        
+        try:
+            if use_local:
+                ext = os.path.splitext(use_local)[1].lower()
+                dest_dir = manager.config.get('image_path', os.path.join(BASE_DIR, 'images'))
+                os.makedirs(dest_dir, exist_ok=True)
+                dest_path = os.path.join(dest_dir, f"{safe_filename}{ext}")
+                shutil.copy2(use_local, dest_path)
+                game.data['Image_Link'] = f"{safe_filename}{ext}"
+                game.data['Has_Image'] = True
+                changes_made = True
+                
+            if use_url:
+                if is_youtube:
+                    game.data['Trailer_Link'] = use_url
+                    changes_made = True
+                else:
+                    match = re.search(r'\.(jpg|jpeg|png|webp)\b', use_url, re.IGNORECASE)
+                    ext = match.group(0).lower()
+                    dest_dir = manager.config.get('image_path', os.path.join(BASE_DIR, 'images'))
+                    os.makedirs(dest_dir, exist_ok=True)
+                    dest_path = os.path.join(dest_dir, f"{safe_filename}{ext}")
+                    
+                    headers = {'User-Agent': 'Mozilla/5.0'}
+                    response = requests.get(use_url, stream=True, timeout=10, headers=headers)
+                    if response.status_code == 200:
+                        with open(dest_path, 'wb') as f:
+                            shutil.copyfileobj(response.raw, f)
+                        game.data['Image_Link'] = f"{safe_filename}{ext}"
+                        game.data['Has_Image'] = True
+                        changes_made = True
+                    else:
+                        QMessageBox.warning(self, "Download Failed", f"HTTP {response.status_code}")
+        except Exception as e:
+            logging.error(f"Inspector Media Error: {e}")
+            QMessageBox.critical(self, "Error", str(e))
+            
+        if changes_made:
+            manager.save_db()
+            self.btn_insp_apply.setEnabled(False)
+            new_data = game.to_dict()
+            if hasattr(self.parent_window, 'library_controller'):
+                self.parent_window.library_controller.patch_memory_df(folder_name, new_data)
+            if hasattr(self.parent_window, 'list_controller'):
+                self.parent_window.list_controller.update_single_card(folder_name, force_media_reload=True)
+            self.load_data()
+
+    def request_batch_sync(self):
+        selected_folders = self.get_selected_folders()
+        if not selected_folders: return
+        
+        from backend.steamgriddb.login_steamgriddb import is_steamgriddb_connected
+        if not is_steamgriddb_connected():
+            QMessageBox.warning(self, "Error", translator.tr("msg_scan_disabled_igdb"))
+            return
+            
+        reply = QMessageBox.question(self, "Batch Sync", f"This will open the SGDB picker sequentially for {len(selected_folders)} games. Continue?", QMessageBox.Yes | QMessageBox.No)
+        if reply != QMessageBox.Yes: return
+        
+        for folder in selected_folders:
+            self.update_inspector(folder)
+            title = self.lbl_insp_name.text()
+            from dialogs.steamgriddb_picker_dialog import SteamGridDBPickerDialog
+            dlg = SteamGridDBPickerDialog(title, self)
+            if dlg.exec():
+                if dlg.selected_url:
+                    self.insp_url.setText(dlg.selected_url)
+                    self.insp_apply_media()
+        
+        QMessageBox.information(self, "Done", "Batch Media Sync completed!")
+
     def request_batch_ok(self):
         selected_folders = self.get_selected_folders()
         if not selected_folders: return
@@ -429,6 +677,7 @@ class GameManagerDialog(QDialog):
             
             self.btn_batch_edit.setEnabled(has_selection)
             self.btn_batch_delete.setEnabled(has_selection)
+            if hasattr(self, 'btn_batch_sync'): self.btn_batch_sync.setEnabled(has_selection)
             if hasattr(self, 'btn_batch_ok'): self.btn_batch_ok.setEnabled(has_selection)
             
             # WHY: Smart Refresh - Synchronize the master "Select All" checkbox state based on the actual table data. 
@@ -444,6 +693,13 @@ class GameManagerDialog(QDialog):
             self.base_df.insert(0, '_selected', False)
             self.base_df.insert(0, '_edit', 'Edit')
             
+            import pandas as pd
+            has_img_series = self.base_df['Has_Image'] if 'Has_Image' in self.base_df.columns else pd.Series(False, index=self.base_df.index)
+            trl_series = self.base_df['Trailer_Link'] if 'Trailer_Link' in self.base_df.columns else pd.Series("", index=self.base_df.index)
+            
+            self.base_df.insert(2, '_has_img', has_img_series.astype(str).str.lower().isin(['true', '1']))
+            self.base_df.insert(3, '_has_trl', trl_series.astype(str).str.startswith('http'))
+            
             # WHY: Populate each multi-select dropdown with the unique comma-separated elements from the target column.
             for col, combo in self.filter_combos.items():
                 combo.blockSignals(True)
@@ -455,7 +711,7 @@ class GameManagerDialog(QDialog):
                         parts = [p.strip() for p in str(val).split(',') if p.strip()]
                         unique_vals.update(parts)
                     # WHY: Initialize to checked=False so the user opts-in to filtering.
-                    for val in sorted(list(unique_vals)):
+                    for val in sorted(list(unique_vals), key=lambda x: x.lower()):
                         combo.add_item(val, checked=False)
                 combo.blockSignals(False)
 
@@ -477,6 +733,12 @@ class GameManagerDialog(QDialog):
             # WHY: Filter strictly for Hidden/DLC games.
             df = df[(df['Is_DLC'] == True) | (df['Is_Excluded'] == True)]
             
+        if self.btn_filter_no_img.isChecked():
+            df = df[(df['_has_img'] == False) & (df['Is_DLC'] != True) & (df['Is_Excluded'] != True)]
+            
+        if self.btn_filter_no_trl.isChecked():
+            df = df[(df['_has_trl'] == False) & (df['Is_DLC'] != True) & (df['Is_Excluded'] != True)]
+            
         # WHY: Apply interdependent Excel-style filtering across all active dropdown columns.
         for col, combo in self.filter_combos.items():
             if col not in df.columns: continue
@@ -494,7 +756,7 @@ class GameManagerDialog(QDialog):
             df = df[df[col].astype(str).str.contains(pattern, case=False, na=False)]
 
         # WHY: Construct the Pandas display columns perfectly ordered to match the assembled UI widgets.
-        cols = ['_edit', '_selected', 'Original_Release_Date', 'Clean_Title'] + self.logical_columns
+        cols = ['_edit', '_selected', '_has_img', '_has_trl', 'Original_Release_Date', 'Clean_Title'] + self.logical_columns
         existing_cols = [c for c in cols if c in df.columns]
         
         # WHY: Preserve user sorting preferences dynamically when filters drastically alter the visible rows.
