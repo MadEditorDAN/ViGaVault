@@ -328,6 +328,12 @@ class FilterController(QObject):
         self.mw.sidebar.setEnabled(False)
         self.mw.list_widget.setEnabled(False)
         QApplication.setOverrideCursor(Qt.WaitCursor)
+        
+        # Update combo box counts
+        if hasattr(self.mw.sidebar, 'combo_view_mode'):
+            self.mw.sidebar.combo_view_mode.blockSignals(True)
+            self.mw.sidebar.update_view_mode_counts()
+            self.mw.sidebar.combo_view_mode.blockSignals(False)
 
         # WHY: Removed Developer. Mapped the 3rd dropdown option to the internal CSV index tracker.
         sort_col_map = ["temp_sort_title", "temp_sort_date", "temp_sort_index"]

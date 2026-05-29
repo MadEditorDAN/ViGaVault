@@ -156,6 +156,7 @@ class Sidebar(QWidget):
             translator.tr("sidebar_btn_toggle_dlc")
         ])
         self.combo_view_mode.setCursor(Qt.PointingHandCursor)
+        self.combo_view_mode.setMinimumWidth(160)
         self.combo_view_mode.currentIndexChanged.connect(lambda index: self.parent.request_filter_update())
         
         filters_header_layout.addWidget(self.combo_view_mode)
@@ -401,7 +402,32 @@ class Sidebar(QWidget):
                 col = 0
                 row += 1
 
-
+    def update_view_mode_counts(self):
+        if not hasattr(self.parent, 'master_df') or self.parent.master_df is None or self.parent.master_df.empty: return
+        df = self.parent.master_df
+        
+        valid_mask = ~df['Is_DLC'] & ~df['Is_Excluded']
+        valid_df = df[valid_mask]
+        
+        counts = [
+            len(valid_df),
+            len(valid_df[~valid_df['Has_Image']]),
+            len(valid_df[valid_df['Trailer_Link'] == '']),
+            len(valid_df[valid_df['Status_Flag'].isin(['NEW', 'NEEDS_ATTENTION'])]),
+            len(df[df['Is_DLC'] | df['Is_Excluded']])
+        ]
+        
+        labels = [
+            "Game Catalog",
+            translator.tr("sidebar_btn_toggle_no_img"),
+            translator.tr("sidebar_btn_toggle_no_trl"),
+            translator.tr("sidebar_btn_toggle_new"),
+            translator.tr("sidebar_btn_toggle_dlc")
+        ]
+        
+        for i in range(5):
+            self.combo_view_mode.setItemText(i, f"{labels[i]} ({counts[i]})")
+            
     def adjust_scan_log_font(self):
         """WHY: Dynamically calculates the perfect pixel size required to fit exactly 80 monospace characters in the list width."""
         viewport_width = self.scan_results.viewport().width()
