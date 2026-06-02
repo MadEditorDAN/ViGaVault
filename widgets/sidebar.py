@@ -8,35 +8,7 @@ from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QFont, QFontMetrics
 
 from ViGaVault_utils import translator
-from .custom_inputs import CollapsibleFilterGroup
-
-class RightAlignedNumberDelegate(QStyledItemDelegate):
-    def paint(self, painter, option, index):
-        self.initStyleOption(option, index)
-        painter.save()
-        
-        option.text = ""  # Prevent default text rendering by the style
-        
-        style = option.widget.style() if option.widget else None
-        if style:
-            style.drawControl(QStyle.CE_ItemViewItem, option, painter, option.widget)
-        label = index.data(Qt.DisplayRole)
-        count_val = index.data(Qt.UserRole)
-        
-        if count_val is not None:
-            count_part = f"({count_val})"
-            
-            rect_left = option.rect.adjusted(5, 0, 0, 0)
-            painter.drawText(rect_left, Qt.AlignLeft | Qt.AlignVCenter, str(label))
-            
-            rect_right = option.rect.adjusted(0, 0, -5, 0)
-            painter.drawText(rect_right, Qt.AlignRight | Qt.AlignVCenter, count_part)
-        else:
-            if label:
-                rect = option.rect.adjusted(5, 0, 0, 0)
-                painter.drawText(rect, Qt.AlignLeft | Qt.AlignVCenter, str(label))
-            
-        painter.restore()
+from .custom_inputs import CollapsibleFilterGroup, RightAlignedNumberDelegate
 
 # The right-hand sidebar containing Counters, Search, Sort, Filters, and the Scan Panel.
 class Sidebar(QWidget):

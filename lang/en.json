@@ -295,5 +295,6 @@
     "gamecard_tooltip_scan": "Scrape Metadata from IGDB",
     "gamecard_tooltip_set_ok": "Set as OK (Remove from New list)",
     "gamecard_tooltip_hide": "Hide Game from Main Library",
-    "gamecard_tooltip_unhide": "Unhide Game"
+    "gamecard_tooltip_unhide": "Unhide Game",
+    "game_manager_inspector_title": "Game Inspector"
 }

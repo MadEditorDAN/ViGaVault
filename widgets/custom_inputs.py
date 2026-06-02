@@ -2,11 +2,39 @@
 # so they can be securely imported across the application without dragging in massive components like the Sidebar.
 from PySide6.QtWidgets import (QComboBox, QGroupBox, QVBoxLayout, QHBoxLayout, 
                              QWidget, QPushButton, QScrollArea, QFrame, 
-                             QGridLayout, QSizePolicy)
+                             QGridLayout, QSizePolicy, QStyledItemDelegate, QStyle)
 from PySide6.QtCore import Qt, QEvent, Signal
 from PySide6.QtGui import QStandardItemModel, QStandardItem
 
 from ViGaVault_utils import translator
+
+class RightAlignedNumberDelegate(QStyledItemDelegate):
+    def paint(self, painter, option, index):
+        self.initStyleOption(option, index)
+        painter.save()
+        
+        option.text = ""  # Prevent default text rendering by the style
+        
+        style = option.widget.style() if option.widget else None
+        if style:
+            style.drawControl(QStyle.CE_ItemViewItem, option, painter, option.widget)
+        label = index.data(Qt.DisplayRole)
+        count_val = index.data(Qt.UserRole)
+        
+        if count_val is not None:
+            count_part = f"({count_val})"
+            
+            rect_left = option.rect.adjusted(5, 0, 0, 0)
+            painter.drawText(rect_left, Qt.AlignLeft | Qt.AlignVCenter, str(label))
+            
+            rect_right = option.rect.adjusted(0, 0, -5, 0)
+            painter.drawText(rect_right, Qt.AlignRight | Qt.AlignVCenter, count_part)
+        else:
+            if label:
+                rect = option.rect.adjusted(5, 0, 0, 0)
+                painter.drawText(rect, Qt.AlignLeft | Qt.AlignVCenter, str(label))
+            
+        painter.restore()
 
 class CheckableComboBox(QComboBox):
     """WHY: Single Responsibility - Provides an Excel-style multi-select dropdown for column filtering."""

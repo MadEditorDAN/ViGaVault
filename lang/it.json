@@ -75,6 +75,7 @@
     "settings_display_language": "Lingua",
     "settings_display_regional": "Impostazioni Regionali",
     "settings_display_date_format": "Formato Data:",
+    "settings_display_time_format": "Formato Ora:",
     "settings_display_sizes_group": "Dimensioni Elementi",
     "settings_folders_scan_local": "Cerca copie locali",
     "settings_folders_local_copies_group": "Copie Locali",
@@ -294,5 +295,6 @@
     "gamecard_tooltip_scan": "Ottieni metadati da IGDB",
     "gamecard_tooltip_set_ok": "Imposta come OK (Rimuovi dalla lista Nuovo)",
     "gamecard_tooltip_hide": "Nascondi gioco",
-    "gamecard_tooltip_unhide": "Mostra gioco"
+    "gamecard_tooltip_unhide": "Mostra gioco",
+    "game_manager_inspector_title": "Ispettore di Gioco"
 }

@@ -29,7 +29,7 @@ class TrailerSearchWorker(QThread):
             command = [
                 sys.executable,
                 '-m', 'yt_dlp', 
-                f'ytsearch18:{query}', 
+                f'ytsearch45:{query}', 
                 '--dump-json', 
                 '--no-playlist', 
                 '--flat-playlist'
@@ -101,28 +101,37 @@ class VideoCard(QWidget):
         
         # Container for thumbnail + absolute checkbox
         self.thumb_container = QWidget()
-        self.thumb_container.setFixedSize(320, 180)
+        self.thumb_container.setFixedSize(256, 144)
         self.thumb_container.setCursor(Qt.PointingHandCursor)
         
         self.lbl_thumb = QLabel(self.thumb_container)
-        self.lbl_thumb.setFixedSize(320, 180)
-        self.lbl_thumb.setAlignment(Qt.AlignCenter)
+        self.lbl_thumb.setFixedSize(256, 144)
+        self.lbl_thumb.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.lbl_thumb.setStyleSheet("background-color: #1e1e1e; color: #888; border: 1px solid #333;")
         self.lbl_thumb.setText("Loading Thumbnail...")
         
         # Overlay checkbox at top right
         self.chk_select = QCheckBox(self.thumb_container)
         self.chk_select.setStyleSheet("""
-            QCheckBox::indicator { width: 24px; height: 24px; }
-            QCheckBox { background: rgba(0,0,0,0.5); border-radius: 4px; }
+            QCheckBox::indicator { 
+                width: 24px; 
+                height: 24px; 
+                border: 2px solid palette(text);
+                border-radius: 4px;
+                background: rgba(0,0,0,0.5);
+            }
+            QCheckBox::indicator:checked {
+                background-color: palette(text);
+            }
+            QCheckBox { background: transparent; }
         """)
-        self.chk_select.move(290, 5)
+        self.chk_select.move(226, 5)
         self.chk_select.toggled.connect(self.on_checked)
         
         # Title
         self.lbl_title = QLabel(video_data['title'])
         self.lbl_title.setWordWrap(True)
-        self.lbl_title.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        self.lbl_title.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.lbl_title.setFixedHeight(40)
         self.lbl_title.setToolTip(video_data['title'])
         
@@ -148,7 +157,7 @@ class VideoCard(QWidget):
         self.worker.start()
 
     def on_thumbnail_ready(self, vid_id, pixmap):
-        scaled = pixmap.scaled(320, 180, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+        scaled = pixmap.scaled(256, 144, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
         self.lbl_thumb.setPixmap(scaled)
 
     def mousePressEvent(self, event):
@@ -179,6 +188,7 @@ class TrailerSearchDialog(QDialog):
         search_layout.addWidget(QLabel("Search Query:"))
         self.txt_search = QLineEdit(f"{self.game_title} trailer")
         self.txt_search.textChanged.connect(self.on_search_text_changed)
+        self.txt_search.returnPressed.connect(self.start_manual_search)
         search_layout.addWidget(self.txt_search, 1)
         
         self.btn_search = QPushButton("Search")
@@ -196,6 +206,11 @@ class TrailerSearchDialog(QDialog):
         main_layout.addWidget(self.grid_container, 1)
         
         btn_layout = QHBoxLayout()
+        
+        self.btn_back = QPushButton("Back")
+        self.btn_back.clicked.connect(self.load_prev_page)
+        self.btn_back.hide()
+        
         self.btn_more = QPushButton("Load More")
         self.btn_more.clicked.connect(self.load_next_page)
         self.btn_more.hide()
@@ -208,6 +223,7 @@ class TrailerSearchDialog(QDialog):
         self.btn_save.setEnabled(False)
         self.btn_save.clicked.connect(self.accept)
         
+        btn_layout.addWidget(self.btn_back)
         btn_layout.addWidget(self.btn_more)
         btn_layout.addStretch()
         btn_layout.addWidget(self.btn_cancel)
@@ -232,15 +248,22 @@ class TrailerSearchDialog(QDialog):
         self.cards.clear()
         self.current_page = 0
         
+        if not hasattr(self, '_active_workers'):
+            self._active_workers = []
+        self._active_workers = [w for w in self._active_workers if w.isRunning()]
+        
         self.worker = TrailerSearchWorker(self.txt_search.text())
         self.worker.finished.connect(self.on_search_finished)
         self.worker.error.connect(self.on_search_error)
+        self._active_workers.append(self.worker)
         self.worker.start()
 
     def on_search_error(self, err):
+        if self.sender() != getattr(self, 'worker', None): return
         self.lbl_status.setText(f"Error: {err}")
 
     def on_search_finished(self, videos):
+        if self.sender() != getattr(self, 'worker', None): return
         self.videos = videos
         if not self.videos:
             self.lbl_status.setText("No trailers found.")
@@ -258,8 +281,8 @@ class TrailerSearchDialog(QDialog):
         
         self.cards.clear()
         
-        start_idx = self.current_page * 6
-        end_idx = min(start_idx + 6, len(self.videos))
+        start_idx = self.current_page * 9
+        end_idx = min(start_idx + 9, len(self.videos))
         page_videos = self.videos[start_idx:end_idx]
         
         row, col = 0, 0
@@ -270,7 +293,7 @@ class TrailerSearchDialog(QDialog):
             self.grid_layout.addWidget(card, row, col)
             
             col += 1
-            if col > 1: # 2 columns (0, 1)
+            if col > 2: # 3 columns (0, 1, 2)
                 col = 0
                 row += 1
                 
@@ -278,10 +301,20 @@ class TrailerSearchDialog(QDialog):
             self.btn_more.show()
         else:
             self.btn_more.hide()
+            
+        if self.current_page > 0:
+            self.btn_back.show()
+        else:
+            self.btn_back.hide()
 
     def load_next_page(self):
         self.current_page += 1
         self.render_page()
+
+    def load_prev_page(self):
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.render_page()
 
     def on_card_selected(self, url):
         self.selected_url = url

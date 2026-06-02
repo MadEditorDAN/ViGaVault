@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Standardized database date schema to YYYY-MM-DD with dynamic localization conversion for UI rendering.
 - Immediate list sorting reflow triggered in-memory upon editing game dates or titles.
 - Implemented real-time Amazon session validation check mid-scan (detecting login redirects), providing instant GUI feedback if the active session has expired and needs to be re-applied.
+- Added real-time YouTube trailer thumbnail previews and local cover rendering to the Game Inspector panel.
+- Extended the YouTube Trailer Search dialog with a 3x3 layout, deeper multi-page pagination, and direct Enter key search execution.
 
 ### Changed
 - Improved local copy injection rules to apply deduplication and user-casing overrides universally across Genre, Collection, Publisher, and Developer fields.
@@ -35,6 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Aligned Amazon Luna scanning logs and report layout to perfectly match standard GOG and Epic formats, ensuring it always outputs a scan header and metrics report block even on empty fetches, and successfully integrates into the final consolidation breakdown and grand totals.
 - Added data-loss guard to Amazon ghost deletion logic, completely preventing the unlinking or deletion of local databases if a transient network/scraper issue returns an empty cloud catalog.
 - Integrated robust millisecond-based Unix timestamp parsing inside the Amazon claim categorization system to ensure historical game acquisitions are perfectly distributed across active catalog year folders.
+- Overhauled the Game Manager Inspector panel into a compact multi-row vertical layout tightly aligning media previews with precise geometric dimensions.
+- Rewired SteamGridDB, YouTube, and Local Media picker dialogs to instantly and automatically apply selected media directly to the game without requiring the manual URL textbox workflow.
+- Renamed the media picker buttons to explicitly read 'Import', 'SteamGridDB', and 'YouTube' instead of abbreviated icons.
 
 ### Fixed
 - Fixed case-sensitive sorting in UI filters (Sidebar, Game Manager, Metadata Manager) to ensure mixed-case items sort correctly.
@@ -51,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Resolved infinite IGDB rescanning loops of incomplete games by excluding `NEEDS_ATTENTION` games from the automated scrapper queue, ensuring they are only queried once when added as `NEW` to prevent redundant network traffic.
 - Resolved `TypeError: cannot unpack non-iterable bool object` critical thread crash in full scan thread by aligning `scan_gog_account`, `scan_epic_account`, and `scan_steam_account` return signatures to return `(changes_made, stats)` tuples, matching GOG, Epic, and Steam backend sync expectations.
 - Resolved redundant rescanning and duplication of existing Amazon games by implementing a clean UUID extractor `get_clean_amazon_id` to unify dot-prefixed cloud IDs with database GOG Galaxy formats.
+- Fixed 'QThread Destroyed' application crashes during rapid scrolling/searching caused by Python garbage collection by implementing persistent active worker lists for the asynchronous thumbnail downloader threads.
 
 ## [1.2.0] - 2026-05-20
 ### Added
