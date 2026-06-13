@@ -416,10 +416,12 @@ class LibraryManager:
             db_has_img = str(game.data.get('Has_Image')).lower() in ['true', '1']
             needs_cover_rescue = not db_has_img and game.data.get('Cover_URL', '') == ''
             
+            has_igdb_id = any(x.strip().startswith('igdb_') for x in str(game.data.get('game_ID', '')).split(','))
+            
             if images_only:
                 should_scrape = needs_cover_rescue
             else:
-                should_scrape = (status in ['NEW', ''] or needs_cover_rescue)
+                should_scrape = (status in ['NEW', ''] or needs_cover_rescue or not has_igdb_id)
                 
             if should_scrape:
                 action_taken = True
@@ -518,11 +520,8 @@ class LibraryManager:
                 has_img_now = str(game.data.get('Has_Image')).lower() in ['true', '1']
                 has_trl_now = bool(game.data.get('Trailer_Link') and str(game.data.get('Trailer_Link')).startswith('http'))
                 
-                if status in ['NEW', 'NEEDS_ATTENTION', '']:
-                    op_name = "Scraping"
-                else:
-                    op_name = "Cover Download"
-                    
+                # WHY: op_name is already correctly assigned during Phase 1 ("Scraping") 
+                # or Phase 2 ("Cover Download"). We don't override it based on legacy Status_Flags.
                 logging.info("UI_UPDATE|" + format_operation_row(op_name, title_disp, has_img_now, has_trl_now))
 
         if changes_made: self.save_db()

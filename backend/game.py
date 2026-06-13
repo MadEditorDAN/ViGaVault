@@ -241,6 +241,9 @@ class Game:
                 self.data['Clean_Title'] = g.get('name', self.data['Clean_Title'])
                 self.data['Summary'] = g.get('summary', '')
                 new_genres = ", ".join([ge.get('name', '') for ge in g.get('genres', [])])
+                vr_platforms = {162, 163, 165, 384, 385, 386, 387, 388, 390, 471}
+                if any(p in vr_platforms for p in g.get('platforms', [])):
+                    new_genres = f"{new_genres}, VR" if new_genres else "VR"
                 self.data['Genre'] = normalize_genre(f"{new_genres}, {self.data.get('Genre', '')}")
                 
                 companies = g.get('involved_companies', [])
@@ -259,8 +262,8 @@ class Game:
                         self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%Y-%m-%d')
                         api_year_str = datetime.utcfromtimestamp(orig_ts).strftime('%Y')
                 
-                if self.data.get('Platforms') == 'Local Copy' and 'id' in g:
-                    current_ids = set(x.strip() for x in self.data.get('game_ID', '').split(',') if x.strip())
+                if 'id' in g:
+                    current_ids = set(x.strip() for x in str(self.data.get('game_ID', '')).split(',') if x.strip())
                     current_ids.add(f"igdb_{g.get('id')}")
                     self.data['game_ID'] = ", ".join(sorted(list(current_ids)))
 
@@ -271,6 +274,10 @@ class Game:
 
         if results is not None:
             self.data['Status_Flag'] = 'NEEDS_ATTENTION'
+            current_ids = set(x.strip() for x in str(self.data.get('game_ID', '')).split(',') if x.strip())
+            current_ids.add('igdb_none')
+            self.data['game_ID'] = ", ".join(sorted(list(current_ids)))
+            
         return False
 
     def fill_missing_metadata(self, token, images_only=False):
@@ -299,16 +306,21 @@ class Game:
                         self.data['Image_Link'] = self._ensure_cover(g, silent=True)
                     return True
                 
-                # WHY: For Local Copies that lack platform metadata, we allow IGDB to perfect the title capitalization and store the ID.
-                if self.data.get('Platforms') == 'Local Copy':
-                    if 'name' in g: self.data['Clean_Title'] = g.get('name')
-                    if 'id' in g:
-                        current_ids = set(x.strip() for x in self.data.get('game_ID', '').split(',') if x.strip())
-                        current_ids.add(f"igdb_{g.get('id')}")
-                        self.data['game_ID'] = ", ".join(sorted(list(current_ids)))
+                # WHY: Allow all platforms to save their official IGDB ID for future metadata syncing and fast lookups.
+                if 'name' in g and self.data.get('Platforms') == 'Local Copy': 
+                    self.data['Clean_Title'] = g.get('name')
+                if 'id' in g:
+                    current_ids = set(x.strip() for x in str(self.data.get('game_ID', '')).split(',') if x.strip())
+                    current_ids.add(f"igdb_{g.get('id')}")
+                    self.data['game_ID'] = ", ".join(sorted(list(current_ids)))
                         
                 if not self.data.get('Summary'): self.data['Summary'] = g.get('summary', '')
-                if not self.data.get('Genre'): self.data['Genre'] = normalize_genre(", ".join([ge.get('name', '') for ge in g.get('genres', [])]))
+                if not self.data.get('Genre'): 
+                    new_genres = ", ".join([ge.get('name', '') for ge in g.get('genres', [])])
+                    vr_platforms = {162, 163, 165, 384, 385, 386, 387, 388, 390, 471}
+                    if any(p in vr_platforms for p in g.get('platforms', [])):
+                        new_genres = f"{new_genres}, VR" if new_genres else "VR"
+                    self.data['Genre'] = normalize_genre(new_genres)
                 
                 companies = g.get('involved_companies', [])
                 if not self.data.get('Developer'): self.data['Developer'] = ", ".join([c.get('company', {}).get('name', '') for c in companies if c.get('developer') and c.get('company', {}).get('name')])
@@ -330,6 +342,12 @@ class Game:
                 if not self.data.get('Cover_URL'):
                     self.data['Image_Link'] = self._ensure_cover(g, silent=True)
                 return True
+                
+        if results is not None:
+            current_ids = set(x.strip() for x in str(self.data.get('game_ID', '')).split(',') if x.strip())
+            current_ids.add('igdb_none')
+            self.data['game_ID'] = ", ".join(sorted(list(current_ids)))
+            
         return False
 
     def fetch_smart_metadata(self, token, search_override=None):
@@ -349,6 +367,9 @@ class Game:
                 self.data['Clean_Title'] = g.get('name', self.data['Clean_Title'])
                 self.data['Summary'] = g.get('summary', '')
                 new_genres = ", ".join([ge.get('name', '') for ge in g.get('genres', [])])
+                vr_platforms = {162, 163, 165, 384, 385, 386, 387, 388, 390, 471}
+                if any(p in vr_platforms for p in g.get('platforms', [])):
+                    new_genres = f"{new_genres}, VR" if new_genres else "VR"
                 self.data['Genre'] = normalize_genre(f"{new_genres}, {self.data.get('Genre', '')}")
                 
                 companies = g.get('involved_companies', [])
@@ -365,6 +386,12 @@ class Game:
                         orig_ts = min(valid_dates)
                         self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%Y-%m-%d')
                 
+                if 'id' in g:
+                    current_ids = set(x.strip() for x in str(self.data.get('game_ID', '')).split(',') if x.strip())
+                    if 'igdb_none' in current_ids: current_ids.remove('igdb_none')
+                    current_ids.add(f"igdb_{g.get('id')}")
+                    self.data['game_ID'] = ", ".join(sorted(list(current_ids)))
+                    
                 self.data['Image_Link'] = self._ensure_cover(g, force_download=True)
                 if self.data['Image_Link']:
                     self.data['Has_Image'] = True
@@ -376,6 +403,9 @@ class Game:
         self.data['Clean_Title'] = g.get('name', self.data.get('Clean_Title'))
         self.data['Summary'] = g.get('summary', '')
         new_genres = ", ".join([ge.get('name', '') for ge in g.get('genres', [])])
+        vr_platforms = {162, 163, 165, 384, 385, 386, 387, 388, 390, 471}
+        if any(p in vr_platforms for p in g.get('platforms', [])):
+            new_genres = f"{new_genres}, VR" if new_genres else "VR"
         self.data['Genre'] = normalize_genre(f"{new_genres}, {self.data.get('Genre', '')}")
         
         companies = g.get('involved_companies', [])
@@ -392,8 +422,9 @@ class Game:
                 orig_ts = min(valid_dates)
                 self.data['Original_Release_Date'] = datetime.utcfromtimestamp(orig_ts).strftime('%Y-%m-%d')
         
-        if self.data.get('Platforms') == 'Local Copy' and 'id' in g:
-            current_ids = set(x.strip() for x in self.data.get('game_ID', '').split(',') if x.strip())
+        if 'id' in g:
+            current_ids = set(x.strip() for x in str(self.data.get('game_ID', '')).split(',') if x.strip())
+            if 'igdb_none' in current_ids: current_ids.remove('igdb_none')
             current_ids.add(f"igdb_{g.get('id')}")
             self.data['game_ID'] = ", ".join(sorted(list(current_ids)))
 

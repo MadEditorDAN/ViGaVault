@@ -198,15 +198,28 @@ def sync_amazon_database(config, games_dict, claims_list, worker_thread=None, pr
             best_game = None
             
             for game in games_dict.values():
+                # 1. Permanent Blacklist Check
+                unmerged = game.data.get('Unmerged_IDs', '')
+                if f"amazon_{clean_amazon_id}" in unmerged:
+                    continue
+                    
                 local_title = game.data.get('Clean_Title', '')
                 local_norm_title = re.sub(r'[^a-z0-9]', '', local_title.lower())
                 
                 score = 0
-                if local_norm_title == norm_title: score += 60
+                if local_norm_title == norm_title: 
+                    score += 60
                 else:
                     ratio = difflib.SequenceMatcher(None, title_clean.lower(), local_title.lower()).ratio()
-                    if ratio > 0.6: score += int(ratio * 60)
-                    else: continue
+                    if ratio > 0.6: 
+                        score += int(ratio * 60)
+                        # Number mismatch penalty
+                        nums1 = set(re.findall(r'\d+', title_clean))
+                        nums2 = set(re.findall(r'\d+', local_title))
+                        if nums1 != nums2:
+                            score -= 30
+                    else: 
+                        continue
                     
                 local_platforms = game.data.get('Platforms', '').lower()
                 if 'amazon' in local_platforms: score += 20
@@ -221,6 +234,11 @@ def sync_amazon_database(config, games_dict, claims_list, worker_thread=None, pr
                 current_ids = set(x.strip() for x in best_game.data.get('game_ID', '').split(',') if x.strip())
                 current_ids.add(f"amazon_{clean_amazon_id}")
                 best_game.data['game_ID'] = ", ".join(sorted(list(current_ids)))
+                
+                mh = best_game.data.get('Merge_History', '')
+                mh_parts = [x for x in mh.split('|') if x]
+                mh_parts.append(f"amazon_{clean_amazon_id}:{title_clean}")
+                best_game.data['Merge_History'] = "|".join(mh_parts)
                 
                 p_set = set(x.strip() for x in best_game.data.get('Platforms', '').split(',') if x.strip())
                 if 'Local Copy' in p_set: p_set.remove('Local Copy')

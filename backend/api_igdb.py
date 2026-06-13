@@ -38,7 +38,7 @@ def query_igdb_api(token, search_term="", limit=10, by_id=False, custom_query=No
     else:
         fields = ('id, name, summary, genres.name, involved_companies.company.name, '
                   'involved_companies.developer, involved_companies.publisher, '
-                  'videos.video_id, release_dates.date, cover.url, category')
+                  'videos.video_id, release_dates.date, cover.url, category, platforms')
         if by_id: query = f'fields {fields}; where id = {search_term};'
         elif go_wild: query = f'search "{search_term}"; fields {fields}; limit {limit};'
         else: query = f'search "{search_term}"; fields {fields}; where platforms = (3, 6, 13, 14, 34, 39, 48, 49, 130, 161, 162, 163, 164, 165, 167, 169, 384, 385, 386, 388, 390, 409, 471); limit {limit};'

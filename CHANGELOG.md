@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-06-13
+### Added
+- Added a new 'Merged' column in the Game Manager table with a top row alignment filter to quickly identify games consisting of multiple manually merged platforms (Steam, Epic, Amazon, GOG).
+- Implemented a 'Merged Sources' unmerge utility inside the Game Manager Inspector to completely disconnect incorrect cross-platform library merges. Unmerged IDs are permanently blacklisted to prevent re-merging during future scans.
+- Added localization for the new Unmerge interface across all supported languages (EN, FR, DE, ES, IT).
+
+### Changed
+- Overhauled the Game Manager's bottom Game Inspector layout into a perfectly symmetrical, fixed-width 3-pane structure (Media, Metadata, Merged Sources) that expands flexibly on widescreen monitors.
+- Cleaned up the Game Manager top toolbar layout.
+
+### Removed
+- Removed the incorrectly named and partially implemented "Batch Sync" button from the Game Manager toolbar.
+
 ## [1.3.0] - 2026-05-29
 ### Added
 - Integrated headless Prime Gaming & Luna GraphQL scanner on the main thread, with persistent browser sessions and automated title smart-merging under the Amazon platform tag.

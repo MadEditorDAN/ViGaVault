@@ -296,5 +296,9 @@
     "gamecard_tooltip_set_ok": "Set as OK (Remove from New list)",
     "gamecard_tooltip_hide": "Hide Game from Main Library",
     "gamecard_tooltip_unhide": "Unhide Game",
-    "game_manager_inspector_title": "Game Inspector"
+    "game_manager_inspector_title": "Game Inspector",
+    "dialog_edit_unmerge_btn": "Unmerge",
+    "dialog_edit_merged_sources": "Merged Sources",
+    "dialog_edit_unmerge_confirm": "Are you sure you want to completely unmerge and remove '{platform}' from this game? This will permanently blacklist this ID.",
+    "dialog_edit_unmerge_success": "Source successfully unmerged."
 }

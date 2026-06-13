@@ -62,7 +62,7 @@ class ActionDialog(QDialog):
         
         fields_to_disable = ['Folder_Name', 'Status_Flag', 'Image_Link', 'Platforms']
         # WHY: Explicitly exclude internal system flags and media paths so they don't clutter the generic text zone.
-        fields_to_exclude = ['Trailer_Link', 'game_ID', 'Image_Link', 'temp_sort_date', 'temp_sort_title', 'temp_sort_index', 'Path_Root', 'Year_Folder', 'Is_Local', 'Has_Image', 'Has_Video', 'Cover_URL', 'Path_Video', 'Is_DLC', 'Is_Excluded']
+        fields_to_exclude = ['Trailer_Link', 'game_ID', 'Image_Link', 'temp_sort_date', 'temp_sort_title', 'temp_sort_index', 'Path_Root', 'Year_Folder', 'Is_Local', 'Has_Image', 'Has_Video', 'Cover_URL', 'Path_Video', 'Is_DLC', 'Is_Excluded', 'Merge_History']
         fmt_str = getattr(self.parent_window, 'date_format_str', 'DD/MM/YYYY')
 
         for field, value in self.original_data.items():
@@ -92,6 +92,13 @@ class ActionDialog(QDialog):
             self.inputs[field] = inp
  
         left_layout.addWidget(metadata_group)
+        
+        # Section: Merged Sources
+        self.sources_group = QGroupBox("Merged Sources")
+        self.sources_layout = QVBoxLayout(self.sources_group)
+        self.refresh_sources_ui()
+        left_layout.addWidget(self.sources_group)
+        left_layout.addStretch()
 
         # --- Right Column (Media) ---
         right_widget = QWidget()
@@ -197,6 +204,109 @@ class ActionDialog(QDialog):
         # WHY: Automatically lock the game if the user manually edits any metadata.
         if not self.chk_locked.isChecked():
             self.chk_locked.setChecked(True)
+
+    def refresh_sources_ui(self):
+        while self.sources_layout.count():
+            item = self.sources_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+            elif item.layout():
+                while item.layout().count():
+                    sub_item = item.layout().takeAt(0)
+                    if sub_item.widget(): sub_item.widget().deleteLater()
+                item.layout().deleteLater()
+                
+        game_id_str = self.updated_data.get('game_ID') if 'game_ID' in self.updated_data else self.original_data.get('game_ID', '')
+        ids = [x.strip() for x in game_id_str.split(',') if x.strip() and x.strip() != 'igdb_none']
+        
+        merge_history_str = self.updated_data.get('Merge_History') if 'Merge_History' in self.updated_data else self.original_data.get('Merge_History', '')
+        history_map = {}
+        for part in merge_history_str.split('|'):
+            if ':' in part:
+                k, v = part.split(':', 1)
+                history_map[k.strip()] = v.strip()
+                
+        if not ids:
+            lbl = QLabel("No external sources linked.")
+            lbl.setStyleSheet("color: #888; font-style: italic;")
+            self.sources_layout.addWidget(lbl)
+            return
+
+        for gid in ids:
+            row = QHBoxLayout()
+            display_name = history_map.get(gid)
+            if not display_name:
+                if gid.startswith('steam_'): display_name = f"Steam Game ({gid.split('_')[1]})"
+                elif gid.startswith('gog_'): display_name = f"GOG Game ({gid.split('_')[1]})"
+                elif gid.startswith('epic_'): display_name = f"Epic Game"
+                elif gid.startswith('uplay_'): display_name = f"Ubisoft Game"
+                elif gid.startswith('origin_'): display_name = f"EA Game"
+                elif gid.startswith('amazon_'): display_name = f"Amazon Game"
+                elif gid.startswith('igdb_'): display_name = f"IGDB Database Entry"
+                else: display_name = f"Source ({gid})"
+                
+            lbl = QLabel(display_name)
+            row.addWidget(lbl, 1)
+            
+            btn = QPushButton("Unmerge")
+            # Bind gid explicitly to avoid lambda closure loop bugs
+            btn.clicked.connect(lambda checked=False, gid_val=gid: self.unmerge_source(gid_val))
+            row.addWidget(btn)
+            
+            self.sources_layout.addLayout(row)
+
+    def unmerge_source(self, source_id):
+        reply = QMessageBox.question(
+            self,
+            "Unmerge Source",
+            f"Are you sure you want to detach this source from the game?\\n\\nIt will be permanently removed from this merged entry. You can then run your platform scanner again to perfectly re-acquire it as an individual game.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply != QMessageBox.Yes: return
+        
+        # 1. Remove ID
+        game_id_str = self.updated_data.get('game_ID') if 'game_ID' in self.updated_data else self.original_data.get('game_ID', '')
+        ids = [x.strip() for x in game_id_str.split(',') if x.strip()]
+        if source_id in ids:
+            ids.remove(source_id)
+            self.updated_data['game_ID'] = ", ".join(sorted(ids))
+            
+        # 2. Cleanup Platforms tag if this was the last ID for that platform
+        prefix = source_id.split('_')[0]
+        if not any(x.startswith(prefix + '_') for x in ids):
+            platform_map = {'steam': 'Steam', 'gog': 'GOG', 'epic': 'Epic Games', 'uplay': 'Ubisoft Connect', 'origin': 'EA App', 'amazon': 'Amazon Games'}
+            plat_name = platform_map.get(prefix)
+            if plat_name:
+                plats_str = self.updated_data.get('Platforms') if 'Platforms' in self.updated_data else self.original_data.get('Platforms', '')
+                p_set = set(x.strip() for x in plats_str.split(',') if x.strip())
+                if plat_name in p_set:
+                    p_set.remove(plat_name)
+                    if not p_set: p_set.add('Local Copy')
+                    self.updated_data['Platforms'] = ", ".join(sorted(list(p_set)))
+                    if 'Platforms' in self.inputs:
+                        self.inputs['Platforms'].setText(self.updated_data['Platforms'])
+        
+        # 3. Clean from Merge_History
+        merge_history_str = self.updated_data.get('Merge_History') if 'Merge_History' in self.updated_data else self.original_data.get('Merge_History', '')
+        history_parts = []
+        for part in merge_history_str.split('|'):
+            if part and not part.startswith(source_id + ':'):
+                history_parts.append(part)
+        self.updated_data['Merge_History'] = "|".join(history_parts)
+        
+        # 4. Add to Unmerged_IDs to permanently blacklist it from future scans
+        unmerged_str = self.updated_data.get('Unmerged_IDs') if 'Unmerged_IDs' in self.updated_data else self.original_data.get('Unmerged_IDs', '')
+        unmerged_list = [x.strip() for x in unmerged_str.split(',') if x.strip()]
+        if source_id not in unmerged_list:
+            unmerged_list.append(source_id)
+            self.updated_data['Unmerged_IDs'] = ", ".join(sorted(unmerged_list))
+
+        # Trigger save state
+        self.on_field_edited()
+        self.refresh_sources_ui()
+        QMessageBox.information(self, "Success", "Source unmerged!\\n\\nPlease save your edits here, then run your platform scanner (or refresh from IGDB) to complete the separation.")
 
     def start_merge(self):
         dlg = MergeSelectionDialog(self.original_data, self.parent_window.master_df, self)
@@ -427,4 +537,10 @@ class ActionDialog(QDialog):
             
         new_data['Is_DLC'] = self.chk_dlc.isChecked()
         new_data['Trailer_Link'] = self.url_line_edit.text().strip()
+        
+        # Preserve updated system fields
+        if 'game_ID' in self.updated_data: new_data['game_ID'] = self.updated_data['game_ID']
+        if 'Merge_History' in self.updated_data: new_data['Merge_History'] = self.updated_data['Merge_History']
+        if 'Unmerged_IDs' in self.updated_data: new_data['Unmerged_IDs'] = self.updated_data['Unmerged_IDs']
+        
         return new_data

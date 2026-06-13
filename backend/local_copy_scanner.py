@@ -137,6 +137,9 @@ def scan_local_system(config, games_dict, worker_thread=None):
                 
                 action = "Unlinked" if (real_platforms or has_external_id) else "Deleted"
                 folder_deletes.append((db_folder, action))
+                
+                # WHY: Temporarily clear Path_Root so Phase 4's Smart Merge can correctly identify it as an unlinked ghost!
+                game_to_check.data['Path_Root'] = ''
 
         # 3. Print UI Headers for this folder
         games_found_count = len(collected_games)
@@ -192,7 +195,10 @@ def scan_local_system(config, games_dict, worker_thread=None):
             else:
                 game = games_dict[folder]
                 game.data['Path_Root'] = full_path
-                game._parse_folder_name()
+                
+                # WHY: Protect manually edited titles from being overwritten by the raw folder name if locked.
+                if game.data.get('Status_Flag') != 'LOCKED':
+                    game._parse_folder_name()
                 
                 p_set = set(x.strip() for x in game.data.get('Platforms', '').split(',') if x.strip())
                 if 'Local Copy' in p_set and len(p_set) > 1: p_set.remove('Local Copy')
@@ -252,6 +258,10 @@ def scan_local_system(config, games_dict, worker_thread=None):
         # 5. Process ghosts for this folder
         for db_folder, action in folder_deletes:
             if worker_thread and worker_thread.isInterruptionRequested(): break
+            
+            # WHY: If Phase 4 successfully merged this ghost into a new folder, it was popped from the dictionary!
+            if db_folder not in games_dict: continue
+            
             game_to_check = games_dict.get(db_folder)
             
             if action == "Unlinked":

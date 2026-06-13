@@ -659,6 +659,8 @@ class ScanController(QObject):
         self.mw.sidebar.chk_scan_amazon.setEnabled(getattr(self.mw, 'amazon_connected_cache', False))
         self.mw.sidebar.chk_scan_local.setEnabled(True)
         self.mw.sidebar.chk_scan_dl_images.setEnabled(True)
+        if hasattr(self.mw.sidebar, 'combo_view_mode'):
+            self.mw.sidebar.combo_view_mode.setEnabled(True)
 
         if self.mw.sidebar.scan_panel.isVisible():
             self.mw.sidebar.scan_results.scrollToBottom()

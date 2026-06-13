@@ -107,15 +107,28 @@ def scan_steam_account(config, games_dict, worker_thread=None):
         
         import difflib
         for g in games_dict.values():
+            # 1. Permanent Blacklist Check
+            unmerged = g.data.get('Unmerged_IDs', '')
+            if f"steam_{appid}" in unmerged:
+                continue
+                
             local_title = g.data.get('Clean_Title', '')
             local_norm_title = re.sub(r'[^a-z0-9]', '', local_title.lower())
             
             score = 0
-            if local_norm_title == norm_title: score += 60
+            if local_norm_title == norm_title: 
+                score += 60
             else:
                 ratio = difflib.SequenceMatcher(None, title_clean.lower(), local_title.lower()).ratio()
-                if ratio > 0.6: score += int(ratio * 60)
-                else: continue
+                if ratio > 0.6: 
+                    score += int(ratio * 60)
+                    # Number mismatch penalty
+                    nums1 = set(re.findall(r'\d+', title_clean))
+                    nums2 = set(re.findall(r'\d+', local_title))
+                    if nums1 != nums2:
+                        score -= 30
+                else: 
+                    continue
                 
             local_platforms = g.data.get('Platforms', '').lower()
             if 'steam' in local_platforms: score += 20
@@ -130,6 +143,11 @@ def scan_steam_account(config, games_dict, worker_thread=None):
             current_ids = set(x.strip() for x in best_game.data.get('game_ID', '').split(',') if x.strip())
             current_ids.add(f"steam_{appid}")
             best_game.data['game_ID'] = ", ".join(sorted(list(current_ids)))
+            
+            mh = best_game.data.get('Merge_History', '')
+            mh_parts = [x for x in mh.split('|') if x]
+            mh_parts.append(f"steam_{appid}:{name}")
+            best_game.data['Merge_History'] = "|".join(mh_parts)
             
             p_set = set(x.strip() for x in best_game.data.get('Platforms', '').split(',') if x.strip())
             if 'Local Copy' in p_set: p_set.remove('Local Copy')

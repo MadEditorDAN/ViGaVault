@@ -296,5 +296,9 @@
     "gamecard_tooltip_set_ok": "Imposta come OK (Rimuovi dalla lista Nuovo)",
     "gamecard_tooltip_hide": "Nascondi gioco",
     "gamecard_tooltip_unhide": "Mostra gioco",
-    "game_manager_inspector_title": "Ispettore di Gioco"
+    "game_manager_inspector_title": "Ispettore di Gioco",
+    "dialog_edit_unmerge_btn": "Separa",
+    "dialog_edit_merged_sources": "Fonti Unite",
+    "dialog_edit_unmerge_confirm": "Sei sicuro di voler separare e rimuovere completamente '{platform}' da questo gioco? Questo ID verrà inserito permanentemente nella lista nera.",
+    "dialog_edit_unmerge_success": "Fonte separata con successo."
 }

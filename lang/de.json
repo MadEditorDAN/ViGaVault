@@ -296,5 +296,9 @@
     "gamecard_tooltip_set_ok": "Als OK markieren (Aus der Neu-Liste entfernen)",
     "gamecard_tooltip_hide": "Spiel ausblenden",
     "gamecard_tooltip_unhide": "Spiel einblenden",
-    "game_manager_inspector_title": "Spiel-Inspektor"
+    "game_manager_inspector_title": "Spiel-Inspektor",
+    "dialog_edit_unmerge_btn": "Trennen",
+    "dialog_edit_merged_sources": "Zusammengeführte Quellen",
+    "dialog_edit_unmerge_confirm": "Sind Sie sicher, dass Sie '{platform}' vollständig von diesem Spiel trennen und entfernen möchten? Diese ID wird dauerhaft auf die schwarze Liste gesetzt.",
+    "dialog_edit_unmerge_success": "Quelle erfolgreich getrennt."
 }

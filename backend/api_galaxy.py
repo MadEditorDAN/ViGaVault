@@ -165,14 +165,27 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
                 norm_title = re.sub(r'[^a-z0-9]', '', title.lower())
                 
                 for game in games_dict.values():
+                    # 1. Permanent Blacklist Check
+                    unmerged = game.data.get('Unmerged_IDs', '')
+                    if releaseKey in unmerged:
+                        continue
+                        
                     local_title = game.data.get('Clean_Title', '')
                     local_norm_title = re.sub(r'[^a-z0-9]', '', local_title.lower())
                     score = 0
-                    if local_norm_title == norm_title: score += 60
+                    if local_norm_title == norm_title: 
+                        score += 60
                     else:
                         ratio = difflib.SequenceMatcher(None, title.lower(), local_title.lower()).ratio()
-                        if ratio > 0.6: score += int(ratio * 60)
-                        else: continue
+                        if ratio > 0.6: 
+                            score += int(ratio * 60)
+                            # Number mismatch penalty
+                            nums1 = set(re.findall(r'\d+', title))
+                            nums2 = set(re.findall(r'\d+', local_title))
+                            if nums1 != nums2:
+                                score -= 30
+                        else: 
+                            continue
 
                     local_platforms = game.data.get('Platforms', '').lower()
                     if platform.lower() in local_platforms: score += 20
@@ -226,6 +239,13 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
             current_ids = set(x.strip() for x in game_obj.data.get('game_ID', '').split(',') if x.strip())
             current_ids.add(releaseKey)
             game_obj.data['game_ID'] = ", ".join(sorted(list(current_ids)))
+            
+            if act_str == "Merged":
+                mh = game_obj.data.get('Merge_History', '')
+                mh_parts = [x for x in mh.split('|') if x]
+                mh_parts.append(f"{releaseKey}:{title}")
+                game_obj.data['Merge_History'] = "|".join(mh_parts)
+                
             game_obj.data['Clean_Title'] = title
             
             current_platforms = set(x.strip() for x in game_obj.data.get('Platforms', '').split(',') if x.strip())

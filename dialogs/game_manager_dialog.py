@@ -7,7 +7,7 @@ import re
 import requests
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                                QTableView, QLineEdit, QLabel, QGroupBox, QAbstractItemView,
-                               QHeaderView, QCheckBox, QFormLayout, QMessageBox, QStyledItemDelegate, QFileDialog, QComboBox, QSizePolicy)
+                               QHeaderView, QCheckBox, QFormLayout, QMessageBox, QStyledItemDelegate, QFileDialog, QComboBox, QSizePolicy, QWidget)
 from PySide6.QtCore import Qt, QAbstractTableModel, QTimer, Signal
 from PySide6.QtGui import QPixmap
 from ViGaVault_utils import translator, get_library_settings_file, center_window, load_encrypted_json, save_encrypted_json, BASE_DIR, get_safe_filename
@@ -136,15 +136,15 @@ class GameManagerModel(QAbstractTableModel):
         if role == Qt.DisplayRole:
             # WHY: Hide the string value "True/False" from displaying next to the checkbox.
             if col_name == '_selected': return ""
-            if col_name == '_edit': return "⚙️"
             if col_name == '_has_img': return "✔" if self._df.iloc[index.row()][col_name] else "❌"
             if col_name == '_has_trl': return "✔" if self._df.iloc[index.row()][col_name] else "❌"
+            if col_name == '_is_merged': return "✔" if self._df.iloc[index.row()][col_name] else " "
             if col_name == 'Original_Release_Date':
                 from ViGaVault_utils import format_date_for_ui
                 return format_date_for_ui(str(self._df.iloc[index.row()][col_name]), self.date_format_str)
             return str(self._df.iloc[index.row()][col_name])
             
-        if role == Qt.TextAlignmentRole and col_name in ['_edit', '_has_img', '_has_trl']:
+        if role == Qt.TextAlignmentRole and col_name in ['_has_img', '_has_trl', '_is_merged']:
             return int(Qt.AlignCenter)
         
         if role == Qt.ForegroundRole:
@@ -169,9 +169,9 @@ class GameManagerModel(QAbstractTableModel):
             if orientation == Qt.Horizontal:
                 col_name = self.display_cols[section]
                 if col_name == '_selected': return ""
-                if col_name == '_edit': return ""
                 if col_name == '_has_img': return translator.tr("media_manager_col_image")
                 if col_name == '_has_trl': return translator.tr("media_manager_col_trailer")
+                if col_name == '_is_merged': return "Merged"
                 # WHY: DRY Principle - Centralized mapping to apply dynamic JSON translations to the raw Pandas column headers.
                 headers_map = {
                     'Original_Release_Date': translator.tr("game_manager_col_rel_date"),
@@ -235,10 +235,6 @@ class GameManagerDialog(QDialog):
         self.btn_batch_edit.clicked.connect(self.request_batch_edit)
         self.btn_batch_delete.clicked.connect(self.request_batch_delete)
         
-        self.btn_batch_sync = QPushButton(translator.tr("game_manager_btn_batch_sync"))
-        self.btn_batch_sync.setEnabled(False)
-        self.btn_batch_sync.clicked.connect(self.request_batch_sync)
-        btn_layout.addWidget(self.btn_batch_sync)
         btn_layout.addStretch()
         
         lbl_show = QLabel("Show : ")
@@ -259,9 +255,6 @@ class GameManagerDialog(QDialog):
         filter_row_layout.setSpacing(0)
         filter_row_layout.setContentsMargins(0, 0, 0, 0)
         
-        self.lbl_edit_spacer = QLabel()
-        self.lbl_edit_spacer.setMinimumWidth(0)
-        
         self.chk_select_all = QCheckBox()
         # WHY: Add a tiny margin to roughly center the master checkbox horizontally over the table's checkbox column.
         self.chk_select_all.setStyleSheet("margin-left: 8px;")
@@ -276,6 +269,11 @@ class GameManagerDialog(QDialog):
         self.chk_missing_trl.setToolTip(translator.tr("sidebar_btn_toggle_no_trl"))
         self.chk_missing_trl.setStyleSheet("margin-left: 13px;")
         self.chk_missing_trl.toggled.connect(self.filter_table)
+        
+        self.chk_is_merged = QCheckBox()
+        self.chk_is_merged.setToolTip("Show only merged games")
+        self.chk_is_merged.setStyleSheet("margin-left: 18px;")
+        self.chk_is_merged.toggled.connect(self.filter_table)
         
         self.combo_date = CheckableComboBox()
         self.combo_date.setPlaceholderText(translator.tr("game_manager_col_rel_date"))
@@ -295,7 +293,7 @@ class GameManagerDialog(QDialog):
         self.search_timer.timeout.connect(self.filter_table)
         self.search_name.textChanged.connect(self.search_timer.start)
         
-        self.filter_widgets = [self.lbl_edit_spacer, self.chk_select_all, self.chk_missing_img, self.chk_missing_trl, self.combo_date, self.combo_year, self.search_name]
+        self.filter_widgets = [self.chk_select_all, self.chk_missing_img, self.chk_missing_trl, self.chk_is_merged, self.combo_date, self.combo_year, self.search_name]
         self.filter_combos = {'Original_Release_Date': self.combo_date, 'Year_Folder': self.combo_year}
         
         # WHY: DRY Principle - Construct columns by merging requested permanent columns with active dynamic filters uniquely.
@@ -370,20 +368,24 @@ class GameManagerDialog(QDialog):
         self.lbl_insp_name.setStyleSheet("font-weight: bold; font-size: 14px;")
         insp_main_layout.addWidget(self.lbl_insp_name)
         
-        # BOTTOM ROW: Image on Left, Controls/Trailer on Right
-        bottom_row = QHBoxLayout()
+        # PANES ROW: Media (Left), Metadata (Center), Merge Data (Right)
+        inspector_panes_layout = QHBoxLayout()
+        
+        # --- PANE 1: MEDIA ---
+        pane1_widget = QWidget()
+        pane1_widget.setFixedWidth(560)
+        pane1_layout = QHBoxLayout(pane1_widget)
+        pane1_layout.setContentsMargins(0, 0, 0, 0)
         
         # Left: Cover Image
         self.lbl_preview_img = QLabel(translator.tr("dialog_edit_no_cover"))
         self.lbl_preview_img.setAlignment(Qt.AlignCenter)
         self.lbl_preview_img.setFixedSize(180, 270)
         self.lbl_preview_img.setStyleSheet("border: 1px solid #555; background-color: #1e1e1e;")
-        bottom_row.addWidget(self.lbl_preview_img, 0, Qt.AlignTop)
+        pane1_layout.addWidget(self.lbl_preview_img, 0, Qt.AlignTop)
         
         # Right: VBox for Controls and Trailer
         right_vbox = QVBoxLayout()
-        
-        # Right Top: Controls
         controls_layout = QHBoxLayout()
         url_layout = QHBoxLayout()
         
@@ -404,7 +406,7 @@ class GameManagerDialog(QDialog):
             
         self.insp_url = QLineEdit()
         self.insp_url.setPlaceholderText(translator.tr("media_manager_url_placeholder"))
-        self.insp_url.setFixedWidth(360)
+        self.insp_url.setFixedWidth(280)
         url_layout.addWidget(self.insp_url)
         url_layout.addStretch()
         
@@ -417,20 +419,54 @@ class GameManagerDialog(QDialog):
         
         right_vbox.addLayout(controls_layout)
         right_vbox.addLayout(url_layout)
-        
-        # Spacer to push trailer to bottom
         right_vbox.addStretch()
         
-        # Right Bottom: Trailer (Bottom Left Aligned)
         self.lbl_preview_trl = QLabel("No Trailer")
         self.lbl_preview_trl.setAlignment(Qt.AlignCenter)
         self.lbl_preview_trl.setFixedSize(360, 203)
         self.lbl_preview_trl.setStyleSheet("border: 1px solid #555; background-color: #1e1e1e;")
         right_vbox.addWidget(self.lbl_preview_trl, 0, Qt.AlignLeft)
         
-        bottom_row.addLayout(right_vbox)
-        insp_main_layout.addLayout(bottom_row)
+        pane1_layout.addLayout(right_vbox)
+        inspector_panes_layout.addWidget(pane1_widget)
         
+        # --- PANE 2: METADATA ---
+        pane2_widget = QGroupBox("Metadata")
+        pane2_layout = QFormLayout(pane2_widget)
+        pane2_layout.setContentsMargins(10, 10, 10, 10)
+        
+        self.inp_title = QLineEdit()
+        self.inp_status = QComboBox()
+        self.inp_status.addItems(['OK', 'NEW', 'NEEDS_ATTENTION', 'LOCKED'])
+        self.inp_genre = QLineEdit()
+        self.inp_dev = QLineEdit()
+        self.inp_pub = QLineEdit()
+        self.inp_date = QLineEdit()
+        
+        pane2_layout.addRow("Title:", self.inp_title)
+        pane2_layout.addRow("Status:", self.inp_status)
+        pane2_layout.addRow("Genre:", self.inp_genre)
+        pane2_layout.addRow("Developer:", self.inp_dev)
+        pane2_layout.addRow("Publisher:", self.inp_pub)
+        pane2_layout.addRow("Release Date:", self.inp_date)
+        
+        self.btn_save_meta = QPushButton("Save Metadata")
+        self.btn_save_meta.clicked.connect(self.save_inspector_metadata)
+        pane2_layout.addRow("", self.btn_save_meta)
+        
+        inspector_panes_layout.addWidget(pane2_widget)
+        
+        # --- PANE 3: MERGE DATA ---
+        pane3_widget = QGroupBox(translator.tr("dialog_edit_merged_sources"))
+        pane3_widget.setFixedWidth(560)
+        self.merge_sources_layout = QVBoxLayout(pane3_widget)
+        self.merge_sources_layout.setContentsMargins(10, 10, 10, 10)
+        self.merge_sources_layout.setAlignment(Qt.AlignTop)
+        
+        inspector_panes_layout.addWidget(pane3_widget)
+        
+        # Finish adding panes to inspector
+        insp_main_layout.addLayout(inspector_panes_layout)
         layout.addWidget(self.inspector_group)
 
         # Bottom: Exclusion Word List
@@ -562,6 +598,138 @@ class GameManagerDialog(QDialog):
                 self.btn_insp_local.setProperty("selected_file", "")
                 self.btn_insp_local.setStyleSheet("")
                 self.insp_url.clear()
+                
+                # POPULATE PANE 2: METADATA
+                self.inp_title.setText(str(row_data.get('Clean_Title', '')))
+                status = str(row_data.get('Status_Flag', 'OK'))
+                idx = self.inp_status.findText(status)
+                if idx >= 0: self.inp_status.setCurrentIndex(idx)
+                self.inp_genre.setText(str(row_data.get('Genre', '')))
+                self.inp_dev.setText(str(row_data.get('Developer', '')))
+                self.inp_pub.setText(str(row_data.get('Publisher', '')))
+                self.inp_date.setText(str(row_data.get('Original_Release_Date', '')))
+                
+                # POPULATE PANE 3: MERGED SOURCES
+                def clear_layout(layout):
+                    while layout.count():
+                        item = layout.takeAt(0)
+                        widget = item.widget()
+                        if widget is not None:
+                            widget.deleteLater()
+                        else:
+                            sub_layout = item.layout()
+                            if sub_layout is not None:
+                                clear_layout(sub_layout)
+                                sub_layout.deleteLater()
+                                
+                clear_layout(self.merge_sources_layout)
+                    
+                game_id_str = str(row_data.get('game_ID', ''))
+                history_str = str(row_data.get('Merge_History', ''))
+                source_ids = [x.strip() for x in game_id_str.split(',') if x.strip()]
+                
+                history_map = {}
+                for part in history_str.split('|'):
+                    if ':' in part:
+                        sid, sname = part.split(':', 1)
+                        history_map[sid.strip()] = sname.strip()
+                        
+                for sid in source_ids:
+                    row_layout = QHBoxLayout()
+                    
+                    platform_prefix = "IGDB" if sid.startswith("igdb_") else "Local Copy"
+                    if sid.startswith("steam_"): platform_prefix = "Steam"
+                    elif sid.startswith("epic_"): platform_prefix = "Epic Games"
+                    elif sid.startswith("gog_") or sid.isdigit(): platform_prefix = "GOG.com"
+                    elif sid.startswith("amazon_"): platform_prefix = "Amazon"
+                    
+                    display_name = history_map.get(sid, f"{platform_prefix} Game ({sid})")
+                    lbl = QLabel(f"• {platform_prefix}: {display_name}")
+                    lbl.setWordWrap(True)
+                    lbl.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+                    row_layout.addWidget(lbl)
+                    
+                    if not sid.startswith("igdb_"):
+                        btn_unmerge = QPushButton(translator.tr("dialog_edit_unmerge_btn"))
+                        btn_unmerge.setFixedWidth(80)
+                        # WHY: Use default arguments in lambda to capture the loop variable correctly.
+                        btn_unmerge.clicked.connect(lambda checked=False, s=sid, p=platform_prefix: self.insp_unmerge_source(s, p))
+                        row_layout.addWidget(btn_unmerge)
+                        
+                    self.merge_sources_layout.addLayout(row_layout)
+                    
+                self.merge_sources_layout.addStretch()
+    def save_inspector_metadata(self):
+        folder_name = self.current_insp_folder
+        if not folder_name: return
+        
+        if hasattr(self.parent_window, 'games_dict') and folder_name in self.parent_window.games_dict:
+            game = self.parent_window.games_dict[folder_name]
+            game.data['Clean_Title'] = self.inp_title.text().strip()
+            game.data['Status_Flag'] = self.inp_status.currentText()
+            game.data['Genre'] = self.inp_genre.text().strip()
+            game.data['Developer'] = self.inp_dev.text().strip()
+            game.data['Publisher'] = self.inp_pub.text().strip()
+            game.data['Original_Release_Date'] = self.inp_date.text().strip()
+            
+            # WHY: If a game is manually edited, assume it should be LOCKED to prevent automated scans from overwriting changes.
+            if game.data['Status_Flag'] != 'LOCKED':
+                game.data['Status_Flag'] = 'LOCKED'
+                self.inp_status.setCurrentText('LOCKED')
+                
+            from ViGaVault_utils import save_library_to_json
+            if save_library_to_json(self.parent_window.games_dict):
+                QMessageBox.information(self, translator.tr("game_manager_title"), "Metadata saved successfully!")
+                if hasattr(self.parent_window, 'compile_db_and_refresh'):
+                    self.parent_window.compile_db_and_refresh()
+                self.load_data()
+            else:
+                QMessageBox.warning(self, translator.tr("game_manager_title"), "Failed to save metadata.")
+
+    def insp_unmerge_source(self, source_id, platform_prefix):
+        folder_name = self.current_insp_folder
+        if not folder_name: return
+        
+        reply = QMessageBox.question(
+            self, translator.tr("dialog_edit_unmerge_btn"), 
+            translator.tr("dialog_edit_unmerge_confirm").format(platform=f"{platform_prefix} ({source_id})"),
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            if hasattr(self.parent_window, 'games_dict') and folder_name in self.parent_window.games_dict:
+                game = self.parent_window.games_dict[folder_name]
+                
+                # 1. Clean from game_ID
+                ids_str = game.data.get('game_ID', '')
+                id_list = [x.strip() for x in ids_str.split(',') if x.strip()]
+                if source_id in id_list: id_list.remove(source_id)
+                game.data['game_ID'] = ", ".join(id_list)
+                
+                # 2. Add to Unmerged_IDs to permanently blacklist it from future scans
+                unmerged_str = game.data.get('Unmerged_IDs', '')
+                unmerged_list = [x.strip() for x in unmerged_str.split(',') if x.strip()]
+                if source_id not in unmerged_list:
+                    unmerged_list.append(source_id)
+                    game.data['Unmerged_IDs'] = ", ".join(sorted(unmerged_list))
+                    
+                # 3. Clean from Merge_History
+                history_str = game.data.get('Merge_History', '')
+                history_parts = []
+                for part in history_str.split('|'):
+                    if part and not part.startswith(source_id + ':'):
+                        history_parts.append(part)
+                game.data['Merge_History'] = "|".join(history_parts)
+                
+                # 4. Save and refresh
+                from ViGaVault_utils import save_library_to_json
+                if save_library_to_json(self.parent_window.games_dict):
+                    QMessageBox.information(self, translator.tr("dialog_edit_unmerge_btn"), translator.tr("dialog_edit_unmerge_success"))
+                    if hasattr(self.parent_window, 'compile_db_and_refresh'):
+                        self.parent_window.compile_db_and_refresh()
+                    self.load_data()
+                    self.update_inspector(folder_name)
+                else:
+                    QMessageBox.warning(self, translator.tr("dialog_edit_unmerge_btn"), "Failed to save unmerge changes.")
 
     def on_thumb_ready(self, vid_id, pixmap):
         if getattr(self, 'current_vid_id', None) != vid_id:
@@ -709,30 +877,6 @@ class GameManagerDialog(QDialog):
             self.load_data()
             self.update_inspector(folder_name)
 
-    def request_batch_sync(self):
-        selected_folders = self.get_selected_folders()
-        if not selected_folders: return
-        
-        from backend.steamgriddb.login_steamgriddb import is_steamgriddb_connected
-        if not is_steamgriddb_connected():
-            QMessageBox.warning(self, "Error", translator.tr("msg_scan_disabled_igdb"))
-            return
-            
-        reply = QMessageBox.question(self, "Batch Sync", f"This will open the SGDB picker sequentially for {len(selected_folders)} games. Continue?", QMessageBox.Yes | QMessageBox.No)
-        if reply != QMessageBox.Yes: return
-        
-        for folder in selected_folders:
-            self.update_inspector(folder)
-            title = self.lbl_insp_name.text()
-            from dialogs.steamgriddb_picker_dialog import SteamGridDBPickerDialog
-            dlg = SteamGridDBPickerDialog(title, self)
-            if dlg.exec():
-                if dlg.selected_url:
-                    self.insp_url.setText(dlg.selected_url)
-                    self.insp_apply_media()
-        
-        QMessageBox.information(self, "Done", "Batch Media Sync completed!")
-
     def cleanup_images(self):
         from ViGaVault_utils import get_image_path
         import os
@@ -799,9 +943,8 @@ class GameManagerDialog(QDialog):
             has_selection = self.model._df['_selected'].any()
             all_selected = self.model._df['_selected'].all() and not self.model._df.empty
             
-            self.btn_batch_edit.setEnabled(has_selection)
-            self.btn_batch_delete.setEnabled(has_selection)
-            if hasattr(self, 'btn_batch_sync'): self.btn_batch_sync.setEnabled(has_selection)
+            if hasattr(self, 'btn_batch_edit'): self.btn_batch_edit.setEnabled(has_selection)
+            if hasattr(self, 'btn_batch_delete'): self.btn_batch_delete.setEnabled(has_selection)
             pass
             
             # WHY: Smart Refresh - Synchronize the master "Select All" checkbox state based on the actual table data. 
@@ -813,9 +956,8 @@ class GameManagerDialog(QDialog):
     def load_data(self):
         if hasattr(self.parent_window, 'master_df'):
             self.base_df = self.parent_window.master_df.copy()
-            # WHY: Inject the _edit and _selected virtual columns for checkboxes.
+            # WHY: Inject the _selected virtual column for checkboxes.
             self.base_df.insert(0, '_selected', False)
-            self.base_df.insert(0, '_edit', 'Edit')
             
             import pandas as pd
             has_img_series = self.base_df['Has_Image'] if 'Has_Image' in self.base_df.columns else pd.Series(False, index=self.base_df.index)
@@ -823,6 +965,15 @@ class GameManagerDialog(QDialog):
             
             self.base_df.insert(2, '_has_img', has_img_series.astype(str).str.lower().isin(['true', '1']))
             self.base_df.insert(3, '_has_trl', trl_series.astype(str).str.startswith('http'))
+            
+            def check_merged(row):
+                game_id_str = str(row.get('game_ID', ''))
+                ids = [x.strip() for x in game_id_str.split(',') if x.strip() and not x.strip().startswith('igdb_')]
+                path_root = str(row.get('Path_Root', '')).strip()
+                total = len(ids) + (1 if path_root and path_root.lower() != 'nan' else 0)
+                return total > 1
+                
+            self.base_df.insert(4, '_is_merged', self.base_df.apply(check_merged, axis=1))
             
             # WHY: Populate each multi-select dropdown with the unique comma-separated elements from the target column.
             for col, combo in self.filter_combos.items():
@@ -889,6 +1040,9 @@ class GameManagerDialog(QDialog):
         if self.chk_missing_trl.isChecked():
             df = df[df['_has_trl'] == False]
             
+        if self.chk_is_merged.isChecked():
+            df = df[df['_is_merged'] == True]
+            
         # WHY: Apply interdependent Excel-style filtering across all active dropdown columns.
         for col, combo in self.filter_combos.items():
             if col not in df.columns: continue
@@ -906,7 +1060,7 @@ class GameManagerDialog(QDialog):
             df = df[df[col].astype(str).str.contains(pattern, case=False, na=False)]
 
         # WHY: Construct the Pandas display columns perfectly ordered to match the assembled UI widgets.
-        cols = ['_edit', '_selected', '_has_img', '_has_trl', 'Original_Release_Date', 'Year_Folder', 'Clean_Title'] + self.logical_columns
+        cols = ['_selected', '_has_img', '_has_trl', '_is_merged', 'Original_Release_Date', 'Year_Folder', 'Clean_Title'] + self.logical_columns
         existing_cols = [c for c in cols if c in df.columns]
         
         # WHY: Preserve user sorting preferences dynamically when filters drastically alter the visible rows.
@@ -928,17 +1082,18 @@ class GameManagerDialog(QDialog):
         
         # WHY: Apply the user-requested fixed and evenly-distributed column widths flawlessly using native Qt rules.
         header = self.table.horizontalHeader()
+        
         header.setSectionResizeMode(0, QHeaderView.Fixed)
         self.table.setColumnWidth(0, 30)
         
         header.setSectionResizeMode(1, QHeaderView.Fixed)
-        self.table.setColumnWidth(1, 30)
+        self.table.setColumnWidth(1, 40)
         
         header.setSectionResizeMode(2, QHeaderView.Fixed)
         self.table.setColumnWidth(2, 40)
         
         header.setSectionResizeMode(3, QHeaderView.Fixed)
-        self.table.setColumnWidth(3, 40)
+        self.table.setColumnWidth(3, 50)
         
         header.setSectionResizeMode(4, QHeaderView.Fixed)
         self.table.setColumnWidth(4, 110)

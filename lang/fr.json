@@ -296,5 +296,9 @@
     "gamecard_tooltip_set_ok": "Définir comme OK (Retirer de la liste Nouveau)",
     "gamecard_tooltip_hide": "Masquer le jeu de la bibliothèque principale",
     "gamecard_tooltip_unhide": "Afficher le jeu",
-    "game_manager_inspector_title": "Inspecteur de Jeu"
+    "game_manager_inspector_title": "Inspecteur de Jeu",
+    "dialog_edit_unmerge_btn": "Défusionner",
+    "dialog_edit_merged_sources": "Sources Fusionnées",
+    "dialog_edit_unmerge_confirm": "Êtes-vous sûr de vouloir défusionner complètement et supprimer '{platform}' de ce jeu ? Cet identifiant sera banni définitivement.",
+    "dialog_edit_unmerge_success": "Source défusionnée avec succès."
 }
