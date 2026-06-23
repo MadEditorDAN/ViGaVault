@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2026-06-14
+### Removed
+- Cleaned up localization files by purging 35 unused/orphaned translation keys across all 5 supported languages (EN, FR, DE, ES, IT), reducing footprint and translating overhead for deprecated features.
+
 ## [1.3.1] - 2026-06-13
 ### Added
 - Added a new 'Merged' column in the Game Manager table with a top row alignment filter to quickly identify games consisting of multiple manually merged platforms (Steam, Epic, Amazon, GOG).

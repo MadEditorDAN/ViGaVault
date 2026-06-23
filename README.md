@@ -32,6 +32,7 @@ To run the application:
 *   Media & Trailer Management: Automatically downloads and caches cover images locally for offline viewing. Extracts and plays YouTube or MP4 trailers directly from the application. Integrates with SteamGridDB for an interactive manual cover picker, alongside a dedicated Media Manager for repairing missing assets.
 *   Dynamic Filtering & Search: Filter massive libraries instantly using Excel-style multi-select dropdowns (by Genre, Platform, Publisher, Year, etc.) that dynamically populate based on your library's content. The search bar supports targeting specific fields like Developer or Summary. All filtering is strictly case-insensitive for smooth operation.
 *   Batch Operations & Data Integrity: A dedicated Game Manager for batch editing metadata, batch deleting games, and managing custom exclusion lists via a dedicated "Hidden" toggle. A built-in file verification tool detects and corrects discrepancies between your database and physical disk.
+*   Advanced Game Inspector: Features a perfectly symmetrical 3-pane layout for real-time metadata editing, media previews, and a powerful Unmerge utility to easily disconnect incorrect cross-platform merges (automatically blacklisting IDs to prevent future false positives).
 *   Zero-Trust Security: All local libraries (`.dat`), configuration files (`.bin`), and authentication sessions are secured with AES symmetric encryption to protect your data.
 *   Advanced Modular Backups: Replaces legacy exports with a highly-compressed, AES-256 encrypted `.vgv` archive format for seamlessly backing up and restoring your database, settings, and native image assets (including WebP support).
 *   Steam Modernization: Natively authenticates with Steam via an embedded Qt WebEngine browser, silently extracting API keys and solving CAPTCHAs to seamlessly fetch your libraries from the Steam Community infrastructure.
@@ -53,10 +54,7 @@ ViGaVault is built on Python using the PySide6 (Qt) framework for a responsive, 
 
 ## Future Roadmap (What's Next)
 
-ViGaVault is actively evolving. Key planned features include:
-
-*   Expanded Storefront Integrations: Implementing native scanners for additional platforms currently stubbed in the UI, such as Ubisoft Connect (Uplay), Battle.net, and the EA App.
-*   Mobile Version: The Android version is coming soon...
+ViGaVault is actively evolving. An Android version is coming soon...
 
 ---
 
