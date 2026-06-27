@@ -278,18 +278,19 @@ def sync_galaxy_database(config, games_dict, worker_thread=None):
                     else: raw_genre = ", ".join([str(g) for g in genres])
                 game_obj.data['Genre'] = normalize_genre(raw_genre)
 
+            # WHY: Defer release date assignment to IGDB.
             release_date = None
-            release_ts = meta_data.get('releaseDate') or meta_data.get('releaseTimestamp')
-            if release_ts:
-                try: release_date = datetime.utcfromtimestamp(release_ts).strftime('%Y-%m-%d')
-                except: pass
-            elif ld_release_date:
-                clean_date_str = ld_release_date.split('T')[0]
-                try:
-                    dt = datetime.strptime(clean_date_str, '%Y-%m-%d')
-                    release_date = dt.strftime('%Y-%m-%d')
-                except ValueError: release_date = ld_release_date
-            if release_date: game_obj.data['Original_Release_Date'] = release_date
+            # release_ts = meta_data.get('releaseDate') or meta_data.get('releaseTimestamp')
+            # if release_ts:
+            #     try: release_date = datetime.utcfromtimestamp(release_ts).strftime('%Y-%m-%d')
+            #     except: pass
+            # elif ld_release_date:
+            #     clean_date_str = ld_release_date.split('T')[0]
+            #     try:
+            #         dt = datetime.strptime(clean_date_str, '%Y-%m-%d')
+            #         release_date = dt.strftime('%Y-%m-%d')
+            #     except ValueError: release_date = ld_release_date
+            # if release_date: game_obj.data['Original_Release_Date'] = release_date
 
             folder_name_for_files = game_obj.data['Folder_Name']
             base_filename = game_obj.data.get('Clean_Title', folder_name_for_files)

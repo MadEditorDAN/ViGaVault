@@ -166,3 +166,81 @@ class GameOperationsController(QObject):
         self.mw.library_controller.update_status_checkboxes_state()
         self.mw.filter_controller.request_filter_update()
         self.mw.settings_controller.save_settings()
+
+    def execute_batch_renames(self, approved_renames):
+        manager = LibraryManager(build_scanner_config())
+        manager.load_db()
+        
+        changes_made = False
+        
+        for rename_info in approved_renames:
+            old_folder = rename_info['old_folder']
+            new_folder = rename_info['new_folder']
+            old_path_root = rename_info['path_root']
+            
+            if not old_path_root or not os.path.exists(old_path_root):
+                logging.error(f"Cannot rename {old_folder}: Root path does not exist.")
+                continue
+                
+            parent_dir = os.path.dirname(old_path_root)
+            new_path_root = os.path.join(parent_dir, new_folder)
+            
+            if os.path.exists(new_path_root):
+                logging.warning(f"Target folder {new_folder} already exists. Skipping.")
+                continue
+                
+            try:
+                temp_game = manager.games.get(old_folder)
+                old_vid_path = None
+                if temp_game:
+                    # Fetch the old video path BEFORE renaming the folder, 
+                    # otherwise get_local_trailer_path() will fail its os.path.exists check.
+                    old_vid_path = temp_game.get_local_trailer_path()
+
+                # 1. Rename physical folder
+                os.rename(old_path_root, new_path_root)
+                
+                if temp_game:
+                    # 2. Rename associated trailer video if it exists
+                    if old_vid_path and os.path.exists(old_vid_path):
+                        ext = os.path.splitext(old_vid_path)[1]
+                        new_vid_path = os.path.join(parent_dir, f"{new_folder}{ext}")
+                        os.rename(old_vid_path, new_vid_path)
+                
+                    # 3. Rename associated image file
+                    if temp_game.data.get('Image_Link'):
+                        old_img_name = temp_game.data['Image_Link']
+                        old_img_path = os.path.join(get_image_path(), old_img_name)
+                        if os.path.exists(old_img_path):
+                            ext = os.path.splitext(old_img_path)[1]
+                            new_img_name = f"{new_folder}{ext}"
+                            new_img_path = os.path.join(get_image_path(), new_img_name)
+                            if old_img_path != new_img_path and not os.path.exists(new_img_path):
+                                os.rename(old_img_path, new_img_path)
+                                temp_game.data['Image_Link'] = new_img_name
+                
+                    # 4. Update DB references
+                    temp_game.data['Path_Root'] = new_path_root
+                    temp_game.data['Folder_Name'] = new_folder
+                    manager.games[new_folder] = temp_game
+                    del manager.games[old_folder]
+                    changes_made = True
+                    
+            except Exception as e:
+                logging.error(f"Failed to rename {old_folder} to {new_folder}: {e}")
+                
+        if changes_made:
+            while True:
+                try:
+                    manager.save_db()
+                    break
+                except PermissionError:
+                    reply = QMessageBox.warning(self.mw, "File Locked", translator.tr("msg_file_locked", db_path=get_db_path()), QMessageBox.Ok | QMessageBox.Cancel)
+                    if reply == QMessageBox.Cancel: return
+                    
+            if hasattr(self.mw, 'compile_db_and_refresh'):
+                self.mw.compile_db_and_refresh()
+            else:
+                self.mw.library_controller.load_database_async()
+            
+            QMessageBox.information(self.mw, "Renames Applied", f"Successfully processed OS folder renames for {len(approved_renames)} games.")

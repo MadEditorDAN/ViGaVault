@@ -15,6 +15,8 @@ from ViGaVault_utils import get_db_path, build_scanner_config, get_library_setti
 # Operations like scanning or filtering can take time. We run them in separate threads
 # to prevent the GUI from freezing (becoming unresponsive) while they process.
 class FullScanWorker(QThread):
+    renames_ready_signal = Signal(list)
+    
     def __init__(self, do_galaxy=True, do_local=True, do_gog_web=False, do_epic=False, do_steam=False, do_amazon=False, amazon_claims=None, amazon_stats=None, do_download_images=True, target_folders=None, parent=None):
         super().__init__(parent)
         self.do_galaxy = do_galaxy

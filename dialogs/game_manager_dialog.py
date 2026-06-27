@@ -571,8 +571,16 @@ class GameManagerDialog(QDialog):
                     self.lbl_preview_img.setText(translator.tr("dialog_edit_no_cover"))
                     
                 # Trailer thumbnail
+                from backend.game import Game
+                temp_game = Game(**row_data.to_dict())
+                local_vid = temp_game.get_local_trailer_path()
+                
                 trailer_url = row_data.get('Trailer_Link')
-                if pd.notna(trailer_url) and str(trailer_url).startswith('http'):
+                
+                if local_vid:
+                    self.lbl_preview_trl.clear()
+                    self.lbl_preview_trl.setText(f"Local Video Available:\n{os.path.basename(local_vid)}")
+                elif pd.notna(trailer_url) and str(trailer_url).startswith('http'):
                     match = re.search(r'(?:v=|/)([0-9A-Za-z_-]{11}).*', str(trailer_url))
                     if match:
                         vid_id = match.group(1)

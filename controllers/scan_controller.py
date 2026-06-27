@@ -627,7 +627,16 @@ class ScanController(QObject):
             parent=self
         )
         self.full_scan_worker.finished.connect(self.finish_full_scan)
+        self.full_scan_worker.renames_ready_signal.connect(self.handle_proposed_renames)
         self.full_scan_worker.start()
+
+    def handle_proposed_renames(self, proposed_renames):
+        from dialogs.rename_confirmation_dialog import RenameConfirmationDialog
+        dlg = RenameConfirmationDialog(proposed_renames, self.mw)
+        if dlg.exec():
+            approved = dlg.get_approved_renames()
+            if approved:
+                self.mw.game_operations_controller.execute_batch_renames(approved)
 
     def stop_full_scan(self):
         if hasattr(self, 'amazon_scanner') and self.amazon_scanner:

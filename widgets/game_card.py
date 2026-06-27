@@ -171,7 +171,12 @@ class GameCard(QWidget):
         self.trailer_link = game_data.get('Trailer_Link', '')
 
         has_local_folder = str(game_data.get('Is_Local')).lower() in ['true', '1']
-        has_trailer = bool(self.trailer_link and self.trailer_link.startswith('http'))
+        
+        # WHY: Dynamically check for local video presence to enable the trailer button even without a YouTube URL.
+        from backend.game import Game
+        temp_game = Game(**game_data)
+        has_local_trailer = bool(temp_game.get_local_trailer_path())
+        has_trailer = has_local_trailer or bool(self.trailer_link and self.trailer_link.startswith('http'))
 
         self.actions_frame = QFrame()
         self.actions_frame.setStyleSheet("background-color: palette(alternate-base); border-radius: 5px;")
@@ -279,7 +284,11 @@ class GameCard(QWidget):
         self.trailer_link = self.data.get('Trailer_Link', '')
         
         has_local_folder = str(self.data.get('Is_Local')).lower() in ['true', '1']
-        has_trailer = bool(self.trailer_link and self.trailer_link.startswith('http'))
+        
+        from backend.game import Game
+        temp_game = Game(**self.data)
+        has_local_trailer = bool(temp_game.get_local_trailer_path())
+        has_trailer = has_local_trailer or bool(self.trailer_link and self.trailer_link.startswith('http'))
         
         self._update_button_icons(has_trailer, has_local_folder)
         
@@ -359,7 +368,10 @@ class GameCard(QWidget):
             
         # Update Buttons
         has_local_folder = str(self.data.get('Is_Local')).lower() in ['true', '1']
-        has_trailer = bool(self.trailer_link and self.trailer_link.startswith('http'))
+        from backend.game import Game
+        temp_game = Game(**self.data)
+        has_local_trailer = bool(temp_game.get_local_trailer_path())
+        has_trailer = has_local_trailer or bool(self.trailer_link and self.trailer_link.startswith('http'))
         self._update_button_icons(has_trailer, has_local_folder)
 
         # Update Text
@@ -390,7 +402,14 @@ class GameCard(QWidget):
             return False
 
     def start_trailer(self):
-        if self.trailer_link:
+        from backend.game import Game
+        temp_game = Game(**self.data)
+        local_vid = temp_game.get_local_trailer_path()
+        
+        if local_vid:
+            logging.info(f"Opening local trailer: {local_vid}")
+            os.startfile(local_vid)
+        elif self.trailer_link:
             logging.info(f"Opening trailer in browser: {self.trailer_link}")
             webbrowser.open(self.trailer_link, new=1)
 

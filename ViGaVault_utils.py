@@ -78,8 +78,10 @@ def center_window(window, parent=None):
         window.move((screen.width() - size.width()) // 2, (screen.height() - size.height()) // 2)
 
 def get_safe_filename(name):
+    # Replace colon with a space instead of just deleting it to preserve readability
     safe_name = name.replace(':', ' ')
-    safe_name = re.sub(r'[^\w\s\-\.\(\)\[\]]', '', safe_name).strip()
+    # Only remove characters strictly forbidden by Windows file systems
+    safe_name = re.sub(r'[<>"\/\\\|\?\*\x00-\x1F]', '', safe_name).strip()
     safe_name = re.sub(r'\s{2,}', ' ', safe_name).strip()
     safe_name = safe_name.rstrip('. ')
     return safe_name

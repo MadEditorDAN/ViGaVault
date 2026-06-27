@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.3] - 2026-06-28
+### Added
+- Implemented a new "Batch Rename" feature that automatically identifies legacy game folders that don't match the standard canonical format (`YYYY - Game Name (Platforms)`).
+- Added an interactive Confirmation Dialog to review and approve proposed bulk folder renames.
+- The renaming engine safely migrates all associated local media (cover images, video trailers) alongside the folder.
+
+### Fixed
+- Fixed an issue where the local file renaming engine ignored local video trailers when renaming game assets.
+- Fixed a metadata logic flaw where storefronts (GOG, Galaxy) were forcibly setting `Original_Release_Date` to the year of their digital re-release instead of the actual game launch year. Disabled platform-specific date injection to ensure IGDB acts as the strict, single source of truth for all release dates.
+- Updated the `get_safe_filename` utility to use a permissive blacklist approach (stripping only Windows forbidden characters) instead of an aggressive alphanumeric whitelist, accurately preserving apostrophes, commas, and other valid characters in game folder names.
+
 ## [1.3.2] - 2026-06-14
 ### Removed
 - Cleaned up localization files by purging 35 unused/orphaned translation keys across all 5 supported languages (EN, FR, DE, ES, IT), reducing footprint and translating overhead for deprecated features.

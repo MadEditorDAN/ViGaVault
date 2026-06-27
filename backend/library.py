@@ -195,7 +195,12 @@ class LibraryManager:
         
         self.sync_media_flags_batch(worker_thread=worker_thread)
         # WHY: Run the unified IGDB scrapper engine after all platforms have finished their fast data intake.
-        self.run_igdb_scrapper(worker_thread=worker_thread, images_only=images_only)
+        scraped_folders = self.run_igdb_scrapper(worker_thread=worker_thread, images_only=images_only)
+        
+        if do_local and not images_only and scraped_folders:
+            proposed_renames = self.prepare_local_renames(scraped_folders)
+            if proposed_renames and hasattr(worker_thread, 'renames_ready_signal'):
+                worker_thread.renames_ready_signal.emit(proposed_renames)
         
         # --- GLOBAL CONSOLIDATION REPORT ---
         if not images_only:
@@ -331,6 +336,47 @@ class LibraryManager:
         csv_str = df.fillna('').to_csv(sep=';', index=False)
         encrypt_string_to_file(self.db_file, csv_str)
 
+    def prepare_local_renames(self, target_folders):
+        """
+        WHY: Generates a list of proposed OS folder renames based on canonical DB metadata.
+        Strictly targets games that were just scraped, filtering out 'Local Copy' tags.
+        """
+        proposed = []
+        for folder in target_folders:
+            game = self.games.get(folder)
+            if not game or str(game.data.get('Is_Local')).lower() not in ['true', '1']:
+                continue
+                
+            clean_title = game.data.get('Clean_Title', folder)
+            year = game.data.get('Original_Release_Date', '')[:4] if game.data.get('Original_Release_Date') else ''
+            
+            # Fallback: if DB has no year, check if the folder already had a valid year prefix
+            if not year:
+                import re
+                match = re.match(r'^(\d{4})\s*-', folder)
+                if match:
+                    year = match.group(1)
+            
+            platforms_str = game.data.get('Platforms', '')
+            plats = [p.strip() for p in platforms_str.split(',') if p.strip()]
+            real_plats = [p for p in plats if p.lower() not in ['local copy', '_unknown', 'unknown']]
+            
+            canonical_name = clean_title
+            if year:
+                canonical_name = f"{year} - {canonical_name}"
+            if real_plats:
+                canonical_name = f"{canonical_name} ({', '.join(sorted(real_plats))})"
+                
+            safe_canonical = get_safe_filename(canonical_name)
+            
+            if safe_canonical != folder:
+                proposed.append({
+                    'old_folder': folder,
+                    'new_folder': safe_canonical,
+                    'path_root': game.data.get('Path_Root')
+                })
+        return proposed
+
     def sync_media_flags_batch(self, worker_thread=None):
         changes_made = False
         
@@ -404,6 +450,7 @@ class LibraryManager:
         
         stats = {'scraped': 0, 'downloads': 0, 'ok': 0, 'needs_attention': 0}
         ops_logged = 0
+        scraped_folders = []
 
         for folder, game in self.games.items():
             if worker_thread and worker_thread.isInterruptionRequested(): break
@@ -440,6 +487,7 @@ class LibraryManager:
                     if game.fill_missing_metadata(igdb_token, images_only=images_only):
                         stats['scraped'] += 1
                         changes_made = True
+                        scraped_folders.append(folder)
                         
                 if game.data.get('Cover_URL', '') == '':
                     game.data['Cover_URL'] = 'NOT_FOUND'
@@ -535,4 +583,6 @@ class LibraryManager:
         logging.info(format_report_row("Needs Attention", stats['needs_attention']))
         logging.info(format_report_row("Covers D/L'd", stats['downloads']))
         logging.info(format_box_bottom([17, 60]))
+        
+        return scraped_folders
 

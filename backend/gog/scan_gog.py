@@ -249,15 +249,14 @@ def scan_gog_account(config, games_dict, worker_thread=None):
                 desc = p_data.get("description", {}).get("full", "")
                 if desc: game_obj.data['Summary'] = re.sub('<[^<]+?>', '', desc).strip()
                 
-                # WHY: Extract and parse the strict ISO-8601 release date provided by the Catalog API 
-                # into ViGaVault's standard DD/MM/YYYY string format.
-                release_date_raw = p_data.get("release_date")
-                if release_date_raw:
-                    try:
-                        dt_str = release_date_raw.split('T')[0]
-                        dt = datetime.strptime(dt_str, "%Y-%m-%d")
-                        game_obj.data['Original_Release_Date'] = dt.strftime('%Y-%m-%d')
-                    except Exception: pass
+                # WHY: Defer release date assignment to IGDB.
+                # release_date_raw = p_data.get("release_date")
+                # if release_date_raw:
+                #     try:
+                #         dt_str = release_date_raw.split('T')[0]
+                #         dt = datetime.strptime(dt_str, "%Y-%m-%d")
+                #         game_obj.data['Original_Release_Date'] = dt.strftime('%Y-%m-%d')
+                #     except Exception: pass
 
         games_dict[folder_name] = game_obj
         changes_made = True

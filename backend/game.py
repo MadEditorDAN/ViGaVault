@@ -434,5 +434,26 @@ class Game:
         self.data['Status_Flag'] = 'LOCKED'
         return True
 
+    def get_local_trailer_path(self):
+        """
+        WHY: Single Responsibility - Dynamically checks for a local video file alongside the game folder.
+        It strictly matches the base Folder_Name with common video extensions to ensure accuracy.
+        """
+        path_root = self.data.get('Path_Root')
+        if not path_root or not os.path.exists(path_root):
+            return None
+            
+        parent_dir = os.path.dirname(path_root)
+        base_name = self.data.get('Folder_Name')
+        if not base_name:
+            return None
+            
+        for ext in ['.mp4', '.mkv', '.avi', '.webm']:
+            potential_video = os.path.join(parent_dir, f"{base_name}{ext}")
+            if os.path.exists(potential_video):
+                return potential_video
+                
+        return None
+
     def to_dict(self):
         return self.data
