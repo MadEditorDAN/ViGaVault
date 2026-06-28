@@ -2,19 +2,19 @@
     <center>
         <img src="{assets_path}/{logo_filename}" width="400">
         <h2>The Ultimate Local Game Library</h2>
-        <p>Welcome to ViGaVault! Your absolute powerhouse for hoarding, managing, and admiring your local PC game collection.</p>
+        <p>Welcome to ViGaVault! Your absolute powerhouse for hoarding, managing, and admiring your local PC and Mobile game collection.</p>
     </center>
     <hr>
 
     <table width="100%" cellpadding="10">
         <tr>
             <td valign="top" width="60%">
-                <h3>🎮 The Main Vault (UI)</h3>
-                <p>The left side is your gaming wall, dynamically scaling your covers perfectly. The right side is your control deck.</p>
+                <h3>The Main Vault (UI)</h3>
+                <p>When you launch ViGaVault, you are greeted by the Main Vault interface, designed to showcase your collection in the best possible light. The left side of the window serves as your interactive gaming wall. Here, your game covers are displayed in a highly responsive list that dynamically scales to perfectly fit your window size, creating a visually stunning gallery. The right side of the screen acts as your command center, offering detailed information and powerful organization tools.</p>
                 <ul>
-                    <li><b>Composite Search:</b> Don't just search by title! Click the tiny arrow (▼) inside the search bar to instantly target Developers, Publishers, or even specific words inside a game's Summary.</li>
-                    <li><b>Smart Sorting:</b> Sort your loot chronologically by Release Date, or by the exact date you added them to your vault.</li>
-                    <li><b>Filters:</b> Instantly isolate your indie platformers or your massive AAA RPGs.</li>
+                    <li><b>Composite Search:</b> Finding a specific game in a massive library shouldn't be a chore. Our advanced composite search goes far beyond simple title matching. By clicking the tiny arrow (▼) nestled inside the search bar, you unlock the ability to pinpoint games based on their Developers, Publishers, or even hunt for specific keywords buried deep within a game's story summary.</li>
+                    <li><b>Smart Sorting:</b> Organize your ever-growing loot exactly how you want to see it. You can arrange your titles chronologically by their official Release Date to take a trip through gaming history, or sort them by the exact Date Added to keep track of your newest acquisitions.</li>
+                    <li><b>Dynamic Filters:</b> Instantly slice through your library by applying multiple filters at once. Whether you want to isolate your collection of pixel-art indie platformers, or focus entirely on massive AAA role-playing epics, the filtering system adapts instantly to show you exactly what you're in the mood to play.</li>
                 </ul>
             </td>
             <td valign="top" width="40%" align="center">
@@ -29,15 +29,16 @@
         <tr>
             <td valign="top" width="40%" align="center">
                 <img src="{assets_path}/images/placeholder_scanner.png" width="300" style="border: 1px solid gray;">
-                <br><small><i>Manual & Full Scan</i></small>
+                <br><small><i>Local Scanner setup</i></small>
             </td>
             <td valign="top" width="60%">
-                <h3>🧠 The Scanner Brain</h3>
-                <p>ViGaVault isn't just a dumb scraper; it's highly intelligent.</p>
+                <h3>The Scanner Engine</h3>
+                <p>At the heart of ViGaVault lies a highly sophisticated Scanner Engine. This isn't just a basic file scraper; it is an intelligent system designed to understand your collection with minimal input.</p>
                 <ul>
-                    <li><b>Full Scan:</b> Rips through your local folders and your GOG Galaxy database, pulling everything into a master list.</li>
-                    <li><b>Exact Match Supremacy:</b> When querying IGDB, the engine mathematically weighs text resemblance against IGDB Category tags (Main Game vs. DLC). It knows to prioritize the base game unless your folder explicitly asks for a "GOTY" or "Remaster"!</li>
-                    <li><b>Background Magic:</b> Downloads covers and backfills media silently so your UI never freezes.</li>
+                    <li><b>Local Copy Scan:</b> Simply point ViGaVault toward the root directory where you install your games. The engine will aggressively dive into the file system, detecting game folders and instantly registering them into your central database. It cross-references folder names with vast online databases to fetch the correct metadata automatically.</li>
+                    <li><b>Platform Integrations:</b> ViGaVault seamlessly connects with multiple digital storefronts including Steam, GOG Galaxy, Epic Games, and Amazon. It can automatically scan these platforms to pull your owned games directly into your unified library.</li>
+                    <li><b>Advanced Folder Rules:</b> While the default Simple Mode expects games to be sitting directly inside your root folder, power users can enable Advanced Mode in the Settings. This unlocks the ability to define complex rules for specific sub-directories. For instance, you can instruct the scanner that any folder discovered inside a <code>\VR Games</code> directory should automatically be tagged with the "VR" genre, saving you from manually tagging dozens of titles.</li>
+                    <li><b>Exact Match Supremacy:</b> Scraping databases can often return cluttered results, but ViGaVault handles the heavy lifting for you. When querying the IGDB database, the engine mathematically weighs text resemblance and analyzes IGDB Category tags to differentiate between a 'Main Game' and a 'DLC' or 'Expansion'. It will always prioritize fetching the metadata for the base game, unless your folder name explicitly contains keywords like 'GOTY', 'Deluxe', or 'Remaster'.</li>
                 </ul>
             </td>
         </tr>
@@ -47,12 +48,12 @@
     <table width="100%" cellpadding="10">
         <tr>
             <td valign="top" width="60%">
-                <h3>⚙️ Settings & Rules</h3>
-                <p>Tailor the engine exactly to your hard drive's layout.</p>
+                <h3>Settings & Setup Rules</h3>
+                <p>ViGaVault is built to adapt to you, not the other way around. The Settings panel provides deep customization options to tailor both the underlying engine and the visual presentation to your exact preferences.</p>
                 <ul>
-                    <li><b>Display:</b> Force Dark/Light mode and slide the exact pixel sizes for your covers and text.</li>
-                    <li><b>Local Copies:</b> Use "Simple Mode" for standard folders, or switch to "Advanced" to map exactly what every single sub-folder means (e.g., tagging everything in a specific folder as "VR").</li>
-                    <li><b>Media Rules:</b> Decide whether the app should aggressively auto-download videos or just grab covers.</li>
+                    <li><b>Deep UI Customization:</b> Take full control over how your library looks. You can override system defaults to force a sleek Dark mode or a clean Light mode. Furthermore, you are given slider controls to define the exact pixel dimensions for your game covers and adjust the UI text scaling, ensuring the interface looks perfect on everything from a small laptop screen to a massive 4K television.</li>
+                    <li><b>Platform Automated Scraping:</b> Within the settings, you can configure automated scraping rules for your connected platforms, allowing ViGaVault to seamlessly synchronize your library by automatically launching the platforms and securely parsing your data without requiring constant manual authentication.</li>
+                    <li><b>Local Video Integration:</b> If you are an archivist who keeps their own high-quality video trailers, ViGaVault seamlessly integrates them into your library without any manual linking. The system detects local video files automatically during the scanning process. To ensure flawless detection, the video file must be named exactly the same as your game's folder, and it must be placed directly adjacent to it. For example, if your game is located at <code>C:\Games\Doom</code>, your trailer must be placed at <code>C:\Games\Doom.mp4</code>. The engine natively supports a wide variety of video formats, including <b>.mp4, .mkv, .avi, .webm</b>.</li>
                 </ul>
             </td>
             <td valign="top" width="40%" align="center">
@@ -70,12 +71,12 @@
                 <br><small><i>Edit & Merge Tools</i></small>
             </td>
             <td valign="top" width="60%">
-                <h3>✏️ Edit & Merge (Curation)</h3>
-                <p>Got a weird indie game or a stubborn ROM that scanned wrong? You have total control.</p>
+                <h3>Edit & Merge (Curation)</h3>
+                <p>No automated scanner is perfect 100% of the time. If you have a highly obscure indie title, a fan-made mod, or a stubborn game that pulled incorrect metadata, the curation tools give you absolute, granular control over your library's information.</p>
                 <ul>
-                    <li><b>Manual Edits:</b> Fix typos, assign custom local covers, or drop in a YouTube URL for a trailer.</li>
-                    <li><b>Data Locking:</b> Check the "Lock" box to protect your curated masterpiece from ever being overwritten by a future auto-scan.</li>
-                    <li><b>Merging:</b> Got duplicates? Smash them together. The Conflict Resolver lets you pick exactly which metadata fields survive the collision.</li>
+                    <li><b>Comprehensive Manual Edits:</b> Dive into any game's profile to manually fix typos, rewrite summaries, or assign your own custom local image files to act as the cover art. ViGaVault integrates directly with SteamGridDB, allowing you to instantly search for and apply high-quality, community-created custom covers with just a click. You can even paste a direct YouTube URL to instantly attach a streaming trailer to the game's page.</li>
+                    <li><b>Data Locking Mechanisms:</b> Once you have painstakingly curated a game's metadata to perfection, you won't want an automated background scan to accidentally overwrite your hard work. By simply checking the 'Lock Data' box, you shield that specific game entry from ever being modified by future database updates or folder scans.</li>
+                    <li><b>The Conflict Resolver:</b> As your library grows across different hard drives or platforms, you might inevitably encounter duplicate entries. ViGaVault provides a powerful Conflict Resolver tool to handle this. When merging two duplicate games together, the interface allows you to surgically choose exactly which metadata fields, images, and playtime statistics survive the collision, ensuring you never lose your precious custom data.</li>
                 </ul>
             </td>
         </tr>
@@ -85,10 +86,10 @@
     <table width="100%" cellpadding="10">
         <tr>
             <td valign="top" width="60%">
-                <h3>🧹 Media Manager & Stats</h3>
-                <p>The polish phase.</p>
-                <p><b>Media Manager:</b> The ultimate cleanup crew. It instantly detects any game missing a cover, trailer, or video. Just paste a direct image/video URL, and it will download it, name it, and link it perfectly without navigating a single menu.</p>
-                <p><b>Statistics:</b> Flex your numbers. See exactly how many games you own, your top developers, the oldest relic in your vault, and your exact media completion percentage!</p>
+                <h3>Media Manager & Stats</h3>
+                <p>Once your games are scanned and organized, it is time for the final polish phase to make your vault truly shine.</p>
+                <p><b>The Media Manager:</b> Think of this as your ultimate digital cleanup crew. The Media Manager provides a centralized dashboard that instantly highlights any game in your library that is currently missing a cover image or a video trailer. Instead of diving into individual edit menus, you can simply paste a direct image, Video file OR Youtube URL right into the manager. ViGaVault will automatically download the images, securely store them in the proper directory, and correctly link all media to the game seamlessly.</p>
+                <p><b>Comprehensive Statistics:</b> Get a birds-eye view of your gaming habits and collection size. The Statistics page allows you to flex your numbers by showing you exactly how many games you own across all platforms. You can discover your most played genres, identify your top developers based on game count, find out what the oldest historical relic in your vault is, track your overall media completion percentage to encourage you to find those missing covers, and explore many more statistics!</p>
             </td>
             <td valign="top" width="40%" align="center">
                 <img src="{assets_path}/images/placeholder_media.png" width="300" style="border: 1px solid gray;">

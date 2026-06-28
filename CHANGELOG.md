@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Changed
+- Completely redesigned and modernized the in-app HTML documentation files across all supported languages (English, French, German, Spanish, Italian) to accurately reflect the latest platform integrations, SteamGridDB support, and media manager features.
+
 ## [1.3.3] - 2026-06-28
 ### Added
 - Implemented a new "Batch Rename" feature that automatically identifies legacy game folders that don't match the standard canonical format (`YYYY - Game Name (Platforms)`).
